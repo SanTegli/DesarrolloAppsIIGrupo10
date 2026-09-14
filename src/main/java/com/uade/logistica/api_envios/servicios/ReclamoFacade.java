@@ -1,77 +1,71 @@
 package com.uade.logistica.api_envios.servicios;
 
-import com.uade.logistica.api_envios.dao.ReclamoRepository;
+import com.uade.logistica.api_envios.dominio.Ciudadano;
 import com.uade.logistica.api_envios.dominio.Reclamo;
 import com.uade.logistica.api_envios.dominio.ReclamoEvento;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
+import java.util.Optional;
 
+/**
+ * Patrón Facade: Proporciona una interfaz unificada y de alto nivel
+ * para interactuar con los subsistemas y servicios del negocio
+ * (ReclamoService, CiudadanoService, NotificacionService).
+ */
 @Service
 public class ReclamoFacade {
-    private final ReclamoRepository repository;
-    private final Map<String, AsignacionAreaStrategy> estrategiasArea;
-    private final ReclamoFactory urgenteFactory;
-    private final ReclamoFactory normalFactory;
-    private final List<ReclamoObserver> observadores;
 
-    public ReclamoFacade(ReclamoRepository repository, 
-                         Map<String, AsignacionAreaStrategy> estrategiasArea,
-                         ReclamoUrgenteFactory urgenteFactory,
-                         ReclamoNormalFactory normalFactory,
-                         List<ReclamoObserver> observadores) {
-        this.repository = repository;
-        this.estrategiasArea = estrategiasArea;
-        this.urgenteFactory = urgenteFactory;
-        this.normalFactory = normalFactory;
-        this.observadores = observadores;
+    private final ReclamoService reclamoService;
+    private final CiudadanoService ciudadanoService;
+    private final NotificacionService notificacionService;
+
+    public ReclamoFacade(ReclamoService reclamoService,
+                         CiudadanoService ciudadanoService,
+                         NotificacionService notificacionService) {
+        this.reclamoService = reclamoService;
+        this.ciudadanoService = ciudadanoService;
+        this.notificacionService = notificacionService;
     }
 
     public Reclamo registrarReclamo(String dni, String direccion, String descripcion, String categoria) {
-        boolean esUrgente = descripcion.toLowerCase().contains("peligro") 
-                         || descripcion.toLowerCase().contains("escuela") 
-                         || descripcion.toLowerCase().contains("urgente");
-        
-        ReclamoFactory factory = esUrgente ? urgenteFactory : normalFactory;
-        Reclamo reclamo = factory.crearReclamo(dni, direccion, descripcion, categoria);
+        return registrarReclamo(dni, direccion, descripcion, categoria, null, null);
+    }
 
-        // Aplicación del patrón Strategy
-        AsignacionAreaStrategy estrategia = estrategiasArea.getOrDefault(
-                categoria.toUpperCase(), (desc) -> "Mesa General de Asuntos Urbanos"
-        );
-        reclamo.setAreaMunicipal(estrategia.determinarArea(descripcion));
+    public Reclamo registrarReclamo(String dni, String direccion, String descripcion, String categoria,
+                                   String nombreCiudadano, String emailCiudadano) {
+        // 1. Coordinación con CiudadanoService para asegurar existencia del ciudadano
+        ciudadanoService.asegurarExistencia(dni, nombreCiudadano, emailCiudadano);
 
-        // Persistencia
-        repository.guardar(reclamo);
-
-        // Notificación mediante Observer
-        dispararEvento(new ReclamoEvento(reclamo.getId(), "ReclamoCreado", "Asignado a: " + reclamo.getAreaMunicipal()));
-
-        return reclamo;
+        // 2. Coordinación con ReclamoService (aplica Factory, Strategy, Persistencia y emite Domain Event)
+        return reclamoService.crearReclamo(dni, direccion, descripcion, categoria);
     }
 
     public Reclamo resolverReclamo(String reclamoId) {
-        Reclamo reclamo = repository.buscarPorId(reclamoId)
-                .orElseThrow(() -> new NoSuchElementException("Reclamo no encontrado"));
-
-        reclamo.actualizarEstado("RESUELTO");
-        repository.guardar(reclamo);
-
-        dispararEvento(new ReclamoEvento(reclamoId, "ReclamoResuelto", "Reclamo solucionado con éxito"));
-        return reclamo;
+        return reclamoService.resolverReclamo(reclamoId);
     }
 
     public Optional<Reclamo> consultarReclamo(String reclamoId) {
-        return repository.buscarPorId(reclamoId);
+        return reclamoService.buscarPorId(reclamoId);
     }
 
     public List<Reclamo> listarTodos() {
-        return repository.obtenerTodos();
+        return reclamoService.listarTodos();
     }
 
-    private void dispararEvento(ReclamoEvento evento) {
-        for (ReclamoObserver obs : observadores) {
-            obs.notificar(evento);
-        }
+    public List<Reclamo> listarReclamosPorCiudadano(String dni) {
+        return reclamoService.listarPorDni(dni);
     }
-}
+
+    public Optional<Ciudadano> consultarCiudadano(String dni) {
+        return ciudadanoService.buscarPorDni(dni);
+    }
+
+    public List<Ciudadano> listarCiudadanos() {
+        return ciudadanoService.listarTodos();
+    }
+
+    public List<ReclamoEvento> obtenerHistorialNotificaciones() {
+        return notificacionService.obtenerHistorialEventos();
+    }
+}

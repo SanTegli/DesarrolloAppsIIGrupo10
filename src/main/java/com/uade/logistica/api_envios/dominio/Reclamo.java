@@ -1,5 +1,7 @@
 package com.uade.logistica.api_envios.dominio;
 
+import com.uade.logistica.api_envios.utilidad.ValidadorReclamo;
+
 public class Reclamo {
     private final String id;
     private final String dniCiudadano;
@@ -11,15 +13,10 @@ public class Reclamo {
     private String estado;
 
     public Reclamo(String id, String dniCiudadano, String direccion, String descripcion, String categoria) {
-        if (dniCiudadano == null || !dniCiudadano.matches("\\d{7,8}")) {
-            throw new IllegalArgumentException("DNI de ciudadano inválido");
-        }
-        if (direccion == null || direccion.trim().isEmpty()) {
-            throw new IllegalArgumentException("La dirección no puede estar vacía");
-        }
-        if (descripcion == null || descripcion.trim().isEmpty()) {
-            throw new IllegalArgumentException("La descripción es obligatoria");
-        }
+        ValidadorReclamo.requerirTextoNoVacio(id, "ID");
+        ValidadorReclamo.requerirDniValido(dniCiudadano);
+        ValidadorReclamo.requerirTextoNoVacio(direccion, "dirección");
+        ValidadorReclamo.requerirTextoNoVacio(descripcion, "descripción");
 
         this.id = id;
         this.dniCiudadano = dniCiudadano;
@@ -30,9 +27,7 @@ public class Reclamo {
     }
 
     public void actualizarEstado(String nuevoEstado) {
-        if (nuevoEstado == null || nuevoEstado.trim().isEmpty()) {
-            throw new IllegalArgumentException("El estado no puede ser nulo");
-        }
+        ValidadorReclamo.requerirTextoNoVacio(nuevoEstado, "estado");
         this.estado = nuevoEstado;
     }
 
