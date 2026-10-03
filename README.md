@@ -119,6 +119,21 @@ reclamos:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
 ```
 
+`categoria` conserva la prioridad base. `palabras-clave` busca las palabras completas
+`urgente`, `peligro`, `riesgo` y `accidente` en la descripción, sin distinguir mayúsculas:
+si encuentra alguna, devuelve el máximo entre la prioridad base y `ALTA`. No interpreta
+negaciones, plurales ni contexto; varias coincidencias no acumulan aumentos.
+
+Las estrategias de asignación reciben únicamente las áreas candidatas del Repository
+(activas, que atienden la categoría y cubren el barrio). `jurisdiccion` elige el menor ID;
+`carga-trabajo` elige la menor cantidad de reclamos `ASIGNADO` o `EN_PROCESO`, con desempate
+por menor ID. Sin candidatas, ambas devuelven vacío. Una estrategia configurada con un
+nombre desconocido impide el arranque con un mensaje de configuración.
+
+El PR3 no incorpora bloqueos ni un campo de versión. Como mejora futura, evaluar bloqueo
+optimista para evitar que operaciones simultáneas sobrescriban el mismo reclamo.
+Tampoco incorpora un scheduler de vencimientos.
+
 ## Documentación
 
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
