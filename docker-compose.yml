@@ -1,0 +1,27 @@
+# Desarrollo: solo MySQL corre en Docker. Backend y frontend se ejecutan en la máquina.
+#   docker compose up -d mysql
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: reclamos-mysql
+    environment:
+      MYSQL_DATABASE: reclamos
+      MYSQL_USER: reclamos
+      MYSQL_PASSWORD: reclamos
+      MYSQL_ROOT_PASSWORD: root
+      TZ: America/Argentina/Buenos_Aires
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    ports:
+      - "3306:3306"
+    volumes:
+      - reclamos-mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ureclamos", "-preclamos"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  reclamos-mysql-data:
