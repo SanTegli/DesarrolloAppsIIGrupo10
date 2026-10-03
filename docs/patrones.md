@@ -10,7 +10,7 @@ Las rutas son relativas a `backend/`. `…` abrevia `src/main/java/ar/edu/uade/r
 | Factory | Crear reclamos siempre consistentes | `ReclamoFactory` |
 | Repository | Separar el negocio de la base de datos | 7 interfaces en el dominio, 7 adaptadores JPA |
 | Strategy | Cambiar por configuración cómo se calcula la prioridad y cómo se asigna el área | `EstrategiaPrioridad`, `EstrategiaAsignacion` y sus 4 implementaciones |
-| Observer | Reaccionar a lo que pasa con un reclamo sin acoplar componentes | `PublicadorEventos`, `NotificacionesReclamoListener` |
+| Observer | Reaccionar a lo que pasa con un reclamo sin acoplar componentes | `PublicadorEventos`, `NotificacionesReclamoListener`, `AuditoriaListener` |
 | Facade | Dar a los controladores una única entrada a los casos de uso | `GestionReclamosFacade` |
 
 ## Factory
@@ -80,7 +80,7 @@ El mapeo objeto-relacional está en `META-INF/orm.xml`, así que las clases del 
 anotaciones de JPA.
 
 - **Código:** `reclamos-dominio/…/dominio/repositorio/` y `reclamos-persistencia/…/persistencia/`
-- **Quién lo usa:** los tres servicios, el listener de notificaciones y `AsignacionPorCargaDeTrabajo`
+- **Quién lo usa:** todos los servicios y `AsignacionPorCargaDeTrabajo`
 - **Tests:** `ReclamoRepositoryJpaTest`, `AreaMunicipalRepositoryJpaTest` y el resto de
   `reclamos-persistencia`, contra H2
 
@@ -112,18 +112,23 @@ reclamos:
 ```
 
 `ConfiguracionAplicacion` lee esas propiedades y registra una implementación por interfaz.
-`ReclamoService` solo conoce las interfaces:
+Los servicios solo conocen las interfaces:
 
 ```java
+// ReclamoService.crear
 Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
 reclamo.definirPrioridad(prioridad.calcular(reclamo));
-asignacion.seleccionarArea(reclamo, areas.buscarCandidatas(categoriaId, barrioId))
-        .ifPresent(area -> reclamo.asignarArea(area, null, "Asignación automática", ahora()));
+asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
+
+// ServicioAsignacion.asignarAutomaticamente
+Optional<AreaMunicipal> elegida =
+        estrategia.seleccionarArea(reclamo, areas.buscarCandidatas(categoriaId, barrioId));
+elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA, ahora));
 ```
 
 - **Código:** contratos en `reclamos-dominio/…/dominio/estrategia/`, implementaciones en
   `reclamos-app/…/aplicacion/estrategia/`
-- **Tests:** `PrioridadTest`, `AsignacionTest`, `ConfiguracionAplicacionTest`
+- **Tests:** `PrioridadTest`, `AsignacionTest`, `ServicioAsignacionTest`, `ConfiguracionAplicacionTest`
 - **Demostración:** con la semilla, "Bache en Bernal" tiene dos áreas candidatas. Con
   `jurisdiccion` va siempre a Obras Públicas; con `carga-trabajo` se reparte con Mantenimiento Vial.
 
@@ -133,40 +138,60 @@ asignacion.seleccionarArea(reclamo, areas.buscarCandidatas(categoriaId, barrioId
 servicio llamara directamente a quien avisa, cada reacción nueva (auditoría, broker, estadísticas)
 obligaría a modificarlo.
 
-**Solución.** El servicio publica un evento de dominio y no sabe quién escucha.
+**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay dos
+observadores independientes; agregar un tercero no toca ni a los servicios ni a los otros dos.
 
 | Pieza | Rol en el patrón |
 | --- | --- |
 | `PublicadorEventos` (interfaz del dominio) | Sujeto: por donde se publica |
 | `PublicadorEventosSpring` | Implementación con `ApplicationEventPublisher` |
-| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto` | Eventos de dominio publicados |
-| `NotificacionesReclamoListener` | Observador: guarda una `Notificacion` por cada evento |
+| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido` | Eventos de dominio |
+| `NotificacionesReclamoListener` | Observador 1: genera los avisos, dentro de la transacción |
+| `AuditoriaListener` | Observador 2: registra cada evento en el log, después del commit |
+
+| Evento | Quién lo publica | Avisos que genera |
+| --- | --- | --- |
+| `ReclamoCreado` | `ReclamoService.crear` | Ciudadano |
+| `ReclamoAsignado` | `ReclamoService.crear` y `asignar` | Ciudadano y agentes activos del área |
+| `EstadoReclamoCambiado` | `ReclamoService.cambiarEstado` | Ciudadano; en reapertura y cierre, también el agente a cargo |
+| `ReclamoResuelto` | `ReclamoService.cambiarEstado` | Ciudadano |
+| `ReclamoVencido` | `ServicioVencimientos.marcarVencidos` | Ciudadano y agente a cargo, o agentes del área |
 
 ```java
 // ReclamoService: publica y sigue
 eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, barrioId,
         guardado.getPrioridad(), guardado.getFechaCreacion()));
 
-// NotificacionesReclamoListener: reacciona
+// Observador 1: delega en ServicioNotificaciones, que decide a quién avisar
 @EventListener
 public void creado(ReclamoCreado evento) {
-    Reclamo reclamo = reclamo(evento);
-    notificar(reclamo, reclamo.getCiudadano(),
-            "Tu reclamo " + evento.numeroReclamo() + " fue ingresado.", evento.ocurridoEn());
+    notificaciones.avisarIngreso(evento.numeroReclamo(), evento.ocurridoEn());
+}
+
+// Observador 2: audita cualquier evento, solo si la transacción se confirmó
+@TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT, fallbackExecution = true)
+public void registrar(EventoDominio evento) {
+    LOGGER.info("{} reclamo={} fecha={} detalle={}", evento.nombre(), evento.numeroReclamo(),
+            evento.ocurridoEn(), evento);
 }
 ```
 
-Los eventos son síncronos y participan de la transacción del servicio: si el listener falla, se
-revierte todo el caso de uso. Llevan solo identificadores y datos simples, de modo que en el Hito 2
-se pueden enviar a un broker como JSON sin cambiarlos.
+Los dos observadores corren en momentos distintos a propósito:
 
-El evento `ReclamoVencido` está definido en el dominio pero todavía no lo publica nadie.
+- **Los avisos** participan de la transacción del servicio: si fallan, se revierte todo el caso de uso.
+- **La auditoría** corre después del commit: una operación revertida no queda auditada.
+
+Los eventos llevan solo identificadores y datos simples, de modo que en el Hito 2 se pueden enviar
+a un broker como JSON sin cambiarlos. Ese envío tiene que hacerse después del commit, igual que la
+auditoría.
 
 - **Código:** contratos en `reclamos-dominio/…/dominio/evento/`, implementación en
   `reclamos-app/…/aplicacion/evento/`
-- **Tests:** `ObserverIntegrationTest`, `PublicadorEventosSpringTest`
+- **Tests:** `FlujoDeAvisosTest` (sin Spring), `ObserverIntegrationTest`, `ServicioNotificacionesTest`,
+  `ServicioVencimientosTest`
 - **Demostración:** el detalle de un reclamo en la interfaz muestra "Avisos enviados"; también
-  `GET /api/reclamos/{numero}/notificaciones`.
+  `GET /api/reclamos/{numero}/notificaciones`. La auditoría se ve en el log del backend, en las
+  líneas del logger `auditoria`.
 
 ## Facade
 
@@ -182,6 +207,7 @@ flowchart TB
   C2["UsuarioController"] --> F
   C3["CatalogoController"] --> F
   F --> S1["ReclamoService<br/>crear, asignar, cambiar estado"]
+  S1 --> S4["ServicioAsignacion<br/>área automática o manual"]
   F --> S2["ConsultaReclamosService<br/>listar, buscar, acciones"]
   F --> S3["ConsultaCatalogosService<br/>usuarios, categorías, barrios, áreas"]
 ```

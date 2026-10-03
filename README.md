@@ -178,9 +178,21 @@ Las estrategias de asignación reciben únicamente las áreas candidatas del Rep
 por menor ID. Sin candidatas, ambas devuelven vacío. Una estrategia configurada con un
 nombre desconocido impide el arranque con un mensaje de configuración.
 
-El PR3 no incorpora bloqueos ni un campo de versión. Como mejora futura, evaluar bloqueo
-optimista para evitar que operaciones simultáneas sobrescriban el mismo reclamo.
-Tampoco incorpora un scheduler de vencimientos.
+No hay bloqueos ni campo de versión: dos operaciones simultáneas sobre el mismo reclamo pueden
+pisarse. Como mejora futura, evaluar bloqueo optimista.
+
+## Control de vencimientos
+
+Una tarea programada busca cada minuto los reclamos que pasaron su fecha límite sin resolverse.
+Los marca como vencidos, les sube un nivel de prioridad y publica el evento `ReclamoVencido`, que
+avisa al ciudadano y al área.
+
+```yaml
+reclamos:
+  vencimientos:
+    habilitado: true       # false apaga la tarea; es el valor del perfil test
+    intervalo-ms: 60000
+```
 
 ## Documentación
 
@@ -188,11 +200,9 @@ Tampoco incorpora un scheduler de vencimientos.
 - [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
+- [Despliegue](docs/despliegue.md): contenedores, puertos y configuración.
 - [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso y capturas de la interfaz.
 - [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
-- [Resumen técnico de PR 1 a 3](README_PR3.md).
-- [Entrega de la versión inicial](docs/referencia/entrega-version-inicial.md): documento de la
-  primera versión del TP, conservado como referencia.
 
 ## Plan de trabajo del Hito 1
 
@@ -202,3 +212,4 @@ Tampoco incorpora un scheduler de vencimientos.
 | 2 | `feature/02-persistence-repositories` | Persistencia JPA, MySQL y datos semilla |
 | 3 | `feature/03-services-rest` | Servicios, Strategy, Observer, Facade y API REST |
 | 4 | `feature/04-frontend-integration` | React, integración, documentación y Docker |
+| 5 | `feature/05-hito1-fixes` | Servicios de asignación, notificaciones y vencimientos; auditoría |

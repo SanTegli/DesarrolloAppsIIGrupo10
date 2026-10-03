@@ -1,10 +1,8 @@
 # Guía para levantar Sistema de Reclamos Urbanos desde cero
 
-Esta guía describe el backend disponible en el working tree inspeccionado el 3 de octubre de 2026. El resumen técnico está en [README_PR3.md](README_PR3.md).
+Guía paso a paso para levantar el sistema completo en Windows: MySQL, backend y frontend. La arquitectura y los patrones están en [docs/](docs/arquitectura.md).
 
-**Estado de Git:** la rama actual es `main`, con PR1 y PR2 integrados (`HEAD: af7cb8e`). PR3 todavía está sin commit: sus clases y tests de aplicación son archivos nuevos locales. La rama local `feature/03-services-rest` aún apunta al commit de PR2. Por lo tanto, clonar el estado publicado inspeccionado no alcanza para obtener los endpoints de PR3: primero hay que disponer de una revisión que incluya esos archivos. No pudo verificarse un commit remoto de PR3. No se debe asumir que cambiar a esa rama incorpora la implementación local.
-
-Los comandos están pensados para PowerShell en Windows. Ejecutarlos en orden y respetar el directorio indicado. MySQL corre en Docker; Spring Boot corre en Windows. No hay frontend implementado en este árbol.
+Los comandos están pensados para PowerShell en Windows. Ejecutarlos en orden y respetar el directorio indicado. MySQL corre en Docker; Spring Boot y el frontend corren en Windows.
 
 ## 1. Qué se necesita instalar
 
@@ -46,7 +44,7 @@ git status --short
 
 Reemplazar `<URL_DEL_REPOSITORIO>` por la URL correspondiente. El remoto `origin` verificado en esta copia es `https://github.com/SanTegli/DesarrolloAppsIIGrupo10.git`.
 
-Comprobar con el grupo qué revisión contiene PR3 antes de probar REST. En el estado inspeccionado, el historial publicado llega a PR2 y la implementación de PR3 existe únicamente en el working tree. Los pasos siguientes presuponen que la copia de trabajo ya contiene esa implementación, incluyendo `backend/reclamos-app/src/main/java/ar/edu/uade/reclamos/aplicacion/rest/controller/ReclamoController.java`.
+Trabajar sobre la rama `main` actualizada (`git pull`): contiene el backend completo y el frontend.
 
 ## 3. Estructura general del proyecto
 
@@ -60,9 +58,16 @@ DesarrolloAppsIIGrupo10/
     reclamos-dominio/
     reclamos-persistencia/
     reclamos-app/
+  frontend/
+    package.json
+    src/
   docs/
     api-contract.md
-    referencia/entrega-version-inicial.md
+    arquitectura.md
+    patrones.md
+    secuencias.md
+    despliegue.md
+    evidencias/
   docker-compose.yml
   .env.example
 ```
@@ -74,7 +79,7 @@ DesarrolloAppsIIGrupo10/
 | `reclamos-persistencia` | Mappings XML, repositorios Spring Data y adaptadores JPA. |
 | `reclamos-app` | Inicio de Spring Boot, perfiles, servicios, Facade, Strategies, Observer y REST. |
 
-`docs/api-contract.md` contiene el contrato REST. El documento de `docs/referencia/` describe una versión anterior y no debe usarse como guía de ejecución actual.
+`docs/api-contract.md` contiene el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
 
 ## 4. Configurar variables de entorno
 
@@ -201,7 +206,19 @@ $env:SPRING_PROFILES_ACTIVE="dev"
 
 Buscar mensajes que indiquen el perfil `dev` activo, la conexión de HikariPool, MySQL 8.4.x según la imagen configurada, `Tomcat started on port 8080` y `Started ReclamosApplication`. El texto y la versión de parche pueden variar; estos mensajes son señales esperadas, no logs de un arranque verificado durante esta documentación.
 
-La API se sirve en `http://localhost:8080/api`. No hay página frontend en `/`. Si 8080 está ocupado, identificar el proceso y liberar el puerto antes de seguir estos ejemplos.
+La API se sirve en `http://localhost:8080/api`. Si 8080 está ocupado, identificar el proceso y liberar el puerto antes de seguir estos ejemplos.
+
+### Levantar el frontend
+
+Requiere Node.js 22 (o 20.19 en adelante). Con el backend ya iniciado, en **otra terminal**, desde la raíz del repositorio:
+
+```powershell
+cd frontend
+npm install
+npm run dev
+```
+
+Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuario de la semilla; no hay login. Si la página muestra "El servidor no responde", el backend no está escuchando en 8080.
 
 ## 9. Datos semilla
 
@@ -407,7 +424,7 @@ Comprobar que Docker Desktop esté abierto, use contenedores Linux y que su moto
 
 ## 14. Cómo apagar todo
 
-En la terminal del backend: **Ctrl+C**.
+En la terminal del backend y en la del frontend: **Ctrl+C**.
 
 En otra terminal, desde la raíz del repositorio:
 
@@ -425,7 +442,7 @@ docker compose down
 
 ## 15. Checklist final
 
-- [ ] La copia contiene la implementación de PR3.
+- [ ] La copia está en `main` actualizada.
 - [ ] Java 21 activo, también en `.\mvnw.cmd -version`.
 - [ ] Docker MySQL aparece `healthy`.
 - [ ] Variables cargadas en la terminal que inicia Spring.
@@ -434,3 +451,4 @@ docker compose down
 - [ ] Spring iniciado con perfil `dev` en 8080.
 - [ ] `/api/usuarios` responde 200.
 - [ ] `/api/reclamos` responde con `X-Usuario-Id`.
+- [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.

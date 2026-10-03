@@ -17,3 +17,7 @@ reclamos:
     estrategia: categoria        # categoria | palabras-clave
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
+  # Control de vencimientos (SLA): cada cuánto se buscan reclamos que pasaron su fecha límite.
+  vencimientos:
+    habilitado: true
+    intervalo-ms: 60000
