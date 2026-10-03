@@ -16,9 +16,12 @@ backend/                    Proyecto Maven multimódulo (Java 21, Spring Boot 3)
   reclamos-dominio/         Modelo, reglas, fábrica, eventos y contratos. Java puro, sin Spring
   reclamos-persistencia/    Adaptadores JPA de los Repository
   reclamos-app/             Servicios, fachada, eventos y API REST
-frontend/                   React + Vite
-docs/                       Contrato REST, arquitectura, patrones y evidencias
-docker-compose.yml          MySQL para desarrollo
+frontend/                   Interfaz React + Vite
+  src/api/                  Única capa que habla con el backend
+  src/componentes/          Pantallas: listado, alta, detalle y administración
+  mock/                     API simulada para trabajar sin Java ni MySQL
+docs/                       Contrato REST, arquitectura, patrones, secuencias y evidencias
+docker-compose.yml          MySQL para desarrollo; backend y frontend para la demo
 ```
 
 Las dependencias entre módulos van en un solo sentido: `app → persistencia → dominio → comun`.
@@ -27,7 +30,7 @@ Las dependencias entre módulos van en un solo sentido: `app → persistencia �
 
 - JDK 21
 - Docker, para MySQL
-- Node.js 20 o superior, para el frontend
+- Node.js 22 (o 20.19 en adelante), para el frontend
 
 No hace falta instalar Maven: el proyecto trae el wrapper (`mvnw`).
 
@@ -68,6 +71,51 @@ cd backend
 ```
 
 La aplicación queda en `http://localhost:8080` con el perfil `dev`.
+
+## Cómo levantar el frontend
+
+Con el backend corriendo en el puerto 8080:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+La interfaz queda en `http://localhost:5173`. No hay login: el selector "Usar el sistema como"
+elige el usuario y la interfaz envía su id en el encabezado `X-Usuario-Id`.
+
+| Rol | Qué puede hacer en la interfaz |
+| --- | --- |
+| Ciudadano | Crear reclamos, ver los suyos, cancelar, confirmar la solución o reabrir |
+| Agente municipal | Ver los reclamos de su área, tomarlos y resolverlos |
+| Administrador | Ver todos, asignar a mano, reasignar y rechazar |
+
+El navegador llama a `/api` en el mismo origen y Vite reenvía esas llamadas al backend, por eso no
+hace falta configurar CORS. Para apuntar a otro backend, copiar `frontend/.env.example` a
+`frontend/.env` y cambiar `VITE_BACKEND_URL`.
+
+Para trabajar en la interfaz sin Java ni MySQL hay una API simulada en memoria que sigue el
+contrato REST. Usa el puerto 8080, así que no puede correr a la vez que el backend:
+
+```bash
+cd frontend
+npm run mock      # en una terminal
+npm run dev       # en otra
+```
+
+Tests del frontend: `npm test`.
+
+## Demo completa con Docker
+
+Levanta MySQL, backend y frontend en tres contenedores. Solo hace falta Docker y el archivo `.env`:
+
+```bash
+docker compose up --build
+```
+
+La interfaz queda en `http://localhost:5173` y la API en `http://localhost:8080/api`. La primera
+vez tarda varios minutos porque compila el backend dentro del contenedor.
 
 ## Perfiles
 
@@ -136,9 +184,15 @@ Tampoco incorpora un scheduler de vencimientos.
 
 ## Documentación
 
+- [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
+- [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade.
+- [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
+- [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso y capturas de la interfaz.
+- [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
+- [Resumen técnico de PR 1 a 3](README_PR3.md).
 - [Entrega de la versión inicial](docs/referencia/entrega-version-inicial.md): documento de la
-  primera versión del TP, conservado como referencia para la documentación final.
+  primera versión del TP, conservado como referencia.
 
 ## Plan de trabajo del Hito 1
 
@@ -146,5 +200,5 @@ Tampoco incorpora un scheduler de vencimientos.
 | --- | --- | --- |
 | 1 | `feature/01-domain-foundation` | Estructura, dominio, reglas, Factory y contratos |
 | 2 | `feature/02-persistence-repositories` | Persistencia JPA, MySQL y datos semilla |
-| 3 | `feature/03-business-rest` | Servicios, Strategy, Observer, Facade y API REST |
-| 4 | `feature/04-frontend-integration` | React, integración, documentación y entrega |
+| 3 | `feature/03-services-rest` | Servicios, Strategy, Observer, Facade y API REST |
+| 4 | `feature/04-frontend-integration` | React, integración, documentación y Docker |

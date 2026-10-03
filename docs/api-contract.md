@@ -1,7 +1,7 @@
 # Contrato REST — Hito 1
 
-Contrato acordado entre el backend (PR 3 y PR 4) y el frontend (PR 4). Mientras el backend no esté
-integrado, el frontend trabaja con mocks que respetan este documento.
+Contrato entre el backend y el frontend. Lo implementan los controladores de `reclamos-app` y lo
+consume `frontend/src/api/`. La API simulada del frontend (`npm run mock`) sigue este mismo documento.
 
 Si alguien necesita cambiar algo de acá, lo avisa al grupo antes: es el único archivo del que
 dependen tres personas a la vez.
@@ -51,6 +51,8 @@ Todos los errores tienen la misma forma:
 | 403 | `ACCESO_DENEGADO` | El usuario existe pero su rol no puede hacer la operación, o el reclamo no es suyo ni de su área | `AccesoDenegadoException` |
 | 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
+| 405 | `METODO_NO_PERMITIDO` | El recurso no admite ese método HTTP | Error de Spring |
+| 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | El cuerpo no es `application/json` | Error de Spring |
 | 500 | `ERROR_INTERNO` | Error inesperado | Cualquier otra |
 
 Cuando una transición no existe y además el rol no alcanza, gana el 409.
