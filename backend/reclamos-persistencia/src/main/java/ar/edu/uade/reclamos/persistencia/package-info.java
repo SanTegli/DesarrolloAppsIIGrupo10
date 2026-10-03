@@ -1,5 +1,5 @@
 /**
- * Capa de persistencia. El PR 2 agrega acá las interfaces Spring Data y los adaptadores
- * que implementan los Repository definidos en {@code ar.edu.uade.reclamos.dominio.repositorio}.
+ * Adaptadores de los Repository del dominio sobre Spring Data JPA.
+ * META-INF/orm.xml mapea el modelo sin agregar dependencias al dominio.
  */
 package ar.edu.uade.reclamos.persistencia;

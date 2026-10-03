@@ -44,6 +44,21 @@ En Windows, `.\mvnw.cmd test`.
 
 ## Cómo levantar el backend
 
+Copiar `.env.example` a `.env` en la raíz y ajustar las credenciales locales.
+Compose lee ese archivo; Spring necesita las mismas variables en el entorno de la terminal.
+En PowerShell, desde la raíz:
+
+```powershell
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+Get-Content .env | ForEach-Object {
+    if ($_ -match '^(DB_NAME|DB_USER|DB_PASSWORD|MYSQL_ROOT_PASSWORD|DB_PORT)=(.*)$') {
+        [Environment]::SetEnvironmentVariable($matches[1], $matches[2], 'Process')
+    }
+}
+```
+
+Verificar que `JAVA_HOME` apunte a Java 21 antes de ejecutar Maven.
+
 ```bash
 docker compose up -d mysql
 
@@ -62,7 +77,35 @@ La aplicación queda en `http://localhost:8080` con el perfil `dev`.
 | `test` | H2 en memoria | Tests automáticos |
 
 La conexión de `dev` se puede cambiar sin tocar archivos con las variables `DB_URL`, `DB_USER` y
-`DB_PASSWORD`.
+`DB_PASSWORD`; también admite `DB_NAME` y `DB_PORT` cuando no se define `DB_URL`.
+
+En `dev`, Hibernate actualiza el esquema y luego se ejecuta
+`reclamos-persistencia/src/main/resources/db/datos-dev.sql`. La semilla respeta los IDs de
+`docs/api-contract.md`: un municipio, tres barrios, tres categorías, cuatro áreas y siete usuarios.
+La tabla técnica `inicializaciones` registra el marcador `datos-dev-v1` al terminar la primera
+ejecución. Los siguientes arranques no restauran datos ni relaciones eliminadas o modificadas.
+Esta tabla se usa únicamente para inicializar datos de desarrollo; una base nueva vuelve a cargar
+la semilla. En una base existente sin marcador, la primera ejecución completa los datos faltantes.
+Si ya hubo eliminaciones que deben conservarse, registrar antes el marcador con
+`INSERT INTO inicializaciones (identificador) VALUES ('datos-dev-v1');`, creando previamente
+la tabla con `CREATE TABLE IF NOT EXISTS inicializaciones (identificador VARCHAR(80) PRIMARY KEY);`.
+El volumen de Compose conserva los datos; cambiar las variables no cambia las credenciales de un
+volumen ya inicializado.
+
+Para verificar la base después de arrancar el backend, desde la raíz:
+
+```bash
+docker compose exec mysql mysql -u reclamos -p reclamos
+```
+
+Si cambiaste `DB_USER` o `DB_NAME`, reemplazar esos argumentos. Ingresar la contraseña de `.env`.
+Consultar `SELECT id, nombre FROM areas_municipales ORDER BY id;` y
+`SELECT id, tipo, nombre, apellido FROM usuarios ORDER BY id;`.
+Reiniciar el backend y repetir: deben conservarse los mismos cuatro y siete registros.
+
+Los tests de persistencia usan H2, guardan y hacen flush/clear antes de recuperar datos.
+También comprueban actualizaciones, consultas, semilla repetible y relaciones fuera de transacción.
+El perfil `test` no carga la semilla de desarrollo automáticamente.
 
 ## Configuración de estrategias
 

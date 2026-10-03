@@ -5,20 +5,20 @@ services:
     image: mysql:8.4
     container_name: reclamos-mysql
     environment:
-      MYSQL_DATABASE: reclamos
-      MYSQL_USER: reclamos
-      MYSQL_PASSWORD: reclamos
-      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: ${DB_NAME:-reclamos}
+      MYSQL_USER: ${DB_USER:-reclamos}
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Definir DB_PASSWORD en .env}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Definir MYSQL_ROOT_PASSWORD en .env}
       TZ: America/Argentina/Buenos_Aires
     command:
       - --character-set-server=utf8mb4
       - --collation-server=utf8mb4_unicode_ci
     ports:
-      - "3306:3306"
+      - "${DB_PORT:-3306}:3306"
     volumes:
       - reclamos-mysql-data:/var/lib/mysql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-ureclamos", "-preclamos"]
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_PASSWORD\" mysqladmin ping -h localhost -u\"$$MYSQL_USER\" --silent"]
       interval: 10s
       timeout: 5s
       retries: 10
