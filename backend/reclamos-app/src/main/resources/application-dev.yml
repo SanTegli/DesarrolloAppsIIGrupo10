@@ -1,10 +1,16 @@
 # Perfil dev: MySQL levantado con `docker compose up -d mysql`.
 spring:
   datasource:
-    url: "${DB_URL:jdbc:mysql://localhost:3306/reclamos?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Argentina/Buenos_Aires&characterEncoding=UTF-8}"
+    url: "${DB_URL:jdbc:mysql://localhost:${DB_PORT:3306}/${DB_NAME:reclamos}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Argentina/Buenos_Aires&characterEncoding=UTF-8}"
     username: "${DB_USER:reclamos}"
-    password: "${DB_PASSWORD:reclamos}"
+    password: "${DB_PASSWORD}"
+  sql:
+    init:
+      mode: always
+      encoding: UTF-8
+      data-locations: classpath:db/datos-dev.sql
   jpa:
+    defer-datasource-initialization: true
     hibernate:
       ddl-auto: update
     show-sql: false

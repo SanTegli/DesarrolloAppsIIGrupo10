@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<entity-mappings xmlns="https://jakarta.ee/xml/ns/persistence/orm"
+                 xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                 xsi:schemaLocation="https://jakarta.ee/xml/ns/persistence/orm https://jakarta.ee/xml/ns/persistence/orm/orm_3_1.xsd"
+                 version="3.1">
+  <package>ar.edu.uade.reclamos.dominio.modelo</package>
+  <!-- El acceso a campos conserva los getters y colecciones protegidos del dominio. -->
+  <mapped-superclass class="Entidad" access="FIELD">
+    <attributes>
+      <id name="id"><generated-value strategy="IDENTITY"/></id>
+    </attributes>
+  </mapped-superclass>
+  <entity class="Usuario" access="FIELD" metadata-complete="true">
+    <table name="usuarios"/>
+    <inheritance strategy="SINGLE_TABLE"/>
+    <discriminator-column name="tipo" discriminator-type="STRING" length="30"/>
+    <attributes>
+      <basic name="dni"><column name="dni" nullable="false" length="8" unique="true"/></basic>
+      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
+      <basic name="apellido"><column name="apellido" nullable="false" length="80"/></basic>
+      <basic name="email"><column name="email" nullable="false" length="254"/></basic>
+      <basic name="telefono"><column name="telefono" nullable="true" length="30"/></basic>
+      <basic name="activo"><column name="activo" nullable="false"/></basic>
+    </attributes>
+  </entity>
+  <entity class="Ciudadano" access="FIELD" metadata-complete="true">
+    <discriminator-value>CIUDADANO</discriminator-value>
+  </entity>
+  <entity class="Administrador" access="FIELD" metadata-complete="true">
+    <discriminator-value>ADMINISTRADOR</discriminator-value>
+  </entity>
+  <entity class="AgenteMunicipal" access="FIELD" metadata-complete="true">
+    <discriminator-value>AGENTE_MUNICIPAL</discriminator-value>
+    <attributes>
+      <!-- SINGLE_TABLE: area_id es nulo para ciudadanos y administradores.
+           El constructor del agente exige su área. -->
+      <many-to-one name="area" target-entity="AreaMunicipal" fetch="LAZY" optional="true"><join-column name="area_id" nullable="true"/></many-to-one>
+    </attributes>
+  </entity>
+  <entity class="Municipio" access="FIELD" metadata-complete="true">
+    <table name="municipios"/>
+    <attributes>
+      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
+      <basic name="provincia"><column name="provincia" nullable="false" length="80"/></basic>
+    </attributes>
+  </entity>
+  <entity class="Barrio" access="FIELD" metadata-complete="true">
+    <table name="barrios"/>
+    <attributes>
+      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
+      <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
+    </attributes>
+  </entity>
+  <entity class="Categoria" access="FIELD" metadata-complete="true">
+    <table name="categorias"/>
+    <attributes>
+      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
+      <basic name="descripcion"><column name="descripcion" nullable="true" length="1000"/></basic>
+      <basic name="slaHoras"><column name="sla_horas" nullable="false"/></basic>
+      <basic name="prioridadBase"><column name="prioridad_base" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+    </attributes>
+  </entity>
+  <entity class="AreaMunicipal" access="FIELD" metadata-complete="true">
+    <table name="areas_municipales"/>
+    <attributes>
+      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
+      <basic name="emailContacto"><column name="email_contacto" nullable="false" length="254"/></basic>
+      <basic name="activa"><column name="activa" nullable="false"/></basic>
+      <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
+      <many-to-many name="barrios" target-entity="Barrio" fetch="LAZY">
+        <join-table name="area_barrio">
+          <join-column name="area_id" nullable="false"/>
+          <inverse-join-column name="barrio_id" nullable="false"/>
+          <unique-constraint><column-name>area_id</column-name><column-name>barrio_id</column-name></unique-constraint>
+        </join-table>
+      </many-to-many>
+      <many-to-many name="categorias" target-entity="Categoria" fetch="LAZY">
+        <join-table name="area_categoria">
+          <join-column name="area_id" nullable="false"/>
+          <inverse-join-column name="categoria_id" nullable="false"/>
+          <unique-constraint><column-name>area_id</column-name><column-name>categoria_id</column-name></unique-constraint>
+        </join-table>
+      </many-to-many>
+    </attributes>
+  </entity>
+  <entity class="Reclamo" access="FIELD" metadata-complete="true">
+    <table name="reclamos"/>
+    <attributes>
+      <basic name="numero"><column name="numero" nullable="false" length="40" unique="true"/></basic>
+      <basic name="descripcion"><column name="descripcion" nullable="false" length="1000"/></basic>
+      <basic name="direccion"><column name="direccion" nullable="false" length="200"/></basic>
+      <basic name="estado"><column name="estado" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="prioridad"><column name="prioridad" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="vencido"><column name="vencido" nullable="false"/></basic>
+      <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
+      <basic name="fechaLimite"><column name="fecha_limite" nullable="false"/></basic>
+      <many-to-one name="ciudadano" target-entity="Ciudadano" fetch="LAZY" optional="false"><join-column name="ciudadano_id" nullable="false"/></many-to-one>
+      <many-to-one name="agente" target-entity="AgenteMunicipal" fetch="LAZY" optional="true"><join-column name="agente_id" nullable="true"/></many-to-one>
+      <many-to-one name="categoria" target-entity="Categoria" fetch="LAZY" optional="false"><join-column name="categoria_id" nullable="false"/></many-to-one>
+      <many-to-one name="barrio" target-entity="Barrio" fetch="LAZY" optional="false"><join-column name="barrio_id" nullable="false"/></many-to-one>
+      <many-to-one name="area" target-entity="AreaMunicipal" fetch="LAZY" optional="true"><join-column name="area_id" nullable="true"/></many-to-one>
+      <one-to-many name="historial" target-entity="HistorialEstado" mapped-by="reclamo" fetch="LAZY">
+        <order-by>fecha ASC, id ASC</order-by>
+        <cascade><cascade-persist/><cascade-merge/></cascade>
+      </one-to-many>
+    </attributes>
+  </entity>
+  <entity class="HistorialEstado" access="FIELD" metadata-complete="true">
+    <table name="historial_estados"/>
+    <attributes>
+      <basic name="estadoAnterior"><column name="estado_anterior" nullable="true" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="estadoNuevo"><column name="estado_nuevo" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="fecha"><column name="fecha" nullable="false"/></basic>
+      <basic name="observacion"><column name="observacion" nullable="true" length="1000"/></basic>
+      <many-to-one name="reclamo" target-entity="Reclamo" fetch="LAZY" optional="false"><join-column name="reclamo_id" nullable="false"/></many-to-one>
+      <many-to-one name="usuario" target-entity="Usuario" fetch="LAZY" optional="true"><join-column name="usuario_id" nullable="true"/></many-to-one>
+    </attributes>
+  </entity>
+  <entity class="Notificacion" access="FIELD" metadata-complete="true">
+    <table name="notificaciones"/>
+    <attributes>
+      <basic name="canal"><column name="canal" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="mensaje"><column name="mensaje" nullable="false" length="500"/></basic>
+      <basic name="fechaEnvio"><column name="fecha_envio" nullable="false"/></basic>
+      <many-to-one name="reclamo" target-entity="Reclamo" fetch="LAZY" optional="false"><join-column name="reclamo_id" nullable="false"/></many-to-one>
+      <many-to-one name="destinatario" target-entity="Usuario" fetch="LAZY" optional="false"><join-column name="destinatario_id" nullable="false"/></many-to-one>
+    </attributes>
+  </entity>
+</entity-mappings>
