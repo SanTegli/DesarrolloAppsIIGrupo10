@@ -157,6 +157,15 @@ function registrar(reclamo, anterior, usuario, observacion, fecha) {
 function notificar(reclamo, destinatarioId, mensaje, fecha) {
   notificaciones.push({ numero: reclamo.numero, canal: 'INTERNO', destinatarioId, mensaje, fechaEnvio: fecha })
 }
+// Igual que ServicioNotificaciones.avisarAsignacion: al ciudadano y a los agentes del área.
+function notificarAsignacion(reclamo, area, fecha) {
+  notificar(reclamo, reclamo.ciudadanoId, `Tu reclamo ${reclamo.numero} fue asignado al area ${area.nombre}.`, fecha)
+  usuarios
+    .filter((usuario) => usuario.rol === 'AGENTE_MUNICIPAL' && usuario.areaId === area.id)
+    .forEach((agente) =>
+      notificar(reclamo, agente.id, `El reclamo ${reclamo.numero} fue asignado a tu area ${area.nombre}.`, fecha),
+    )
+}
 const pendientes = (areaId) =>
   reclamos.filter((r) => r.areaId === areaId && (r.estado === 'ASIGNADO' || r.estado === 'EN_PROCESO')).length
 
@@ -208,7 +217,7 @@ function crear(usuario, cuerpo) {
     reclamo.areaId = candidatas[0].id
     reclamo.estado = 'ASIGNADO'
     registrar(reclamo, 'INGRESADO', null, 'Asignación automática', fecha)
-    notificar(reclamo, usuario.id, `Tu reclamo ${reclamo.numero} fue asignado al area ${candidatas[0].nombre}.`, fecha)
+    notificarAsignacion(reclamo, candidatas[0], fecha)
   }
   reclamos.unshift(reclamo)
   return reclamo
@@ -258,7 +267,7 @@ function asignar(usuario, reclamo, cuerpo) {
   reclamo.agenteId = null
   reclamo.estado = 'ASIGNADO'
   registrar(reclamo, anterior, usuario, cuerpo.observacion, fecha)
-  notificar(reclamo, reclamo.ciudadanoId, `Tu reclamo ${reclamo.numero} fue asignado al area ${area.nombre}.`, fecha)
+  notificarAsignacion(reclamo, area, fecha)
 }
 
 function listar(usuario, consulta) {

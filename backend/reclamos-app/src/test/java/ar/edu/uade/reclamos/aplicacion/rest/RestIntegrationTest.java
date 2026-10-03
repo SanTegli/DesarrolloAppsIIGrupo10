@@ -137,7 +137,8 @@ class RestIntegrationTest {
         campos(dto.get("categoria"), "id", "nombre");
         campos(dto.get("historial").get(0), "estadoAnterior", "estadoNuevo", "fecha", "observacion", "usuario");
         assertThat(LocalDateTime.parse(dto.get("fechaCreacion").asText())).isNotNull();
-        assertThat(notificaciones.buscarPorReclamo(dto.get("numero").asText())).hasSize(2);
+        // Ingreso y asignación al ciudadano, más el aviso al agente del área asignada.
+        assertThat(notificaciones.buscarPorReclamo(dto.get("numero").asText())).hasSize(3);
     }
 
     @Test

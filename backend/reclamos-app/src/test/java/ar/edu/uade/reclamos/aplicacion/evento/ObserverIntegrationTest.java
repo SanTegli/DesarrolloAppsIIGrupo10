@@ -90,29 +90,31 @@ class ObserverIntegrationTest {
         assertThat(eventosDel(numero)).extracting(EventoDominio::nombre)
                 .containsExactly("ReclamoCreado", "ReclamoAsignado");
         assertThat(avisos(numero)).extracting(n -> n.getDestinatario().getId())
-                .containsExactly(datos.ciudadano(), datos.ciudadano());
+                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.agente());
         assertThat(avisos(numero)).extracting(Notificacion::getMensaje)
                 .containsExactly("Tu reclamo " + numero + " fue ingresado.",
-                        "Tu reclamo " + numero + " fue asignado al area Obras.");
+                        "Tu reclamo " + numero + " fue asignado al area Obras.",
+                        "El reclamo " + numero + " fue asignado a tu area Obras.");
         servicio.tomar(datos.agente(), numero, "Tomar");
-        assertThat(avisos(numero)).hasSize(3);
+        assertThat(avisos(numero)).hasSize(4);
         servicio.resolver(datos.agente(), numero, "Reparado");
         assertThat(eventosDel(numero)).extracting(EventoDominio::nombre)
                 .containsExactly("ReclamoCreado", "ReclamoAsignado", "EstadoReclamoCambiado",
                         "EstadoReclamoCambiado", "ReclamoResuelto");
-        assertThat(avisos(numero)).hasSize(4);
-        assertThat(avisos(numero).get(3).getMensaje()).contains("fue resuelto");
-        assertThat(avisos(numero).get(3).getDestinatario().getId()).isEqualTo(datos.ciudadano());
+        assertThat(avisos(numero)).hasSize(5);
+        assertThat(avisos(numero).get(4).getMensaje()).contains("fue resuelto");
+        assertThat(avisos(numero).get(4).getDestinatario().getId()).isEqualTo(datos.ciudadano());
         servicio.reabrir(datos.ciudadano(), numero, "Persiste");
         assertThat(avisos(numero)).extracting(n -> n.getDestinatario().getId())
-                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.ciudadano(),
+                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.agente(), datos.ciudadano(),
                         datos.ciudadano(), datos.ciudadano(), datos.agente());
         servicio.resolver(datos.agente(), numero, "Reparado nuevamente");
         servicio.cerrar(datos.ciudadano(), numero, "Confirmado");
         List<Notificacion> avisos = avisos(numero);
         assertThat(avisos).extracting(n -> n.getDestinatario().getId())
-                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.ciudadano(), datos.ciudadano(),
-                        datos.ciudadano(), datos.agente(), datos.ciudadano(), datos.ciudadano(), datos.agente());
+                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.agente(), datos.ciudadano(),
+                        datos.ciudadano(), datos.ciudadano(), datos.agente(), datos.ciudadano(),
+                        datos.ciudadano(), datos.agente());
         assertThat(avisos).extracting(Notificacion::getId).doesNotHaveDuplicates();
         assertThat(avisos).allSatisfy(aviso -> {
             assertThat(aviso.getCanal()).isEqualTo(CanalNotificacion.INTERNO);
@@ -124,7 +126,7 @@ class ObserverIntegrationTest {
     }
 
     @Test
-    void sinAsignacionAutomaticaAsignacionManualReasignacionCancelacionYRechazoGeneranUnAvisoCadaUno() {
+    void sinAsignacionAutomaticaAsignacionManualReasignacionCancelacionYRechazoAvisanAlCiudadanoYAlArea() {
         String numero = crear(false).getNumero();
         assertThat(eventosDel(numero)).extracting(EventoDominio::nombre).containsExactly("ReclamoCreado");
         assertThat(avisos(numero)).hasSize(1);
@@ -134,9 +136,10 @@ class ObserverIntegrationTest {
         assertThat(eventosDel(numero)).extracting(EventoDominio::nombre)
                 .containsExactly("ReclamoCreado", "ReclamoAsignado", "ReclamoAsignado", "EstadoReclamoCambiado");
         assertThat(avisos(numero)).extracting(n -> n.getDestinatario().getId())
-                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.ciudadano(), datos.ciudadano());
-        assertThat(avisos(numero).get(2).getMensaje()).contains("Vial");
-        assertThat(avisos(numero).get(3).getMensaje()).contains("CANCELADO");
+                .containsExactly(datos.ciudadano(), datos.ciudadano(), datos.agente(),
+                        datos.ciudadano(), datos.otroAgente(), datos.ciudadano());
+        assertThat(avisos(numero).get(3).getMensaje()).contains("Vial");
+        assertThat(avisos(numero).get(5).getMensaje()).contains("CANCELADO");
         String rechazado = crear(false).getNumero();
         servicio.rechazar(datos.administrador(), rechazado, "No corresponde");
         assertThat(avisos(rechazado)).hasSize(2);

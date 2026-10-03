@@ -82,7 +82,8 @@ class ServiciosAplicacionIntegrationTest {
         assertThat(cerrado.getHistorial()).hasSize(7);
         assertThat(facade.listar(datos.administrador(), EstadoReclamo.CERRADO, datos.area(), datos.ciudadano()))
                 .extracting(Reclamo::getNumero).containsExactly(numero);
-        assertThat(facade.consultarNotificaciones(datos.ciudadano(), numero)).hasSize(9);
+        // Nueve avisos del flujo más el aviso al agente del área en la asignación automática.
+        assertThat(facade.consultarNotificaciones(datos.ciudadano(), numero)).hasSize(10);
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
     }
 }

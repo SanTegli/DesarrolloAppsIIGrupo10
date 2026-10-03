@@ -25,8 +25,9 @@ class ReclamoServiceTest {
     private final EstrategiaPrioridad prioridad = mock(EstrategiaPrioridad.class);
     private final EstrategiaAsignacion asignacion = mock(EstrategiaAsignacion.class);
     private final PublicadorEventos eventos = mock(PublicadorEventos.class);
-    private final ReclamoService servicio = new ReclamoService(usuarios, categorias, barrios, areas,
-            reclamos, e.factory, prioridad, asignacion, new PermisosReclamo(), e.reloj, eventos);
+    private final ReclamoService servicio = new ReclamoService(usuarios, categorias, barrios,
+            reclamos, e.factory, prioridad, new ServicioAsignacion(areas, asignacion), new PermisosReclamo(),
+            e.reloj, eventos);
 
     @BeforeEach
     void usuariosYGuardado() {

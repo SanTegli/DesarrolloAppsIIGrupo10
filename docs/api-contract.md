@@ -234,21 +234,36 @@ inexistente; `409` el reclamo no está `INGRESADO` ni `ASIGNADO`, el área está
 
 ### `GET /api/reclamos/{numero}/notificaciones` — avisos generados
 
-Evidencia del patrón Observer: los avisos que los listeners enviaron por este reclamo. Mismos
-permisos que la consulta del reclamo.
+Evidencia del patrón Observer: los avisos que generaron los eventos de este reclamo, del más viejo
+al más nuevo. Mismos permisos que la consulta del reclamo.
 
 ```json
 [
   {
-    "canal": "EMAIL",
+    "canal": "INTERNO",
     "destinatario": { "id": 1, "nombreCompleto": "Ana Pérez" },
-    "mensaje": "Tu reclamo REC-4F2A91BC fue asignado al área Alumbrado.",
-    "fechaEnvio": "2026-10-05T10:00:01"
+    "mensaje": "Tu reclamo REC-4F2A91BC fue asignado al area Alumbrado.",
+    "fechaEnvio": "2026-10-05T10:00:00"
+  },
+  {
+    "canal": "INTERNO",
+    "destinatario": { "id": 3, "nombreCompleto": "Carla Gómez" },
+    "mensaje": "El reclamo REC-4F2A91BC fue asignado a tu area Alumbrado.",
+    "fechaEnvio": "2026-10-05T10:00:00"
   }
 ]
 ```
 
-`canal` puede ser `EMAIL`, `SMS` o `INTERNO`.
+`canal` es siempre `INTERNO` en el Hito 1: los avisos se guardan en la base y no se envían por
+correo ni SMS.
+
+| Evento | A quién se avisa |
+| --- | --- |
+| `ReclamoCreado` | Ciudadano |
+| `ReclamoAsignado` | Ciudadano y agentes activos del área asignada |
+| `EstadoReclamoCambiado` | Ciudadano; en la reapertura y el cierre, también el agente a cargo |
+| `ReclamoResuelto` | Ciudadano |
+| `ReclamoVencido` | Ciudadano y el agente a cargo; si nadie lo tomó, los agentes del área |
 
 ## Consultas de apoyo
 

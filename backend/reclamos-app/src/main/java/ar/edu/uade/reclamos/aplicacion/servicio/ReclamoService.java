@@ -2,7 +2,7 @@ package ar.edu.uade.reclamos.aplicacion.servicio;
 
 import ar.edu.uade.reclamos.aplicacion.seguridad.PermisosReclamo;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
-import ar.edu.uade.reclamos.dominio.estrategia.*;
+import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
 import ar.edu.uade.reclamos.dominio.evento.*;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
@@ -12,28 +12,31 @@ import java.time.LocalDateTime;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Casos de uso de escritura sobre un reclamo: crear, asignar y cambiar de estado.
+ * Coordina fábrica, estrategia de prioridad, {@link ServicioAsignacion}, persistencia y eventos;
+ * las reglas de transición y pertenencia las valida el dominio.
+ */
 @Service
 public class ReclamoService {
     private final UsuarioRepository usuarios;
     private final CategoriaRepository categorias;
     private final BarrioRepository barrios;
-    private final AreaMunicipalRepository areas;
     private final ReclamoRepository reclamos;
     private final ReclamoFactory factory;
     private final EstrategiaPrioridad prioridad;
-    private final EstrategiaAsignacion asignacion;
+    private final ServicioAsignacion asignacion;
     private final PermisosReclamo permisos;
     private final Clock reloj;
     private final PublicadorEventos eventos;
 
     public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, BarrioRepository barrios,
-                          AreaMunicipalRepository areas, ReclamoRepository reclamos, ReclamoFactory factory,
-                          EstrategiaPrioridad prioridad, EstrategiaAsignacion asignacion,
+                          ReclamoRepository reclamos, ReclamoFactory factory,
+                          EstrategiaPrioridad prioridad, ServicioAsignacion asignacion,
                           PermisosReclamo permisos, Clock reloj, PublicadorEventos eventos) {
         this.usuarios = usuarios;
         this.categorias = categorias;
         this.barrios = barrios;
-        this.areas = areas;
         this.reclamos = reclamos;
         this.factory = factory;
         this.prioridad = prioridad;
@@ -52,8 +55,7 @@ public class ReclamoService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
         Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
         reclamo.definirPrioridad(prioridad.calcular(reclamo));
-        asignacion.seleccionarArea(reclamo, areas.buscarCandidatas(categoriaId, barrioId))
-                .ifPresent(area -> reclamo.asignarArea(area, null, "Asignación automática", ahora()));
+        asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
         eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, barrioId,
                 guardado.getPrioridad(), guardado.getFechaCreacion()));
@@ -68,9 +70,7 @@ public class ReclamoService {
     public Reclamo asignar(Long usuarioId, String numero, Long areaId, String observacion) {
         Usuario actor = usuario(usuarioId);
         Reclamo reclamo = reclamo(numero);
-        AreaMunicipal area = areas.buscarPorId(areaId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("área", areaId));
-        reclamo.asignarArea(area, actor, observacion, ahora());
+        asignacion.asignarManualmente(reclamo, areaId, actor, observacion, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
         publicarAsignacion(guardado, actor);
         return guardado;
