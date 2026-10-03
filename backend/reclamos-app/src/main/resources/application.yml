@@ -1,0 +1,19 @@
+# Configuración común a todos los perfiles.
+# Perfiles: dev (MySQL en Docker, por defecto) y test (H2 en memoria).
+spring:
+  application:
+    name: reclamos-urbanos
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+
+server:
+  port: 8080
+
+# Estrategias activas (patrón Strategy). Las implementaciones llegan en el PR 3.
+reclamos:
+  prioridad:
+    estrategia: categoria        # categoria | palabras-clave
+  asignacion:
+    estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
