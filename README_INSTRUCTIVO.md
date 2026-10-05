@@ -10,7 +10,8 @@ Los comandos están pensados para PowerShell en Windows. Ejecutarlos en orden y 
 | --- | --- |
 | Git | Clonar y consultar versiones del repositorio. |
 | Java JDK 21 | Compilar y ejecutar el backend. Se necesita JDK, que incluye `javac`. |
-| Docker Desktop | Ejecutar MySQL; debe estar iniciado y usar contenedores Linux. |
+| Docker Desktop | Ejecutar MySQL, o el sistema completo en modo demo (sección 8); debe estar iniciado y usar contenedores Linux. |
+| Node.js 22 (o 20.19 en adelante) | Ejecutar el frontend. No hace falta para el modo demo con contenedores. |
 | Docker Compose | Administrar el servicio definido en `docker-compose.yml`; normalmente viene integrado en Docker Desktop. |
 | PowerShell | Ejecutar los comandos de esta guía y cargar variables en la sesión. |
 | Maven Wrapper incluido | Ejecutar Maven mediante `backend/mvnw.cmd`. No debería ser necesario instalar Maven globalmente. |
@@ -220,6 +221,35 @@ npm run dev
 
 Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuario de la semilla; no hay login. Si la página muestra "El servidor no responde", el backend no está escuchando en 8080.
 
+### Alternativa: todo en contenedores (modo demo)
+
+En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los tres servicios: MySQL, backend y frontend. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
+
+Antes de empezar, detener el backend y el frontend locales si están corriendo: el modo demo usa los mismos puertos, 8080 y 5173.
+
+Desde la raíz del repositorio:
+
+```powershell
+docker compose up --build
+```
+
+La primera vez tarda varios minutos, porque compila el backend dentro del contenedor. Cuando el log muestra `Started ReclamosApplication`, abrir `http://localhost:5173`. La API queda en `http://localhost:8080/api`.
+
+| Contenedor | Qué corre | Puerto |
+| --- | --- | --- |
+| `reclamos-mysql` | MySQL 8.4 | 3306, o el valor de `DB_PORT` |
+| `reclamos-backend` | Spring Boot con el perfil `dev` | 8080 |
+| `reclamos-frontend` | nginx con la interfaz compilada; reenvía `/api` al backend | 5173 |
+
+Para ver el estado y los logs, en otra terminal:
+
+```powershell
+docker compose ps
+docker compose logs -f backend
+```
+
+Después de cambiar código, volver a ejecutar `docker compose up --build` para reconstruir las imágenes. Los datos de MySQL se conservan en el volumen `reclamos-mysql-data`, que es el mismo del modo desarrollo.
+
 ## 9. Datos semilla
 
 Después de que Hibernate actualiza el esquema (`ddl-auto: update`), Spring ejecuta `backend/reclamos-persistencia/src/main/resources/db/datos-dev.sql`, en UTF-8. Compose crea la base y usuarios MySQL, pero la semilla del dominio se carga al iniciar Spring.
@@ -319,7 +349,7 @@ Invoke-RestMethod `
     -Headers @{"X-Usuario-Id"="1"} | ConvertTo-Json -Depth 10
 ```
 
-El POST responde **201 Created**, con `Location: /api/reclamos/{numero}`. Con la semilla y las Strategies predeterminadas, queda `ASIGNADO` a Alumbrado, prioridad `MEDIA`, agente `null`, dos registros de historial y dos notificaciones `INTERNO` para el ciudadano: ingreso y asignación. El número real es generado; reutilizar `$numero`, sin copiar uno ficticio.
+El POST responde **201 Created**, con `Location: /api/reclamos/{numero}`. Con la semilla y las Strategies predeterminadas, queda `ASIGNADO` a Alumbrado, prioridad `MEDIA`, agente `null`, dos registros de historial y tres notificaciones `INTERNO`: ingreso y asignación para el ciudadano, y el aviso de asignación para la agente de Alumbrado. El número real es generado; reutilizar `$numero`, sin copiar uno ficticio.
 
 Para probar falta de cobertura, usar categoría 1 y barrio 3: queda `INGRESADO`, `area: null`, un historial y una notificación de ingreso; también responde 201. El administrador puede asignarlo manualmente.
 
@@ -351,6 +381,32 @@ Invoke-RestMethod `
 ```
 
 Cada PATCH exitoso responde 200. El detalle incluye `historial` y `accionesDisponibles` según el actor; el endpoint de notificaciones devuelve todos los avisos del reclamo visible, incluidos los destinados al agente.
+
+### Probar el vencimiento y la auditoría
+
+Una tarea programada revisa cada minuto los reclamos que pasaron su fecha límite sin resolverse. Los marca como vencidos, les sube un nivel de prioridad y genera avisos para el ciudadano y para el área.
+
+Para verlo sin esperar el plazo real, adelantar la fecha límite de un reclamo `ASIGNADO` o `EN_PROCESO`. Abrir la consola de MySQL (pide la contraseña de `.env`):
+
+```powershell
+docker compose exec mysql mysql -u reclamos -p reclamos
+```
+
+Y ejecutar, reemplazando el número:
+
+```sql
+UPDATE reclamos SET fecha_limite = NOW() - INTERVAL 1 DAY WHERE numero = 'REC-XXXXXXXX';
+```
+
+Antes de dos minutos, la consulta del reclamo devuelve `"vencido": true` y una prioridad más alta, y el endpoint de notificaciones suma dos avisos. En la interfaz aparece la insignia "Vencido".
+
+Cada operación confirmada deja además una línea de auditoría en el log del backend, con el nombre del evento y el número de reclamo. Se reconocen por el logger `auditoria`:
+
+```text
+INFO ... auditoria : ReclamoCreado reclamo=REC-XXXXXXXX fecha=... detalle=...
+```
+
+El formato exacto de la línea depende de la configuración de logs; lo que hay que buscar es la palabra `auditoria` seguida del nombre del evento.
 
 ## 11. Endpoints disponibles
 
@@ -424,7 +480,7 @@ Comprobar que Docker Desktop esté abierto, use contenedores Linux y que su moto
 
 ## 14. Cómo apagar todo
 
-En la terminal del backend y en la del frontend: **Ctrl+C**.
+En la terminal del backend y en la del frontend: **Ctrl+C**. En modo demo, **Ctrl+C** en la terminal de `docker compose up` detiene los tres contenedores.
 
 En otra terminal, desde la raíz del repositorio:
 
@@ -452,3 +508,4 @@ docker compose down
 - [ ] `/api/usuarios` responde 200.
 - [ ] `/api/reclamos` responde con `X-Usuario-Id`.
 - [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.
+- [ ] Modo demo: `docker compose up --build` levanta los tres contenedores y la interfaz responde.

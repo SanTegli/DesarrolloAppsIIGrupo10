@@ -1,5 +1,7 @@
 # Sistema de Reclamos Urbanos
 
+[![CI](https://github.com/SanTegli/DesarrolloAppsIIGrupo10/actions/workflows/ci.yml/badge.svg)](https://github.com/SanTegli/DesarrolloAppsIIGrupo10/actions/workflows/ci.yml)
+
 TPO de Desarrollo de Aplicaciones II (UADE) — Grupo 10. Docente: Mg. Christian Parkinson.
 
 Los ciudadanos reportan problemas en la vía pública (baches, luminarias rotas, residuos), el sistema
@@ -44,6 +46,9 @@ cd backend
 ```
 
 En Windows, `.\mvnw.cmd test`.
+
+GitHub Actions corre los tests del backend y del frontend en cada pull request y en cada push a
+`main` (`.github/workflows/ci.yml`). Un PR con la verificación en rojo no se mergea.
 
 ## Cómo levantar el backend
 
@@ -96,7 +101,8 @@ hace falta configurar CORS. Para apuntar a otro backend, copiar `frontend/.env.e
 `frontend/.env` y cambiar `VITE_BACKEND_URL`.
 
 Para trabajar en la interfaz sin Java ni MySQL hay una API simulada en memoria que sigue el
-contrato REST. Usa el puerto 8080, así que no puede correr a la vez que el backend:
+contrato REST, incluido el control de vencimientos. Usa el puerto 8080, así que no puede correr a
+la vez que el backend:
 
 ```bash
 cd frontend
@@ -197,6 +203,7 @@ reclamos:
 ## Documentación
 
 - [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
+- [Modelo de dominio](docs/modelo-dominio.md): clases, reglas del dominio y tablas.
 - [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
@@ -213,3 +220,4 @@ reclamos:
 | 3 | `feature/03-services-rest` | Servicios, Strategy, Observer, Facade y API REST |
 | 4 | `feature/04-frontend-integration` | React, integración, documentación y Docker |
 | 5 | `feature/05-hito1-fixes` | Servicios de asignación, notificaciones y vencimientos; auditoría |
+| 6 | `feature/06-ci-docs` | Integración continua, modelo de dominio e instructivo |
