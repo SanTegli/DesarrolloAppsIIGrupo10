@@ -15,6 +15,8 @@ npm test             # 28 tests: capa de API y componentes
 ```
 
 Guardar en esta carpeta la salida de los dos comandos (`BUILD SUCCESS` y el resumen de Vitest).
+Los mismos tests corren en GitHub Actions en cada pull request; una captura de la verificación en
+verde también sirve de evidencia.
 
 ## Casos a demostrar
 

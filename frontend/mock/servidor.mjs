@@ -9,6 +9,10 @@ import { randomUUID } from 'node:crypto'
 const PUERTO = Number(process.env.PUERTO || 8080)
 const ESTRATEGIA_PRIORIDAD = process.env.ESTRATEGIA_PRIORIDAD || 'categoria' // categoria | palabras-clave
 const ESTRATEGIA_ASIGNACION = process.env.ESTRATEGIA_ASIGNACION || 'jurisdiccion' // jurisdiccion | carga-trabajo
+// Control de vencimientos, como TareaVencimientos en el backend.
+const INTERVALO_VENCIMIENTOS_MS = Number(process.env.INTERVALO_VENCIMIENTOS_MS || 60000)
+// Para probar el vencimiento sin esperar días: plazo en segundos para todos los reclamos nuevos.
+const SLA_SEGUNDOS = process.env.SLA_SEGUNDOS ? Number(process.env.SLA_SEGUNDOS) : null
 
 // Datos semilla acordados en el contrato.
 const barrios = [
@@ -72,10 +76,8 @@ function ahora() {
   const local = new Date(fecha.getTime() - fecha.getTimezoneOffset() * 60000)
   return local.toISOString().slice(0, 19)
 }
-function sumarHoras(iso, horas) {
-  const fecha = new Date(`${iso}Z`)
-  fecha.setUTCHours(fecha.getUTCHours() + horas)
-  return fecha.toISOString().slice(0, 19)
+function sumarSegundos(iso, segundos) {
+  return new Date(Date.parse(`${iso}Z`) + segundos * 1000).toISOString().slice(0, 19)
 }
 
 const referencia = (objeto) => (objeto ? { id: objeto.id, nombre: objeto.nombre } : null)
@@ -166,6 +168,32 @@ function notificarAsignacion(reclamo, area, fecha) {
       notificar(reclamo, agente.id, `El reclamo ${reclamo.numero} fue asignado a tu area ${area.nombre}.`, fecha),
     )
 }
+// Igual que ServicioVencimientos.marcarVencidos y ServicioNotificaciones.avisarVencimiento:
+// marca una sola vez, sube un nivel de prioridad y avisa al ciudadano y al agente o al área.
+function marcarVencidos() {
+  const fecha = ahora()
+  reclamos
+    .filter((r) => !r.vencido && ['INGRESADO', 'ASIGNADO', 'EN_PROCESO'].includes(r.estado) && r.fechaLimite < fecha)
+    .forEach((reclamo) => {
+      reclamo.vencido = true
+      reclamo.prioridad = PRIORIDADES[Math.min(PRIORIDADES.indexOf(reclamo.prioridad) + 1, PRIORIDADES.length - 1)]
+      notificar(
+        reclamo,
+        reclamo.ciudadanoId,
+        `Tu reclamo ${reclamo.numero} supero su fecha limite y paso a prioridad ${reclamo.prioridad}.`,
+        fecha,
+      )
+      const aviso = `El reclamo ${reclamo.numero} vencio sin resolverse. Prioridad ${reclamo.prioridad}.`
+      if (reclamo.agenteId) {
+        notificar(reclamo, reclamo.agenteId, aviso, fecha)
+      } else if (reclamo.areaId) {
+        usuarios
+          .filter((usuario) => usuario.rol === 'AGENTE_MUNICIPAL' && usuario.areaId === reclamo.areaId)
+          .forEach((agente) => notificar(reclamo, agente.id, aviso, fecha))
+      }
+      console.log(`Vencimiento: ${reclamo.numero} pasa a prioridad ${reclamo.prioridad}`)
+    })
+}
 const pendientes = (areaId) =>
   reclamos.filter((r) => r.areaId === areaId && (r.estado === 'ASIGNADO' || r.estado === 'EN_PROCESO')).length
 
@@ -197,7 +225,7 @@ function crear(usuario, cuerpo) {
     prioridad,
     vencido: false,
     fechaCreacion: fecha,
-    fechaLimite: sumarHoras(fecha, categoria.slaHoras),
+    fechaLimite: sumarSegundos(fecha, SLA_SEGUNDOS ?? categoria.slaHoras * 3600),
     categoriaId: categoria.id,
     barrioId: barrio.id,
     ciudadanoId: usuario.id,
@@ -387,4 +415,6 @@ createServer(async (peticion, respuesta) => {
 }).listen(PUERTO, () => {
   console.log(`API simulada en http://localhost:${PUERTO}/api`)
   console.log(`Prioridad: ${ESTRATEGIA_PRIORIDAD}. Asignación: ${ESTRATEGIA_ASIGNACION}.`)
+  console.log(`Vencimientos: control cada ${INTERVALO_VENCIMIENTOS_MS} ms.`)
 })
+setInterval(marcarVencidos, INTERVALO_VENCIMIENTOS_MS)

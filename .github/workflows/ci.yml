@@ -1,0 +1,52 @@
+# Corre los tests del backend y del frontend en cada pull request y en cada push a main.
+# Un PR no debería mergearse si alguno de los dos trabajos falla.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  backend:
+    name: Backend (Maven)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Los tests usan H2 en memoria: no necesitan MySQL ni Docker.
+      - name: Tests
+        run: ./mvnw -B test
+      # Si algo falla, los reportes quedan descargables desde la página de la ejecución.
+      - name: Guardar reportes de tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-surefire
+          path: backend/**/target/surefire-reports/
+
+  frontend:
+    name: Frontend (Vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Tests
+        run: npm test
+      - name: Compilación
+        run: npm run build

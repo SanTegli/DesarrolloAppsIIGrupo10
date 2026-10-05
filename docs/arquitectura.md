@@ -70,6 +70,8 @@ React → Controller → Facade → Servicios → Dominio → Repository → JPA
 | Persistencia | `reclamos-persistencia` | Implementar los Repository con Spring Data JPA | No tiene reglas de negocio |
 | Utilidades | `reclamos-comun` | Validación y excepciones compartidas | No depende de nada |
 
+El detalle de las clases del dominio y de las tablas está en [modelo-dominio.md](modelo-dominio.md).
+
 ## Componentes
 
 Cada módulo Maven es un componente con artefacto propio. Las dependencias van en un solo sentido.
