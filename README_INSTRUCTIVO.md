@@ -418,6 +418,7 @@ El formato exacto de la línea depende de la configuración de logs; lo que hay 
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
 | GET | `/api/reclamos/{numero}/notificaciones` | Consultar avisos del reclamo con los mismos permisos del detalle. |
+| GET | `/api/notificaciones` | Bandeja de avisos del usuario de `X-Usuario-Id`, del más nuevo al más viejo. |
 | GET | `/api/usuarios` | Listar usuarios del selector de identidad. |
 | GET | `/api/usuarios/{id}` | Consultar usuario por ID positivo. |
 | GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |

@@ -265,6 +265,27 @@ correo ni SMS.
 | `ReclamoResuelto` | Ciudadano |
 | `ReclamoVencido` | Ciudadano y el agente a cargo; si nadie lo tomó, los agentes del área |
 
+## Avisos
+
+### `GET /api/notificaciones` — bandeja de avisos del usuario
+
+Los avisos que recibió el usuario de `X-Usuario-Id`, de cualquier reclamo, del más nuevo al más
+viejo. Cada usuario ve solo los suyos; no hay filtros.
+
+```json
+[
+  {
+    "numeroReclamo": "REC-4F2A91BC",
+    "canal": "INTERNO",
+    "mensaje": "Tu reclamo REC-4F2A91BC fue asignado al area Alumbrado.",
+    "fechaEnvio": "2026-10-05T10:00:00"
+  }
+]
+```
+
+Sin avisos devuelve `[]`. Errores: `400` falta `X-Usuario-Id` o no es un número positivo; `404` el
+usuario no existe.
+
 ## Consultas de apoyo
 
 No piden `X-Usuario-Id`.

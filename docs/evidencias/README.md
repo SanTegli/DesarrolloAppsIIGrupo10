@@ -39,6 +39,7 @@ Los usuarios, barrios, categorías y áreas son los de la semilla (ver
 | CP12 | Consultas por número, ciudadano y área | `ReclamoRepositoryJpaTest.filtraPorCiudadanoYAreaYOrdenaDelMasNuevoAlMasViejo`, `RestIntegrationTest.listadosPorRolConservanOrdenYSoloIncluyenCamposDelResumen` | El listado de Ana muestra solo sus reclamos; el de Carla, los de Alumbrado; el de Elena, todos, con filtro por área |
 
 | CP13 | Vencimiento: se marca, sube la prioridad y publica `ReclamoVencido` | `ServicioVencimientosTest`, `FlujoDeAvisosTest.elVencimientoPublicaReclamoVencidoYAvisaAlCiudadanoYAlArea` | Con un reclamo abierto, adelantar su `fecha_limite` en MySQL y esperar un minuto. Aparece la insignia "Vencido" y un aviso nuevo |
+| CP14 | Cada usuario consulta los avisos que recibió | `ConsultaAvisosTest`, `RestIntegrationTest.bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad` | Crear un reclamo como Ana y abrir la pestaña "Avisos": dos avisos. Cambiar a Carla: un aviso, el de la asignación a su área |
 
 Para CP13, con el número del reclamo:
 
@@ -66,6 +67,7 @@ evidencia de la integración.
 | [09-admin-administracion](interfaz/09-admin-administracion.png) | Administrador: reclamos sin asignar y cobertura de las áreas |
 | [10-admin-asignacion-manual](interfaz/10-admin-asignacion-manual.png) | Administrador: asignación manual y rechazo |
 | [13-ciudadano-cerrado](interfaz/13-ciudadano-cerrado.png) | Flujo completo: historial de cinco pasos y avisos |
+| [14-avisos-ciudadano](interfaz/14-avisos-ciudadano.png) | Pestaña Avisos: lo que recibió el usuario, con enlace a cada reclamo |
 
 ## Pendiente antes de entregar
 

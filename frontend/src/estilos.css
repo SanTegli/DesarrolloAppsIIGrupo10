@@ -270,6 +270,10 @@ td .secundario {
   display: block;
 }
 
+.sin-corte {
+  white-space: nowrap;
+}
+
 .vacio,
 .estado-carga,
 .ayuda {

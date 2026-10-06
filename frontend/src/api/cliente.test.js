@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { simularApi } from '../pruebas/apiFalsa.js'
 import { ErrorApi, pedir } from './cliente.js'
-import { asignarArea, cambiarEstado, crearReclamo, listarReclamos } from './reclamos.js'
+import { asignarArea, cambiarEstado, crearReclamo, listarAvisos, listarReclamos } from './reclamos.js'
 
 describe('cliente HTTP', () => {
   it('envía X-Usuario-Id y pide JSON', async () => {
@@ -57,6 +57,14 @@ describe('cliente HTTP', () => {
     await asignarArea(7, 'REC-1', 2, 'Corresponde a Obras')
 
     expect(llamadas[0].cuerpo).toEqual({ areaId: 2, observacion: 'Corresponde a Obras' })
+  })
+
+  it('pide la bandeja de avisos con el X-Usuario-Id del usuario', async () => {
+    const llamadas = simularApi({ 'GET /api/notificaciones': [] })
+
+    await listarAvisos(3)
+
+    expect(llamadas[0]).toMatchObject({ metodo: 'GET', ruta: '/api/notificaciones', usuarioId: '3' })
   })
 
   it('convierte el error del contrato en ErrorApi con status, código, mensaje y detalles', async () => {

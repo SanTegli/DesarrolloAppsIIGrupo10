@@ -72,6 +72,10 @@ public class GestionReclamosFacade {
         return consultas.consultarNotificaciones(usuarioId, numero);
     }
 
+    public List<Notificacion> consultarAvisosDelUsuario(Long usuarioId) {
+        return consultas.consultarAvisosDelUsuario(usuarioId);
+    }
+
     public Set<EstadoReclamo> accionesDisponibles(Long usuarioId, String numero) {
         return consultas.accionesDisponibles(usuarioId, numero);
     }

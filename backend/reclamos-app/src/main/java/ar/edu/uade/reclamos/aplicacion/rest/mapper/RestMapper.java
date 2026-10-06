@@ -33,6 +33,11 @@ public class RestMapper {
                 aviso.getMensaje(), aviso.getFechaEnvio());
     }
 
+    public AvisoResponse aviso(Notificacion aviso) {
+        return new AvisoResponse(aviso.getReclamo().getNumero(), aviso.getCanal(), aviso.getMensaje(),
+                aviso.getFechaEnvio());
+    }
+
     public UsuarioResponse usuario(Usuario usuario) {
         ReferenciaResponse area = usuario instanceof AgenteMunicipal agente ? areaReferencia(agente.getArea()) : null;
         return new UsuarioResponse(usuario.getId(), usuario.getNombreCompleto(), usuario.getRol(), area);

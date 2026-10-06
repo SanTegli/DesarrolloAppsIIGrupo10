@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { listarAreas, listarBarrios, listarCategorias, listarUsuarios } from './api/catalogos.js'
 import { AvisoError } from './componentes/Aviso.jsx'
+import BandejaAvisos from './componentes/BandejaAvisos.jsx'
 import DetalleReclamo from './componentes/DetalleReclamo.jsx'
 import Encabezado from './componentes/Encabezado.jsx'
 import FormularioReclamo from './componentes/FormularioReclamo.jsx'
@@ -45,6 +46,7 @@ function pestanasPara(rol) {
   if (rol === 'ADMINISTRADOR') {
     pestanas.push({ id: 'administracion', texto: 'Administración' })
   }
+  pestanas.push({ id: 'avisos', texto: 'Avisos' })
   return pestanas
 }
 
@@ -137,6 +139,10 @@ export default function App() {
 
         {usuario && vista.nombre === 'administracion' && usuario.rol === 'ADMINISTRADOR' && (
           <PanelAdministracion usuario={usuario} areas={catalogos.datos.areas} onAbrir={abrir} />
+        )}
+
+        {usuario && vista.nombre === 'avisos' && (
+          <BandejaAvisos key={usuario.id} usuario={usuario} onAbrir={abrir} />
         )}
 
         {usuario && vista.nombre === 'detalle' && (
