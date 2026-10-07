@@ -58,6 +58,12 @@ public class ConsultaReclamosService {
         return notificaciones.buscarPorReclamo(numero);
     }
 
+    /** Bandeja de avisos: todo lo que se le notificó al usuario, del aviso más nuevo al más viejo. */
+    public List<Notificacion> consultarAvisosDelUsuario(Long usuarioId) {
+        Usuario usuario = usuario(usuarioId);
+        return notificaciones.buscarPorDestinatario(usuario.getId());
+    }
+
     public Set<EstadoReclamo> accionesDisponibles(Long usuarioId, String numero) {
         Usuario usuario = usuario(usuarioId);
         Reclamo reclamo = reclamo(numero);

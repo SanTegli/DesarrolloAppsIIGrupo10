@@ -20,7 +20,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos', 'Crear reclamo'])
+    expect(pestanas()).toEqual(['Reclamos', 'Crear reclamo', 'Avisos'])
     expect(llamadas.find((llamada) => llamada.ruta === '/api/reclamos').usuarioId).toBe('1')
   })
 
@@ -33,12 +33,12 @@ describe('App', () => {
 
     await usuario.selectOptions(selector, 'Carla Gómez, Agente municipal de Alumbrado')
     expect(await screen.findByRole('heading', { name: 'Reclamos de mi área' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos'])
+    expect(pestanas()).toEqual(['Reclamos', 'Avisos'])
     expect(await screen.findByText('Tu área no tiene reclamos asignados.')).toBeInTheDocument()
 
     await usuario.selectOptions(selector, 'Elena Ruiz, Administrador')
     expect(await screen.findByRole('heading', { name: 'Todos los reclamos' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos', 'Administración'])
+    expect(pestanas()).toEqual(['Reclamos', 'Administración', 'Avisos'])
 
     const usados = llamadas.filter((llamada) => llamada.ruta === '/api/reclamos').map((llamada) => llamada.usuarioId)
     expect(usados).toEqual(['1', '3', '7'])
@@ -122,6 +122,52 @@ describe('App', () => {
     expect(await screen.findByText('Sin asignar')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'Obras Públicas' })).toBeInTheDocument()
     expect(llamadas.some((llamada) => llamada.consulta?.estado === 'INGRESADO' && llamada.usuarioId === '7')).toBe(true)
+  })
+
+  it('el agente ve en Avisos lo que le notificaron y abre el reclamo desde ahí', async () => {
+    localStorage.setItem('reclamos.usuarioId', '3')
+    const asignado = reclamo({ accionesDisponibles: ['EN_PROCESO'] })
+    const llamadas = simularApi({
+      ...CATALOGOS,
+      'GET /api/reclamos': [],
+      'GET /api/notificaciones': [
+        { numeroReclamo: 'REC-4F2A91BC', canal: 'INTERNO', mensaje: 'El reclamo REC-4F2A91BC fue asignado a tu area Alumbrado.', fechaEnvio: '2026-10-05T10:00:00' },
+      ],
+      'GET /api/reclamos/REC-4F2A91BC': asignado,
+      'GET /api/reclamos/REC-4F2A91BC/notificaciones': [],
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
+
+    expect(await screen.findByText('El reclamo REC-4F2A91BC fue asignado a tu area Alumbrado.')).toBeInTheDocument()
+    expect(screen.getByText('05/10/2026 10:00')).toBeInTheDocument()
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/notificaciones').usuarioId).toBe('3')
+
+    await usuario.click(screen.getByRole('button', { name: 'REC-4F2A91BC' }))
+    expect(await screen.findByRole('button', { name: 'Tomar reclamo' })).toBeInTheDocument()
+
+    await usuario.click(screen.getByRole('button', { name: 'Volver al listado' }))
+    expect(await screen.findByRole('heading', { name: 'Avisos' })).toBeInTheDocument()
+  })
+
+  it('la bandeja vacía lo dice y un error del backend se muestra', async () => {
+    simularApi({ ...CATALOGOS, 'GET /api/reclamos': [], 'GET /api/notificaciones': [] })
+    const usuario = userEvent.setup()
+    const { unmount } = render(<App />)
+    await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
+    expect(await screen.findByText('No tenés avisos.')).toBeInTheDocument()
+    unmount()
+
+    simularApi({
+      ...CATALOGOS,
+      'GET /api/reclamos': [],
+      'GET /api/notificaciones': { status: 404, cuerpo: { status: 404, codigo: 'RECURSO_NO_ENCONTRADO', mensaje: 'No existe usuario con identificador 1', detalles: [] } },
+    })
+    render(<App />)
+    await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('No existe usuario con identificador 1')
   })
 
   it('avisa cuando el backend no responde y permite reintentar', async () => {

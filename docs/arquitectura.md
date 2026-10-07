@@ -12,7 +12,7 @@ flowchart TB
     API["src/api: cliente HTTP y X-Usuario-Id"]
   end
   subgraph REST["Presentación REST - reclamos-app/aplicacion/rest"]
-    CTRL["ReclamoController, UsuarioController, CatalogoController"]
+    CTRL["ReclamoController, NotificacionController,<br/>UsuarioController, CatalogoController"]
     DTO["DTOs, RestMapper, ManejadorGlobalErrores"]
   end
   subgraph APP["Servicios - reclamos-app/aplicacion"]
@@ -119,6 +119,8 @@ Los servicios se integran entre sí de dos formas:
 
 `TareaVencimientos` ejecuta `ServicioVencimientos` cada minuto. El intervalo se cambia con
 `reclamos.vencimientos.intervalo-ms` y la tarea se apaga con `reclamos.vencimientos.habilitado: false`.
+Toda la configuración `reclamos.*` está tipada en `PropiedadesReclamos`: una clave mal escrita o un
+intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
 
 ## Decisiones de diseño
 

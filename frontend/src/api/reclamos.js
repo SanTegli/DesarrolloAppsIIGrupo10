@@ -39,6 +39,11 @@ export function asignarArea(usuarioId, numero, areaId, observacion) {
   })
 }
 
+/** GET /api/notificaciones. Bandeja del usuario: los avisos que recibió, del más nuevo al más viejo. */
+export function listarAvisos(usuarioId) {
+  return pedir('/notificaciones', { usuarioId })
+}
+
 /** GET /api/reclamos/{numero}/notificaciones. Avisos generados por los eventos. */
 export function listarNotificaciones(usuarioId, numero) {
   return pedir(`${ruta(numero)}/notificaciones`, { usuarioId })

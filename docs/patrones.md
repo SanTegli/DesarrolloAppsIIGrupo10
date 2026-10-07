@@ -189,8 +189,9 @@ auditoría.
   `reclamos-app/…/aplicacion/evento/`
 - **Tests:** `FlujoDeAvisosTest` (sin Spring), `ObserverIntegrationTest`, `ServicioNotificacionesTest`,
   `ServicioVencimientosTest`
-- **Demostración:** el detalle de un reclamo en la interfaz muestra "Avisos enviados"; también
-  `GET /api/reclamos/{numero}/notificaciones`. La auditoría se ve en el log del backend, en las
+- **Demostración:** el detalle de un reclamo en la interfaz muestra "Avisos enviados" y la
+  pestaña "Avisos" reúne los que recibió cada usuario; también
+  `GET /api/reclamos/{numero}/notificaciones` y `GET /api/notificaciones`. La auditoría se ve en el log del backend, en las
   líneas del logger `auditoria`.
 
 ## Facade

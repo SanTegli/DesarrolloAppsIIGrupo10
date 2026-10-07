@@ -96,6 +96,8 @@ elige el usuario y la interfaz envía su id en el encabezado `X-Usuario-Id`.
 | Agente municipal | Ver los reclamos de su área, tomarlos y resolverlos |
 | Administrador | Ver todos, asignar a mano, reasignar y rechazar |
 
+Los tres roles tienen además la pestaña **Avisos**, con las notificaciones que recibió el usuario.
+
 El navegador llama a `/api` en el mismo origen y Vite reenvía esas llamadas al backend, por eso no
 hace falta configurar CORS. Para apuntar a otro backend, copiar `frontend/.env.example` a
 `frontend/.env` y cambiar `VITE_BACKEND_URL`.
@@ -200,6 +202,9 @@ reclamos:
     intervalo-ms: 60000
 ```
 
+Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singular) o un
+`intervalo-ms` que no sea mayor que cero impiden el arranque con un mensaje de configuración.
+
 ## Documentación
 
 - [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
@@ -221,3 +226,4 @@ reclamos:
 | 4 | `feature/04-frontend-integration` | React, integración, documentación y Docker |
 | 5 | `feature/05-hito1-fixes` | Servicios de asignación, notificaciones y vencimientos; auditoría |
 | 6 | `feature/06-ci-docs` | Integración continua, modelo de dominio e instructivo |
+| 7 | `feature/07-avisos-config` | Bandeja de avisos y configuración de vencimientos validada |

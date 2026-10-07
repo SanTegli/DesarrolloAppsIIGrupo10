@@ -367,6 +367,21 @@ class RestIntegrationTest {
     }
 
     @Test
+    void bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad() throws Exception {
+        facade.tomar(datos.agente(), datos.asignado(), "Cuadrilla");
+        String ruta = "/api/notificaciones";
+        MvcResult resultado = mvc.perform(get(ruta).header("X-Usuario-Id", datos.ciudadano()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].numeroReclamo").value(datos.asignado()))
+                .andExpect(jsonPath("$[0].canal").value("INTERNO")).andReturn();
+        campos(leer(resultado).get(0), "numeroReclamo", "canal", "mensaje", "fechaEnvio");
+        mvc.perform(get(ruta).header("X-Usuario-Id", datos.otroCiudadano()))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
+        error(mvc.perform(get(ruta)), 400, "DATOS_INVALIDOS", ruta);
+        error(mvc.perform(get(ruta).header("X-Usuario-Id", 999999)), 404, "RECURSO_NO_ENCONTRADO", ruta);
+    }
+
+    @Test
     void usuariosYCatalogosNoExigenIdentidadYSoloExponenCamposDelContrato() throws Exception {
         JsonNode usuariosDto = leer(mvc.perform(get("/api/usuarios")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(5))).andReturn());

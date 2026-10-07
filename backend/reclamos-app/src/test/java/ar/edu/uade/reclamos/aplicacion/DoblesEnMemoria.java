@@ -107,7 +107,11 @@ public final class DoblesEnMemoria {
 
         @Override
         public List<Notificacion> buscarPorDestinatario(Long usuarioId) {
-            return guardadas.stream().filter(n -> n.getDestinatario().getId().equals(usuarioId)).toList();
+            // Del más nuevo al más viejo, como pide el contrato del Repository.
+            return guardadas.stream().filter(n -> n.getDestinatario().getId().equals(usuarioId))
+                    .sorted(Comparator.comparing(Notificacion::getFechaEnvio).thenComparing(Notificacion::getId)
+                            .reversed())
+                    .toList();
         }
 
         /** Ids de los destinatarios, en el orden en que se guardaron los avisos. */

@@ -54,6 +54,30 @@ class ConfiguracionAplicacionTest {
     }
 
     @Test
+    void vencimientosTienenValoresPredeterminadosYAceptanOtros() {
+        contexto.run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            PropiedadesReclamos.Vencimientos vencimientos = ctx.getBean(PropiedadesReclamos.class).vencimientos();
+            assertThat(vencimientos.habilitado()).isTrue();
+            assertThat(vencimientos.intervaloMs()).isEqualTo(60000);
+        });
+        contexto.withPropertyValues("reclamos.vencimientos.habilitado=false",
+                "reclamos.vencimientos.intervalo-ms=5000").run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            PropiedadesReclamos.Vencimientos vencimientos = ctx.getBean(PropiedadesReclamos.class).vencimientos();
+            assertThat(vencimientos.habilitado()).isFalse();
+            assertThat(vencimientos.intervaloMs()).isEqualTo(5000);
+        });
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"reclamos.vencimientos.intervalo-ms=0", "reclamos.vencimientos.intervalo-ms=-1",
+            "reclamos.vencimiento.habilitado=false", "reclamos.vencimientos.intervalo=60000"})
+    void vencimientosMalConfiguradosImpidenArrancar(String propiedad) {
+        contexto.withPropertyValues(propiedad).run(ctx -> assertThat(ctx).hasFailed());
+    }
+
+    @Test
     void factoryUsaElRelojInyectadoParaCreacionYSla() {
         Clock fijo = Clock.fixed(Instant.parse("2026-10-05T13:00:00Z"), ZoneId.of("America/Argentina/Buenos_Aires"));
         contexto.withBean(Clock.class, () -> fijo).run(ctx -> {

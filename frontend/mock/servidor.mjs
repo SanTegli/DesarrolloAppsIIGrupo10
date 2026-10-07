@@ -356,6 +356,16 @@ async function atender(peticion) {
     }
   }
 
+  // Bandeja del usuario: sus avisos, del más nuevo al más viejo.
+  if (partes[1] === 'notificaciones' && partes.length === 2 && metodo === 'GET') {
+    const usuario = usuarioDe(peticion)
+    const lista = notificaciones
+      .filter((n) => n.destinatarioId === usuario.id)
+      .map((n) => ({ numeroReclamo: n.numero, canal: n.canal, mensaje: n.mensaje, fechaEnvio: n.fechaEnvio }))
+      .reverse()
+    return [200, lista]
+  }
+
   if (partes[1] === 'reclamos') {
     const usuario = usuarioDe(peticion)
     if (partes.length === 2 && metodo === 'GET') return [200, listar(usuario, url.searchParams)]
