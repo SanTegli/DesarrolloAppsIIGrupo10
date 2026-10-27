@@ -8,9 +8,9 @@ import java.util.Optional;
 /**
  * Patrón Strategy: algoritmo intercambiable para elegir el área responsable de un reclamo.
  *
- * <p>Implementaciones del Hito 1 (PR 3): {@code AsignacionPorJurisdiccion} y
- * {@code AsignacionPorCargaDeTrabajo}. En el Hito 2 se suma {@code AsignacionPorJurisdiccionRemota},
- * que consulta el servicio SOAP.
+ * <p>Implementaciones: {@code AsignacionPorJurisdiccion} y {@code AsignacionPorCargaDeTrabajo}.
+ * Las áreas candidatas las entrega {@code CatalogoCobertura}; en la Segunda Parte salen del servicio
+ * SOAP de cobertura y esta interfaz no cambia.
  */
 public interface EstrategiaAsignacion {
 

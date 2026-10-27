@@ -11,6 +11,7 @@ import java.util.TreeMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.TypeMismatchException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.method.ParameterErrors;
@@ -50,6 +51,15 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(ReglaNegocioException.class)
     public ResponseEntity<ErrorResponse> reglaNegocio(ReglaNegocioException error, HttpServletRequest request) {
         return respuesta(409, "REGLA_NEGOCIO", error.getMessage(), List.of(), request);
+    }
+
+    /** Otra operación modificó el mismo reclamo entre la lectura y el guardado (bloqueo optimista). */
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<ErrorResponse> conflictoConcurrente(OptimisticLockingFailureException error,
+                                                             HttpServletRequest request) {
+        return respuesta(409, "CONFLICTO_CONCURRENTE",
+                "El reclamo cambió mientras se procesaba la operación. Volvé a cargarlo e intentá de nuevo.",
+                List.of(), request);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

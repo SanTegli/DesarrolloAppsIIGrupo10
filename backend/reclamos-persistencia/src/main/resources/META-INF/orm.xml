@@ -92,8 +92,14 @@
       <basic name="estado"><column name="estado" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
       <basic name="prioridad"><column name="prioridad" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
       <basic name="vencido"><column name="vencido" nullable="false"/></basic>
+      <!-- Segunda Parte: nulables o con valor implícito para no romper los reclamos ya guardados. -->
+      <basic name="origenPrioridad"><column name="origen_prioridad" nullable="true" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="motivoPrioridad"><column name="motivo_prioridad" nullable="true" length="300"/></basic>
+      <basic name="asignacionPendiente"><column name="asignacion_pendiente" nullable="false"/></basic>
       <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
       <basic name="fechaLimite"><column name="fecha_limite" nullable="false"/></basic>
+      <!-- Bloqueo optimista: una copia desactualizada del reclamo no pisa el cambio de otra operación. -->
+      <version name="version"><column name="version" nullable="false"/></version>
       <many-to-one name="ciudadano" target-entity="Ciudadano" fetch="LAZY" optional="false"><join-column name="ciudadano_id" nullable="false"/></many-to-one>
       <many-to-one name="agente" target-entity="AgenteMunicipal" fetch="LAZY" optional="true"><join-column name="agente_id" nullable="true"/></many-to-one>
       <many-to-one name="categoria" target-entity="Categoria" fetch="LAZY" optional="false"><join-column name="categoria_id" nullable="false"/></many-to-one>
@@ -103,6 +109,7 @@
         <order-by>fecha ASC, id ASC</order-by>
         <cascade><cascade-persist/><cascade-merge/></cascade>
       </one-to-many>
+      <embedded name="ubicacion"/>
     </attributes>
   </entity>
   <entity class="HistorialEstado" access="FIELD" metadata-complete="true">
@@ -126,4 +133,14 @@
       <many-to-one name="destinatario" target-entity="Usuario" fetch="LAZY" optional="false"><join-column name="destinatario_id" nullable="false"/></many-to-one>
     </attributes>
   </entity>
+  <!-- Ubicación del reclamo, en columnas de la tabla reclamos. -->
+  <embeddable class="Ubicacion" access="FIELD" metadata-complete="true">
+    <attributes>
+      <basic name="estado"><column name="ubicacion_estado" nullable="true" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="latitud"><column name="ubicacion_latitud" nullable="true"/></basic>
+      <basic name="longitud"><column name="ubicacion_longitud" nullable="true"/></basic>
+      <basic name="direccionNormalizada"><column name="ubicacion_direccion" nullable="true" length="300"/></basic>
+      <basic name="proveedor"><column name="ubicacion_proveedor" nullable="true" length="40"/></basic>
+    </attributes>
+  </embeddable>
 </entity-mappings>

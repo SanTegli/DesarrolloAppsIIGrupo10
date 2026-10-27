@@ -11,6 +11,12 @@ spring:
 server:
   port: 8080
 
+# Contrato OpenAPI de REST 1: Swagger UI en /swagger-ui.html, contrato en /v3/api-docs.yaml.
+springdoc:
+  paths-to-match: /api/**
+  swagger-ui:
+    path: /swagger-ui.html
+
 # Estrategias activas (patrón Strategy).
 reclamos:
   prioridad:
@@ -21,3 +27,6 @@ reclamos:
   vencimientos:
     habilitado: true
     intervalo-ms: 60000
+  # De dónde salen las áreas candidatas para la asignación automática.
+  cobertura:
+    origen: local                # local (la base del backend); soap se suma en la Segunda Parte

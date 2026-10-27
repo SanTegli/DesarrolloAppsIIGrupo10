@@ -19,13 +19,20 @@ public class Reclamo extends Entidad {
 
     public static final int LONGITUD_MAXIMA_DESCRIPCION = 1000;
     public static final int LONGITUD_MAXIMA_DIRECCION = 200;
+    public static final int LONGITUD_MAXIMA_MOTIVO_PRIORIDAD = 300;
 
     private String numero;
     private String descripcion;
     private String direccion;
     private EstadoReclamo estado;
     private Prioridad prioridad;
+    private OrigenPrioridad origenPrioridad;
+    private String motivoPrioridad;
     private boolean vencido;
+    private boolean asignacionPendiente;
+    private Ubicacion ubicacion;
+    /** Bloqueo optimista: lo incrementa la persistencia en cada actualización. */
+    private long version;
     private LocalDateTime fechaCreacion;
     private LocalDateTime fechaLimite;
     private Ciudadano ciudadano;
@@ -54,6 +61,8 @@ public class Reclamo extends Entidad {
             throw new DatosInvalidosException("La fecha límite no puede ser anterior a la fecha de creación.");
         }
         this.estado = EstadoReclamo.INGRESADO;
+        this.origenPrioridad = OrigenPrioridad.CATEGORIA;
+        this.ubicacion = Ubicacion.pendiente();
         registrarCambio(null, ciudadano, "Reclamo ingresado", fechaCreacion);
     }
 
@@ -75,6 +84,7 @@ public class Reclamo extends Entidad {
         EstadoReclamo anterior = estado;
         this.area = nuevaArea;
         this.agente = null;
+        this.asignacionPendiente = false;
         this.estado = EstadoReclamo.ASIGNADO;
         registrarCambio(anterior, actor, observacion, ahora);
     }
@@ -116,9 +126,33 @@ public class Reclamo extends Entidad {
         return true;
     }
 
-    /** La define la estrategia de prioridad después de crear el reclamo. */
-    public void definirPrioridad(Prioridad nuevaPrioridad) {
+    /**
+     * La define la estrategia de prioridad después de crear el reclamo.
+     *
+     * @param origen qué decidió la prioridad, para que gestión sepa cuánto confiar en ella
+     * @param motivo explicación breve; {@code null} cuando es la prioridad de la categoría
+     */
+    public void definirPrioridad(Prioridad nuevaPrioridad, OrigenPrioridad origen, String motivo) {
         this.prioridad = Validador.requerirNoNulo(nuevaPrioridad, "prioridad");
+        this.origenPrioridad = Validador.requerirNoNulo(origen, "origen");
+        this.motivoPrioridad = motivo == null || motivo.isBlank() ? null
+                : Validador.requerirTexto(motivo, "motivo", LONGITUD_MAXIMA_MOTIVO_PRIORIDAD);
+    }
+
+    /** Guarda dónde ocurre el reclamo; reemplaza la ubicación anterior. */
+    public void registrarUbicacion(Ubicacion nuevaUbicacion) {
+        this.ubicacion = Validador.requerirNoNulo(nuevaUbicacion, "ubicación");
+    }
+
+    /**
+     * El servicio de cobertura no respondió y el reclamo quedó sin asignar por esa razón, no por falta de
+     * áreas. Un administrador lo asigna a mano; asignarlo borra la marca.
+     */
+    public void marcarAsignacionPendiente() {
+        if (estado != EstadoReclamo.INGRESADO) {
+            throw new ReglaNegocioException("Solo un reclamo INGRESADO puede quedar con la asignación pendiente.");
+        }
+        this.asignacionPendiente = true;
     }
 
     public boolean perteneceA(Usuario usuario) {
@@ -159,8 +193,31 @@ public class Reclamo extends Entidad {
         return prioridad;
     }
 
+    /** Los reclamos guardados antes de existir este dato se informan como {@link OrigenPrioridad#CATEGORIA}. */
+    public OrigenPrioridad getOrigenPrioridad() {
+        return origenPrioridad == null ? OrigenPrioridad.CATEGORIA : origenPrioridad;
+    }
+
+    /** {@code null} cuando la prioridad es la de la categoría. */
+    public String getMotivoPrioridad() {
+        return motivoPrioridad;
+    }
+
     public boolean isVencido() {
         return vencido;
+    }
+
+    public boolean isAsignacionPendiente() {
+        return asignacionPendiente;
+    }
+
+    /** Nunca {@code null}: los reclamos guardados antes de existir este dato se informan como pendientes. */
+    public Ubicacion getUbicacion() {
+        return ubicacion == null ? Ubicacion.pendiente() : ubicacion;
+    }
+
+    public long getVersion() {
+        return version;
     }
 
     public LocalDateTime getFechaCreacion() {

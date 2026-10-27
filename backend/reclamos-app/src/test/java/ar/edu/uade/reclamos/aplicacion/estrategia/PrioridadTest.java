@@ -2,6 +2,7 @@ package ar.edu.uade.reclamos.aplicacion.estrategia;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import ar.edu.uade.reclamos.dominio.estrategia.PrioridadCalculada;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -13,7 +14,7 @@ class PrioridadTest {
     @EnumSource(Prioridad.class)
     void categoriaDevuelveSuBaseSinModificarElReclamo(Prioridad base) {
         Reclamo reclamo = reclamo(base, "Problema urgente");
-        assertThat(new PrioridadPorCategoria().calcular(reclamo)).isEqualTo(base);
+        assertThat(new PrioridadPorCategoria().calcular(reclamo)).isEqualTo(PrioridadCalculada.porCategoria(base));
         assertThat(reclamo.getPrioridad()).isEqualTo(base);
         assertThat(reclamo.getHistorial()).hasSize(1);
     }
@@ -23,16 +24,20 @@ class PrioridadTest {
             "riesgo/accidente", "un accidente\nfrente a la plaza"})
     void palabrasCompletasElevanHastaAltaSinModificarElReclamo(String descripcion) {
         Reclamo reclamo = reclamo(Prioridad.BAJA, descripcion);
-        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo)).isEqualTo(Prioridad.ALTA);
+        PrioridadCalculada calculada = new PrioridadPorPalabrasClave().calcular(reclamo);
+        assertThat(calculada.prioridad()).isEqualTo(Prioridad.ALTA);
+        assertThat(calculada.origen()).isEqualTo(OrigenPrioridad.PALABRAS_CLAVE);
+        assertThat(calculada.motivo()).startsWith("La descripción menciona \"");
         assertThat(reclamo.getPrioridad()).isEqualTo(Prioridad.BAJA);
     }
 
     @ParameterizedTest
     @EnumSource(Prioridad.class)
     void palabrasNuncaReducenLaBase(Prioridad base) {
-        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(base, "riesgo urgente")))
+        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(base, "riesgo urgente")).prioridad())
                 .isEqualTo(Prioridad.mayor(base, Prioridad.ALTA));
-        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(base, "Farol apagado"))).isEqualTo(base);
+        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(base, "Farol apagado")))
+                .isEqualTo(PrioridadCalculada.porCategoria(base));
     }
 
     @ParameterizedTest
@@ -40,7 +45,14 @@ class PrioridadTest {
             "preurgente", "urgente123", "urgente_", "éurgente", "urgenteñ"})
     void noCoincidenFragmentosDeOtrasPalabras(String descripcion) {
         assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(Prioridad.MEDIA, descripcion)))
-                .isEqualTo(Prioridad.MEDIA);
+                .isEqualTo(PrioridadCalculada.porCategoria(Prioridad.MEDIA));
+    }
+
+    @ParameterizedTest
+    @EnumSource(value = Prioridad.class, names = {"ALTA", "CRITICA"})
+    void siLaBaseYaEsAltaLaPrioridadSigueSiendoDeLaCategoria(Prioridad base) {
+        assertThat(new PrioridadPorPalabrasClave().calcular(reclamo(base, "Hay peligro")))
+                .isEqualTo(PrioridadCalculada.porCategoria(base));
     }
 
     public static Reclamo reclamo(Prioridad base, String descripcion) {

@@ -100,6 +100,12 @@ nueva obligaría a modificarlo.
 | `EstrategiaAsignacion` | `AsignacionPorCargaDeTrabajo` | Entre las áreas candidatas, la que tiene menos reclamos pendientes | `carga-trabajo` |
 
 Las áreas candidatas son las activas que atienden la categoría y tienen jurisdicción sobre el barrio.
+Las entrega `CatalogoCobertura`: hoy `CoberturaLocal`, que consulta la base; en la Segunda Parte, el
+servicio SOAP. La estrategia no cambia.
+
+Las estrategias de prioridad devuelven una `PrioridadCalculada`: la prioridad, qué la decidió
+(`CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO`) y un motivo. El reclamo guarda las tres cosas, así
+gestión sabe cuánto confiar en ella.
 
 La estrategia activa se elige en `application.yml`, sin tocar código:
 
@@ -117,12 +123,13 @@ Los servicios solo conocen las interfaces:
 ```java
 // ReclamoService.crear
 Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
-reclamo.definirPrioridad(prioridad.calcular(reclamo));
+PrioridadCalculada calculada = prioridad.calcular(reclamo);
+reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
 asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
 
 // ServicioAsignacion.asignarAutomaticamente
-Optional<AreaMunicipal> elegida =
-        estrategia.seleccionarArea(reclamo, areas.buscarCandidatas(categoriaId, barrioId));
+candidatas = cobertura.buscarCandidatas(municipioId, barrioId, categoriaId);
+Optional<AreaMunicipal> elegida = estrategia.seleccionarArea(reclamo, candidatas);
 elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA, ahora));
 ```
 
@@ -181,9 +188,9 @@ Los dos observadores corren en momentos distintos a propósito:
 - **Los avisos** participan de la transacción del servicio: si fallan, se revierte todo el caso de uso.
 - **La auditoría** corre después del commit: una operación revertida no queda auditada.
 
-Los eventos llevan solo identificadores y datos simples, de modo que en el Hito 2 se pueden enviar
-a un broker como JSON sin cambiarlos. Ese envío tiene que hacerse después del commit, igual que la
-auditoría.
+Los eventos llevan solo identificadores y datos simples. En la Segunda Parte, lo que sale por RabbitMQ
+son los avisos que generan, guardados en una tabla de outbox dentro de la misma transacción y
+publicados después del commit (ver [contrato de mensajes](contratos/mensajes.md)).
 
 - **Código:** contratos en `reclamos-dominio/…/dominio/evento/`, implementación en
   `reclamos-app/…/aplicacion/evento/`
@@ -199,7 +206,7 @@ auditoría.
 **Problema.** Crear un reclamo involucra permisos, catálogos, fábrica, estrategias, persistencia y
 eventos. Los controladores no deberían conocer ni coordinar todo eso.
 
-**Solución.** `GestionReclamosFacade` es la única clase de aplicación que ven los tres controladores.
+**Solución.** `GestionReclamosFacade` es la única clase de aplicación que ven los cuatro controladores.
 Expone los casos de uso con nombres del negocio y delega en los servicios.
 
 ```mermaid
@@ -207,9 +214,10 @@ flowchart TB
   C1["ReclamoController"] --> F["GestionReclamosFacade"]
   C2["UsuarioController"] --> F
   C3["CatalogoController"] --> F
+  C4["NotificacionController"] --> F
   F --> S1["ReclamoService<br/>crear, asignar, cambiar estado"]
   S1 --> S4["ServicioAsignacion<br/>área automática o manual"]
-  F --> S2["ConsultaReclamosService<br/>listar, buscar, acciones"]
+  F --> S2["ConsultaReclamosService<br/>listar, buscar, acciones, avisos"]
   F --> S3["ConsultaCatalogosService<br/>usuarios, categorías, barrios, áreas"]
 ```
 
@@ -224,8 +232,8 @@ public ResponseEntity<ReclamoResponse> crear(@RequestHeader("X-Usuario-Id") @Pos
 }
 ```
 
-La fachada no depende de HTTP. En el Hito 2 la pueden reutilizar el servicio SOAP y los
-consumidores de mensajes.
+La fachada no depende de HTTP: otro transporte de entrada (un consumidor de mensajes, por ejemplo)
+la usaría igual que los controladores.
 
 - **Código:** `reclamos-app/…/aplicacion/facade/GestionReclamosFacade.java`
 - **Tests:** `GestionReclamosFacadeTest`, `RestIntegrationTest`

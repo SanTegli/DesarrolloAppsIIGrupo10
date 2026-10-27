@@ -7,6 +7,7 @@ import ar.edu.uade.reclamos.aplicacion.DoblesEnMemoria;
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
 import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorJurisdiccion;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorCategoria;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.seguridad.PermisosReclamo;
 import ar.edu.uade.reclamos.aplicacion.servicio.ReclamoService;
 import ar.edu.uade.reclamos.aplicacion.servicio.ServicioAsignacion;
@@ -51,7 +52,8 @@ class FlujoDeAvisosTest {
         categorias.guardar(sinArea);
         var areas = new DoblesEnMemoria.Areas(e.area, e.otraArea);
         servicio = new ReclamoService(usuarios, categorias, new DoblesEnMemoria.Barrios(e.barrio), reclamos,
-                e.factory, new PrioridadPorCategoria(), new ServicioAsignacion(areas, new AsignacionPorJurisdiccion()),
+                e.factory, new PrioridadPorCategoria(), new ServicioAsignacion(areas, new CoberturaLocal(areas),
+                new AsignacionPorJurisdiccion()),
                 new PermisosReclamo(), e.reloj, eventos);
         eventos.conectar(new NotificacionesReclamoListener(new ServicioNotificaciones(reclamos, avisos, usuarios)));
     }

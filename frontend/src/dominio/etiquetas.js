@@ -18,6 +18,20 @@ export const PRIORIDADES = {
   CRITICA: 'Crítica',
 }
 
+/** Qué decidió la prioridad. Los reclamos sin este dato se informan como de la categoría. */
+export const ORIGENES_PRIORIDAD = {
+  CATEGORIA: 'por categoría',
+  PALABRAS_CLAVE: 'por palabras clave',
+  IA: 'sugerida por IA',
+  RESPALDO: 'por categoría (la IA no respondió)',
+}
+
+/** "Alta, por palabras clave. La descripción menciona "peligro"." */
+export function describirPrioridad({ prioridad, origenPrioridad, motivoPrioridad }) {
+  const texto = `${PRIORIDADES[prioridad] ?? prioridad}, ${ORIGENES_PRIORIDAD[origenPrioridad] ?? ORIGENES_PRIORIDAD.CATEGORIA}`
+  return motivoPrioridad ? `${texto}. ${motivoPrioridad}` : texto
+}
+
 export const ROLES = {
   CIUDADANO: 'Ciudadano',
   AGENTE_MUNICIPAL: 'Agente municipal',

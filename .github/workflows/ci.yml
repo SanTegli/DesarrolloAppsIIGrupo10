@@ -1,5 +1,6 @@
-# Corre los tests del backend y del frontend en cada pull request y en cada push a main.
-# Un PR no debería mergearse si alguno de los dos trabajos falla.
+# Corre los tests del backend, de los servicios de integración y del frontend en cada pull request
+# y en cada push a main.
+# Un PR no debería mergearse si alguno de los trabajos falla.
 name: CI
 
 on:
@@ -31,6 +32,31 @@ jobs:
         with:
           name: reportes-surefire
           path: backend/**/target/surefire-reports/
+      # OpenApiTest regenera el contrato de REST 1; queda descargable para commitearlo si cambió.
+      - name: Guardar contrato OpenAPI
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-reclamos
+          path: docs/openapi/reclamos.yaml
+          if-no-files-found: ignore
+
+  servicios:
+    name: Servicios (Maven)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: servicios
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      # Los servicios de integración tienen su propio pom; Maven ya viene instalado en el runner.
+      - name: Tests
+        run: mvn -B -ntp verify
 
   frontend:
     name: Frontend (Vitest)

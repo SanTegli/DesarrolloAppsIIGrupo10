@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { asignarArea, cambiarEstado, listarNotificaciones, obtenerReclamo } from '../api/reclamos.js'
-import { ESTADOS, esAccionDefinitiva, formatearFecha, nombreDeAccion } from '../dominio/etiquetas.js'
+import { ESTADOS, describirPrioridad, esAccionDefinitiva, formatearFecha, nombreDeAccion } from '../dominio/etiquetas.js'
 import { useCarga } from '../hooks/useCarga.js'
 import { AvisoError, AvisoExito } from './Aviso.jsx'
 import { InsigniaEstado, InsigniaPrioridad, InsigniaVencido } from './Insignias.jsx'
@@ -81,6 +81,8 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
           <dl className="datos">
             <dt>Categoría</dt>
             <dd>{reclamo.categoria.nombre}</dd>
+            <dt>Prioridad</dt>
+            <dd>{describirPrioridad(reclamo)}</dd>
             <dt>Ubicación</dt>
             <dd>
               {reclamo.direccion}, {reclamo.barrio.nombre}
@@ -88,7 +90,13 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
             <dt>Ciudadano</dt>
             <dd>{reclamo.ciudadano.nombreCompleto}</dd>
             <dt>Área responsable</dt>
-            <dd>{reclamo.area ? reclamo.area.nombre : 'Sin asignar'}</dd>
+            <dd>
+              {reclamo.area
+                ? reclamo.area.nombre
+                : reclamo.asignacionPendiente
+                  ? 'Sin asignar: el servicio de cobertura no respondió'
+                  : 'Sin asignar'}
+            </dd>
             <dt>Agente a cargo</dt>
             <dd>{reclamo.agente ? reclamo.agente.nombreCompleto : 'Ninguno todavía'}</dd>
             <dt>Creado</dt>

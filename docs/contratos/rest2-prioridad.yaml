@@ -1,0 +1,107 @@
+# Contrato de REST 2, servicio de prioridad con IA (borrador del PR 8; lo implementa el PR 10).
+# Cuando exista el servicio, el contrato generado por springdoc reemplaza a este en docs/openapi/prioridad.yaml.
+openapi: 3.0.3
+info:
+  title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
+  version: 0.1.0
+  description: >
+    Sugiere la prioridad de un reclamo a partir de su categoría y su descripción usando un modelo de
+    lenguaje externo (Gemini u OpenAI). No recibe datos personales: ni nombre, ni email, ni DNI, ni foto.
+servers:
+  - url: http://localhost:8082
+paths:
+  /api/prioridades/evaluar:
+    post:
+      summary: Sugerir la prioridad de un reclamo
+      operationId: evaluar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvaluacionRequest'
+            example:
+              categoria: Luminaria rota
+              descripcion: Poste inclinado con cables expuestos frente a la escuela
+      responses:
+        '200':
+          description: Prioridad sugerida por el modelo
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EvaluacionResponse'
+              example:
+                prioridad: CRITICA
+                motivo: Se describe un riesgo eléctrico en un lugar con chicos.
+                proveedor: gemini
+                modelo: nombre-del-modelo-configurado
+        '400':
+          description: Entrada inválida (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: El modelo devolvió una respuesta inválida (RESPUESTA_INVALIDA)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Proveedor caído o sin clave configurada (PROVEEDOR_NO_DISPONIBLE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    EvaluacionRequest:
+      type: object
+      required: [categoria, descripcion]
+      properties:
+        categoria:
+          type: string
+          maxLength: 80
+        descripcion:
+          type: string
+          maxLength: 1000
+    EvaluacionResponse:
+      type: object
+      required: [prioridad, motivo, proveedor, modelo]
+      properties:
+        prioridad:
+          type: string
+          enum: [BAJA, MEDIA, ALTA, CRITICA]
+        motivo:
+          type: string
+          maxLength: 300
+        proveedor:
+          type: string
+          enum: [gemini, openai]
+        modelo:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [status, codigo, mensaje, detalles, ruta, fecha]
+      properties:
+        status:
+          type: integer
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: array
+          items:
+            type: string
+        ruta:
+          type: string
+        fecha:
+          type: string
+          example: '2026-10-26T15:00:00'

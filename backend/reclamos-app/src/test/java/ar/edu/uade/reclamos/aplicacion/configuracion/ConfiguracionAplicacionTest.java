@@ -7,6 +7,9 @@ import ar.edu.uade.reclamos.aplicacion.estrategia.*;
 import ar.edu.uade.reclamos.dominio.estrategia.*;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
+import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
+import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import java.time.*;
 import org.junit.jupiter.api.Test;
@@ -17,7 +20,8 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner;
 class ConfiguracionAplicacionTest {
     private final ApplicationContextRunner contexto = new ApplicationContextRunner()
             .withUserConfiguration(ConfiguracionAplicacion.class)
-            .withBean(ReclamoRepository.class, () -> mock(ReclamoRepository.class));
+            .withBean(ReclamoRepository.class, () -> mock(ReclamoRepository.class))
+            .withBean(AreaMunicipalRepository.class, () -> mock(AreaMunicipalRepository.class));
 
     @Test
     void valoresPredeterminadosRegistranUnaEstrategiaPorContratoFactoryYReloj() {
@@ -27,6 +31,7 @@ class ConfiguracionAplicacionTest {
                     .hasSingleBean(Clock.class);
             assertThat(ctx.getBean(EstrategiaPrioridad.class)).isInstanceOf(PrioridadPorCategoria.class);
             assertThat(ctx.getBean(EstrategiaAsignacion.class)).isInstanceOf(AsignacionPorJurisdiccion.class);
+            assertThat(ctx.getBean(CatalogoCobertura.class)).isInstanceOf(CoberturaLocal.class);
             assertThat(ctx.getBean(Clock.class).getZone()).isEqualTo(ZoneId.systemDefault());
         });
     }
@@ -44,7 +49,8 @@ class ConfiguracionAplicacionTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"reclamos.prioridad.estrategia=desconocida", "reclamos.asignacion.estrategia=desconocida",
-            "reclamos.prioridad.estrategia=", "reclamos.asignacion.estrategia="})
+            "reclamos.prioridad.estrategia=", "reclamos.asignacion.estrategia=",
+            "reclamos.cobertura.origen=desconocida", "reclamos.cobertura.origen="})
     void configuracionInvalidaImpideArrancarConMensajeClaro(String propiedad) {
         contexto.withPropertyValues(propiedad).run(ctx -> {
             assertThat(ctx).hasFailed();

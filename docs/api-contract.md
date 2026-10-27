@@ -1,7 +1,11 @@
-# Contrato REST — Hito 1
+# Contrato REST
 
 Contrato entre el backend y el frontend. Lo implementan los controladores de `reclamos-app` y lo
 consume `frontend/src/api/`. La API simulada del frontend (`npm run mock`) sigue este mismo documento.
+
+El mismo contrato en OpenAPI, generado del código, está en [`openapi/reclamos.yaml`](openapi/README.md)
+y en Swagger UI (`http://localhost:8080/swagger-ui.html`). Este documento explica las reglas que el
+OpenAPI no cuenta: permisos por rol, transiciones y datos semilla.
 
 Si alguien necesita cambiar algo de acá, lo avisa al grupo antes: es el único archivo del que
 dependen tres personas a la vez.
@@ -12,13 +16,13 @@ dependen tres personas a la vez.
 | --- | --- |
 | URL base | `http://localhost:8080/api` |
 | Formato | JSON en UTF-8, `Content-Type: application/json` |
-| Fechas | ISO-8601 sin zona horaria: `2026-10-05T10:00:00` |
-| Identidad | Encabezado `X-Usuario-Id` con el id numérico del usuario. No hay login en el Hito 1 |
+| Fechas | ISO-8601 sin zona horaria: `2026-10-05T10:00:00`. Las del historial y los avisos pueden traer fracción de segundo (`2026-10-05T10:00:00.123456`) |
+| Identidad | Encabezado `X-Usuario-Id` con el id numérico del usuario. Todavía no hay login: lo agrega la Segunda Parte |
 | Número de reclamo | `REC-` más ocho caracteres hexadecimales en mayúscula: `REC-4F2A91BC` |
 
-`X-Usuario-Id` es obligatorio en todos los endpoints de `/api/reclamos`. Los endpoints de consulta
-de usuarios, barrios, categorías y áreas no lo piden, porque el selector de usuario los necesita
-antes de saber quién es el usuario.
+`X-Usuario-Id` es obligatorio en todos los endpoints de `/api/reclamos` y en `/api/notificaciones`.
+Los endpoints de consulta de usuarios, barrios, categorías y áreas no lo piden, porque el selector de
+usuario los necesita antes de saber quién es el usuario.
 
 ### Enumerados
 
@@ -27,6 +31,8 @@ antes de saber quién es el usuario.
 | `rol` | `CIUDADANO`, `AGENTE_MUNICIPAL`, `ADMINISTRADOR` |
 | `estado` | `INGRESADO`, `ASIGNADO`, `EN_PROCESO`, `RESUELTO`, `CERRADO`, `RECHAZADO`, `CANCELADO` |
 | `prioridad` | `BAJA`, `MEDIA`, `ALTA`, `CRITICA` |
+| `origenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` |
+| `ubicacion.estado` | `CONFIRMADA`, `PENDIENTE` |
 
 ### Errores
 
@@ -51,6 +57,7 @@ Todos los errores tienen la misma forma:
 | 403 | `ACCESO_DENEGADO` | El usuario existe pero su rol no puede hacer la operación, o el reclamo no es suyo ni de su área | `AccesoDenegadoException` |
 | 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
+| 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo mientras se procesaba esta; hay que volver a cargarlo | Bloqueo optimista de JPA |
 | 405 | `METODO_NO_PERMITIDO` | El recurso no admite ese método HTTP | Error de Spring |
 | 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | El cuerpo no es `application/json` | Error de Spring |
 | 500 | `ERROR_INTERNO` | Error inesperado | Cualquier otra |
@@ -68,9 +75,19 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
   "numero": "REC-4F2A91BC",
   "descripcion": "Farol apagado frente a la plaza",
   "direccion": "Belgrano 450",
+  "ubicacion": {
+    "estado": "PENDIENTE",
+    "latitud": null,
+    "longitud": null,
+    "direccionNormalizada": null,
+    "proveedor": null
+  },
   "estado": "ASIGNADO",
   "prioridad": "MEDIA",
+  "origenPrioridad": "CATEGORIA",
+  "motivoPrioridad": null,
   "vencido": false,
+  "asignacionPendiente": false,
   "fechaCreacion": "2026-10-05T10:00:00",
   "fechaLimite": "2026-10-07T10:00:00",
   "categoria": { "id": 1, "nombre": "Luminaria rota" },
@@ -98,6 +115,12 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
 }
 ```
 
+- `ubicacion.estado` es `CONFIRMADA` cuando el ciudadano eligió una sugerencia del geocodificador, con
+  coordenadas, dirección normalizada y proveedor; si no, `PENDIENTE` y los demás campos en `null`.
+- `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
+  no respondió y se usó la de la categoría). `motivoPrioridad` la explica; es `null` con `CATEGORIA`.
+- `asignacionPendiente` es `true` cuando el servicio de cobertura no respondió al crear el reclamo: queda
+  `INGRESADO` y un administrador lo asigna a mano. No es lo mismo que no tener área compatible.
 - `area` es `null` mientras el reclamo está `INGRESADO`.
 - `agente` es `null` hasta que un agente toma el reclamo.
 - `usuario` en el historial es `null` cuando el cambio lo hizo el sistema.
@@ -116,6 +139,7 @@ Lo devuelve el listado. Es el reclamo sin `historial` y sin `descripcion` comple
   "estado": "ASIGNADO",
   "prioridad": "MEDIA",
   "vencido": false,
+  "asignacionPendiente": false,
   "fechaCreacion": "2026-10-05T10:00:00",
   "fechaLimite": "2026-10-07T10:00:00",
   "categoria": { "id": 1, "nombre": "Luminaria rota" },

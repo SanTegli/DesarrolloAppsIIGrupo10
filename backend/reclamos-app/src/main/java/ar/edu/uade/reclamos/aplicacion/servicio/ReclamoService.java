@@ -3,6 +3,7 @@ package ar.edu.uade.reclamos.aplicacion.servicio;
 import ar.edu.uade.reclamos.aplicacion.seguridad.PermisosReclamo;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
+import ar.edu.uade.reclamos.dominio.estrategia.PrioridadCalculada;
 import ar.edu.uade.reclamos.dominio.evento.*;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
@@ -54,7 +55,8 @@ public class ReclamoService {
         Barrio barrio = barrios.buscarPorId(barrioId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
         Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
-        reclamo.definirPrioridad(prioridad.calcular(reclamo));
+        PrioridadCalculada calculada = prioridad.calcular(reclamo);
+        reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
         asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
         eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, barrioId,

@@ -31,6 +31,22 @@ describe('DetalleReclamo', () => {
     expect(screen.getByText('Tu reclamo fue ingresado.')).toBeInTheDocument()
   })
 
+  it('muestra de dónde salió la prioridad y si la cobertura no respondió', async () => {
+    mostrar(elena, {
+      [`GET ${RUTA}`]: reclamo({
+        estado: 'INGRESADO',
+        area: null,
+        prioridad: 'ALTA',
+        origenPrioridad: 'PALABRAS_CLAVE',
+        motivoPrioridad: 'La descripción menciona "peligro".',
+        asignacionPendiente: true,
+      }),
+    })
+
+    expect(await screen.findByText('Alta, por palabras clave. La descripción menciona "peligro".')).toBeInTheDocument()
+    expect(screen.getByText('Sin asignar: el servicio de cobertura no respondió')).toBeInTheDocument()
+  })
+
   it('no ofrece acciones cuando el backend no devuelve ninguna', async () => {
     mostrar(ana, { [`GET ${RUTA}`]: reclamo({ estado: 'EN_PROCESO', accionesDisponibles: [] }) })
 

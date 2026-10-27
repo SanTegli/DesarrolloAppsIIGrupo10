@@ -126,6 +126,7 @@ function resumen(reclamo) {
     estado: reclamo.estado,
     prioridad: reclamo.prioridad,
     vencido: reclamo.vencido,
+    asignacionPendiente: false,
     fechaCreacion: reclamo.fechaCreacion,
     fechaLimite: reclamo.fechaLimite,
     categoria: referencia(categorias.find((c) => c.id === reclamo.categoriaId)),
@@ -138,6 +139,10 @@ function detalle(usuario, reclamo) {
   return {
     ...resumen(reclamo),
     descripcion: reclamo.descripcion,
+    // La API simulada no geocodifica ni consulta servicios externos: igual que el backend sin integraciones.
+    ubicacion: { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null },
+    origenPrioridad: reclamo.origenPrioridad,
+    motivoPrioridad: reclamo.motivoPrioridad,
     agente: referenciaUsuario(usuarios.find((u) => u.id === reclamo.agenteId)),
     historial: reclamo.historial.map((cambio) => ({
       ...cambio,
@@ -213,9 +218,15 @@ function crear(usuario, cuerpo) {
   const barrio = buscar(barrios, cuerpo.barrioId, 'barrio')
 
   const fecha = ahora()
+  // Igual que PrioridadPorPalabrasClave: solo cambia el origen si la palabra sube la prioridad.
   let prioridad = categoria.prioridadBase
-  if (ESTRATEGIA_PRIORIDAD === 'palabras-clave' && PALABRAS_CLAVE.test(cuerpo.descripcion)) {
-    prioridad = PRIORIDADES[Math.max(PRIORIDADES.indexOf(prioridad), PRIORIDADES.indexOf('ALTA'))]
+  let origenPrioridad = 'CATEGORIA'
+  let motivoPrioridad = null
+  const palabra = ESTRATEGIA_PRIORIDAD === 'palabras-clave' ? cuerpo.descripcion.match(PALABRAS_CLAVE) : null
+  if (palabra && PRIORIDADES.indexOf('ALTA') > PRIORIDADES.indexOf(prioridad)) {
+    prioridad = 'ALTA'
+    origenPrioridad = 'PALABRAS_CLAVE'
+    motivoPrioridad = `La descripción menciona "${palabra[1].toLowerCase()}".`
   }
   const reclamo = {
     numero: `REC-${randomUUID().slice(0, 8).toUpperCase()}`,
@@ -223,6 +234,8 @@ function crear(usuario, cuerpo) {
     direccion: cuerpo.direccion.trim(),
     estado: 'INGRESADO',
     prioridad,
+    origenPrioridad,
+    motivoPrioridad,
     vencido: false,
     fechaCreacion: fecha,
     fechaLimite: sumarSegundos(fecha, SLA_SEGUNDOS ?? categoria.slaHoras * 3600),
