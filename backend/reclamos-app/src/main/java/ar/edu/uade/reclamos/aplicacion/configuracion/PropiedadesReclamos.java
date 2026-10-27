@@ -10,9 +10,12 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "reclamos", ignoreUnknownFields = false)
 public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultValue Asignacion asignacion,
-                                  @DefaultValue Vencimientos vencimientos) {
+                                  @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura) {
     public record Prioridad(@DefaultValue("categoria") String estrategia) { }
     public record Asignacion(@DefaultValue("jurisdiccion") String estrategia) { }
+
+    /** De dónde salen las áreas candidatas: {@code local} (la base del backend). */
+    public record Cobertura(@DefaultValue("local") String origen) { }
 
     /**
      * Control de vencimientos. {@code TareaVencimientos} lee las mismas propiedades:

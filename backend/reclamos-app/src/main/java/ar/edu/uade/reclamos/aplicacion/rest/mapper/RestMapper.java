@@ -9,18 +9,26 @@ import org.springframework.stereotype.Component;
 public class RestMapper {
     public ReclamoResponse reclamo(Reclamo reclamo, Set<EstadoReclamo> acciones) {
         return new ReclamoResponse(reclamo.getNumero(), reclamo.getDescripcion(), reclamo.getDireccion(),
-                reclamo.getEstado(), reclamo.getPrioridad(), reclamo.isVencido(), reclamo.getFechaCreacion(),
-                reclamo.getFechaLimite(), categoriaReferencia(reclamo.getCategoria()),
-                barrioReferencia(reclamo.getBarrio()), usuarioReferencia(reclamo.getCiudadano()),
-                areaReferencia(reclamo.getArea()), usuarioReferencia(reclamo.getAgente()),
-                reclamo.getHistorial().stream().map(this::historial).toList(), acciones);
+                ubicacion(reclamo.getUbicacion()), reclamo.getEstado(), reclamo.getPrioridad(),
+                reclamo.getOrigenPrioridad(), reclamo.getMotivoPrioridad(), reclamo.isVencido(),
+                reclamo.isAsignacionPendiente(), reclamo.getFechaCreacion(), reclamo.getFechaLimite(),
+                categoriaReferencia(reclamo.getCategoria()), barrioReferencia(reclamo.getBarrio()),
+                usuarioReferencia(reclamo.getCiudadano()), areaReferencia(reclamo.getArea()),
+                usuarioReferencia(reclamo.getAgente()), reclamo.getHistorial().stream().map(this::historial).toList(),
+                acciones);
     }
 
     public ResumenReclamoResponse resumen(Reclamo reclamo) {
         return new ResumenReclamoResponse(reclamo.getNumero(), reclamo.getDireccion(), reclamo.getEstado(),
-                reclamo.getPrioridad(), reclamo.isVencido(), reclamo.getFechaCreacion(), reclamo.getFechaLimite(),
-                categoriaReferencia(reclamo.getCategoria()), barrioReferencia(reclamo.getBarrio()),
-                usuarioReferencia(reclamo.getCiudadano()), areaReferencia(reclamo.getArea()));
+                reclamo.getPrioridad(), reclamo.isVencido(), reclamo.isAsignacionPendiente(),
+                reclamo.getFechaCreacion(), reclamo.getFechaLimite(), categoriaReferencia(reclamo.getCategoria()),
+                barrioReferencia(reclamo.getBarrio()), usuarioReferencia(reclamo.getCiudadano()),
+                areaReferencia(reclamo.getArea()));
+    }
+
+    public UbicacionResponse ubicacion(Ubicacion ubicacion) {
+        return new UbicacionResponse(ubicacion.getEstado(), ubicacion.getLatitud(), ubicacion.getLongitud(),
+                ubicacion.getDireccionNormalizada(), ubicacion.getProveedor());
     }
 
     public HistorialEstadoResponse historial(HistorialEstado cambio) {

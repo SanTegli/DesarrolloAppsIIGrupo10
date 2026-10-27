@@ -65,10 +65,14 @@ DesarrolloAppsIIGrupo10/
   docs/
     api-contract.md
     arquitectura.md
+    modelo-dominio.md
     patrones.md
     secuencias.md
     despliegue.md
+    contratos/
+    openapi/
     evidencias/
+  servicios/
   docker-compose.yml
   .env.example
 ```
@@ -180,7 +184,9 @@ El resultado esperado es **`BUILD SUCCESS`** y módulos sin fallos. No se necesi
 
 La suite incluye validación común; dominio, transiciones y Factory; persistencia y relaciones JPA; Strategies; servicios, consultas y permisos; Observer y rollback; Facade; y REST mediante MockMvc con componentes reales e integración H2.
 
-Los 27 reportes XML existentes en `backend/*/target/surefire-reports/TEST-*.xml`, fechados el 03/10/2026, suman **221 tests**, con 0 fallos, 0 errores y 0 omitidos. Es evidencia de la ejecución registrada, no de una nueva ejecución realizada para redactar esta guía. Los casos parametrizados cuentan por ejecución.
+GitHub Actions corre la misma suite en cada pull request; el resultado se ve en la pestaña **Checks** del PR. Los reportes de cada ejecución local quedan en `backend/*/target/surefire-reports/`.
+
+Al terminar, `OpenApiTest` deja actualizado `docs/openapi/reclamos.yaml`, el contrato OpenAPI de la API. Si cambió, se commitea junto con el código.
 
 H2 en memoria se usa para pruebas, en modo MySQL y con `ddl-auto: create-drop`; el perfil `dev` usa MySQL real. La semilla de desarrollo no se carga automáticamente con `test`; las pruebas preparan sus escenarios y `DatosSemillaTest` ejecuta el SQL de manera explícita.
 
@@ -424,6 +430,8 @@ El formato exacto de la línea depende de la configuración de logs; lo que hay 
 | GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |
 | GET | `/api/barrios` | Listar barrios y nombre de municipio. |
 | GET | `/api/areas` | Listar áreas, estado activo y cobertura. |
+| GET | `/swagger-ui.html` | Swagger UI: documentación de todos los endpoints y un formulario para probarlos. |
+| GET | `/v3/api-docs.yaml` | Contrato OpenAPI de la API. |
 
 `CambiarEstadoRequest` admite `estado` obligatorio y `observacion` opcional de hasta 1000 caracteres. `ASIGNADO` debe solicitarse por asignación, nunca por `/estado`. `AsignarReclamoRequest` admite `areaId` obligatorio y positivo, y `observacion` opcional de hasta 1000 caracteres. La asignación manual requiere un área activa y distinta de la actual, y un reclamo `INGRESADO` o `ASIGNADO`; no exige cobertura territorial ni categoría compatibles como la automática.
 
@@ -435,6 +443,7 @@ El formato exacto de la línea depende de la configuración de logs; lo que hay 
 | 403 | `ACCESO_DENEGADO` | Rol no habilitado, reclamo de otro ciudadano/área o filtros administrativos sin permiso. |
 | 404 | `RECURSO_NO_ENCONTRADO` | Usuario, reclamo, categoría, barrio, área o ruta inexistente. |
 | 409 | `REGLA_NEGOCIO` | Transición inexistente, ciudadano inactivo al crear, área inactiva o igual a la actual al asignar. |
+| 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo al mismo tiempo; volver a cargarlo. |
 | 405 | `METODO_NO_PERMITIDO` | Método HTTP no admitido por el recurso. |
 | 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | Tipo de contenido no soportado; enviar JSON en las escrituras. |
 | 500 | `ERROR_INTERNO` | Fallo inesperado; revisar los logs del backend. |
@@ -469,7 +478,7 @@ Compose interpreta `.env`; el proceso Java local recibe el entorno de PowerShell
 
 ### E. BUILD FAILURE
 
-Leer la primera causa real y las líneas `Caused by`, no solo el resumen final de Maven. Distinguir fallo de compilación, test, descarga o arranque/conexión. Los reportes de tests quedan en `target/surefire-reports` dentro de cada módulo. Si al ejecutar `-pl reclamos-app` faltan artefactos `0.1.0-SNAPSHOT`, ejecutar antes `install -DskipTests` desde `backend`. Comprobar también Internet en la primera descarga y que la copia contenga los archivos de PR3.
+Leer la primera causa real y las líneas `Caused by`, no solo el resumen final de Maven. Distinguir fallo de compilación, test, descarga o arranque/conexión. Los reportes de tests quedan en `target/surefire-reports` dentro de cada módulo. Si al ejecutar `-pl reclamos-app` faltan artefactos `0.1.0-SNAPSHOT`, ejecutar antes `install -DskipTests` desde `backend`. Comprobar también Internet en la primera descarga.
 
 ### F. Caracteres como PÃ©rez en PowerShell
 

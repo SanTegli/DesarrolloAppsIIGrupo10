@@ -11,7 +11,7 @@
 
     <artifactId>reclamos-persistencia</artifactId>
     <name>Reclamos - Persistencia</name>
-    <description>Componente de acceso a datos: adaptadores JPA de las interfaces Repository del dominio (PR 2).</description>
+    <description>Componente de acceso a datos: adaptadores JPA de las interfaces Repository del dominio.</description>
 
     <dependencies>
         <dependency>

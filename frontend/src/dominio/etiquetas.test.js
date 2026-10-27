@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { describirUsuario, esAccionDefinitiva, formatearFecha, nombreDeAccion } from './etiquetas.js'
+import { describirPrioridad, describirUsuario, esAccionDefinitiva, formatearFecha, nombreDeAccion } from './etiquetas.js'
 
 describe('etiquetas', () => {
   it('nombra cada transición como la acción que ve el usuario', () => {
@@ -28,5 +28,15 @@ describe('etiquetas', () => {
     expect(describirUsuario({ nombreCompleto: 'Carla Gómez', rol: 'AGENTE_MUNICIPAL', area: { nombre: 'Alumbrado' } })).toBe(
       'Carla Gómez, Agente municipal de Alumbrado',
     )
+  })
+
+  it('describe la prioridad con su origen y, si hay, su motivo', () => {
+    expect(describirPrioridad({ prioridad: 'MEDIA', origenPrioridad: 'CATEGORIA', motivoPrioridad: null })).toBe(
+      'Media, por categoría',
+    )
+    expect(
+      describirPrioridad({ prioridad: 'CRITICA', origenPrioridad: 'IA', motivoPrioridad: 'Cables expuestos.' }),
+    ).toBe('Crítica, sugerida por IA. Cables expuestos.')
+    expect(describirPrioridad({ prioridad: 'BAJA' })).toBe('Baja, por categoría')
   })
 })

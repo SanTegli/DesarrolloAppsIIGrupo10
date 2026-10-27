@@ -11,7 +11,7 @@ cd backend
 
 cd ../frontend
 npm install
-npm test             # 28 tests: capa de API y componentes
+npm test             # 33 tests: capa de API, etiquetas y componentes
 ```
 
 Guardar en esta carpeta la salida de los dos comandos (`BUILD SUCCESS` y el resumen de Vitest).
@@ -37,9 +37,9 @@ Los usuarios, barrios, categorías y áreas son los de la semilla (ver
 | CP10 | Transición inexistente: `409` | `RestIntegrationTest.patchTransicionInvalidaPrevaleceSobrePermisosYEs409`, `PoliticaTransicionesTest` | Solo por API: `PATCH .../estado` con `RESUELTO` sobre un reclamo `INGRESADO` |
 | CP11 | Persistencia de reclamo, barrio, área, categoría e historial | `ReclamoRepositoryJpaTest.guardaYRecuperaPorNumeroConSusRelaciones` | Después de CP08, consultar las tablas `reclamos` e `historial_estados` en MySQL |
 | CP12 | Consultas por número, ciudadano y área | `ReclamoRepositoryJpaTest.filtraPorCiudadanoYAreaYOrdenaDelMasNuevoAlMasViejo`, `RestIntegrationTest.listadosPorRolConservanOrdenYSoloIncluyenCamposDelResumen` | El listado de Ana muestra solo sus reclamos; el de Carla, los de Alumbrado; el de Elena, todos, con filtro por área |
-
 | CP13 | Vencimiento: se marca, sube la prioridad y publica `ReclamoVencido` | `ServicioVencimientosTest`, `FlujoDeAvisosTest.elVencimientoPublicaReclamoVencidoYAvisaAlCiudadanoYAlArea` | Con un reclamo abierto, adelantar su `fecha_limite` en MySQL y esperar un minuto. Aparece la insignia "Vencido" y un aviso nuevo |
 | CP14 | Cada usuario consulta los avisos que recibió | `ConsultaAvisosTest`, `RestIntegrationTest.bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad` | Crear un reclamo como Ana y abrir la pestaña "Avisos": dos avisos. Cambiar a Carla: un aviso, el de la asignación a su área |
+| CP15 | La API de reclamos está documentada en OpenAPI y se puede probar desde Swagger | `OpenApiTest` | Abrir `http://localhost:8080/swagger-ui.html`, elegir `GET /api/categorias` y ejecutarlo |
 
 Para CP13, con el número del reclamo:
 

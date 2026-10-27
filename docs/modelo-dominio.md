@@ -57,14 +57,30 @@ classDiagram
     -String direccion
     -EstadoReclamo estado
     -Prioridad prioridad
+    -OrigenPrioridad origenPrioridad
+    -String motivoPrioridad
     -boolean vencido
+    -boolean asignacionPendiente
     -LocalDateTime fechaCreacion
     -LocalDateTime fechaLimite
+    -long version
     +asignarArea(AreaMunicipal, Usuario, String, LocalDateTime)
     +cambiarEstado(EstadoReclamo, Usuario, String, LocalDateTime)
     +marcarVencido(LocalDateTime) boolean
-    +definirPrioridad(Prioridad)
+    +definirPrioridad(Prioridad, OrigenPrioridad, String)
+    +registrarUbicacion(Ubicacion)
+    +marcarAsignacionPendiente()
     +perteneceA(Usuario) boolean
+  }
+  class Ubicacion {
+    <<value object>>
+    -EstadoUbicacion estado
+    -Double latitud
+    -Double longitud
+    -String direccionNormalizada
+    -String proveedor
+    +pendiente()$ Ubicacion
+    +confirmada(double, double, String, String)$ Ubicacion
   }
   class HistorialEstado {
     -EstadoReclamo estadoAnterior
@@ -104,6 +120,7 @@ classDiagram
   Reclamo "*" --> "0..1" AreaMunicipal
   Reclamo "*" --> "0..1" AgenteMunicipal
   Reclamo "1" *-- "1..*" HistorialEstado
+  Reclamo *-- "1" Ubicacion
   HistorialEstado "*" --> "0..1" Usuario
   Notificacion "*" --> "1" Reclamo
   Notificacion "*" --> "1" Usuario : destinatario
@@ -112,7 +129,8 @@ classDiagram
 ```
 
 `Municipio`, `Barrio`, `Categoria`, `HistorialEstado` y `Notificacion` también heredan de `Entidad`;
-no se dibuja para no cargar el diagrama.
+no se dibuja para no cargar el diagrama. `Ubicacion` no es una entidad: es un valor que se guarda en
+columnas de la tabla `reclamos`.
 
 | Enum | Valores |
 | --- | --- |
@@ -120,6 +138,8 @@ no se dibuja para no cargar el diagrama.
 | `Prioridad` | `BAJA`, `MEDIA`, `ALTA`, `CRITICA` |
 | `Rol` | `CIUDADANO`, `AGENTE_MUNICIPAL`, `ADMINISTRADOR`, `SISTEMA` |
 | `CanalNotificacion` | `EMAIL`, `SMS`, `INTERNO` |
+| `OrigenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` |
+| `EstadoUbicacion` | `CONFIRMADA`, `PENDIENTE` |
 
 `Rol.SISTEMA` no corresponde a ningún usuario: representa las acciones automáticas, como la
 asignación al crear el reclamo. En el Hito 1 todos los avisos usan el canal `INTERNO`.
@@ -133,6 +153,8 @@ asignación al crear el reclamo. En el Hito 1 todos los avisos usan el canal `IN
 | Solo se asigna a un área activa y distinta de la actual | `Reclamo.asignarArea` |
 | Un área puede atender si está activa, atiende la categoría y cubre el barrio | `AreaMunicipal.puedeAtender` |
 | Un reclamo vence una sola vez y sube un nivel de prioridad | `Reclamo.marcarVencido` |
+| Solo un reclamo `INGRESADO` queda con la asignación pendiente; asignarle un área la borra | `Reclamo.marcarAsignacionPendiente` y `asignarArea` |
+| Una ubicación confirmada tiene coordenadas válidas, dirección y proveedor; nunca se inventan | `Ubicacion.confirmada` |
 | Todo reclamo nace `INGRESADO`, con número, fecha límite e historial | `ReclamoFactory.crear` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
@@ -202,9 +224,18 @@ erDiagram
     string direccion
     string estado
     string prioridad
+    string origen_prioridad "nulo en reclamos anteriores a la Segunda Parte"
+    string motivo_prioridad
     boolean vencido
+    boolean asignacion_pendiente
     datetime fecha_creacion
     datetime fecha_limite
+    bigint version "bloqueo optimista"
+    string ubicacion_estado
+    double ubicacion_latitud
+    double ubicacion_longitud
+    string ubicacion_direccion
+    string ubicacion_proveedor
     bigint ciudadano_id FK
     bigint agente_id FK
     bigint categoria_id FK

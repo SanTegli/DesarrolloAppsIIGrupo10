@@ -7,7 +7,7 @@ import java.util.Optional;
 
 /**
  * Patrón Repository: el dominio y los servicios piden reclamos por esta interfaz y no conocen JPA.
- * La implementa un adaptador en {@code reclamos-persistencia} (PR 2).
+ * La implementa un adaptador en {@code reclamos-persistencia}.
  */
 public interface ReclamoRepository {
 

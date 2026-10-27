@@ -9,9 +9,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ar.edu.uade.reclamos.aplicacion.DoblesEnMemoria;
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaAsignacion;
+import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
+import ar.edu.uade.reclamos.dominio.integracion.ServicioExternoNoDisponibleException;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.EstadoReclamo;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
@@ -38,7 +41,8 @@ class ServicioAsignacionTest {
             area.agregarCategoria(e.categoria);
             area.agregarBarrio(e.barrio);
         }
-        servicio = new ServicioAsignacion(new DoblesEnMemoria.Areas(e.area, e.otraArea), ultimaCandidata);
+        var areas = new DoblesEnMemoria.Areas(e.area, e.otraArea);
+        servicio = new ServicioAsignacion(areas, new CoberturaLocal(areas), ultimaCandidata);
     }
 
     @Test
@@ -110,5 +114,42 @@ class ServicioAsignacionTest {
                 () -> servicio.asignarManualmente(reclamo, 1L, e.ciudadano, null, ahora));
 
         assertNull(reclamo.getArea());
+    }
+
+    @Test
+    void elCatalogoRecibeMunicipioBarrioYCategoriaDelReclamo() {
+        List<List<Long>> consultas = new ArrayList<>();
+        CatalogoCobertura registrador = (municipioId, barrioId, categoriaId) -> {
+            consultas.add(List.of(municipioId, barrioId, categoriaId));
+            return List.of(e.area);
+        };
+        var conRegistro = new ServicioAsignacion(new DoblesEnMemoria.Areas(e.area), registrador, ultimaCandidata);
+
+        assertTrue(conRegistro.asignarAutomaticamente(e.ingresado(), 1L, 1L, ahora));
+        assertEquals(List.of(List.of(e.municipio.getId(), 1L, 1L)), consultas);
+    }
+
+    @Test
+    void siLaCoberturaNoRespondeElReclamoQuedaIngresadoConLaAsignacionPendiente() {
+        CatalogoCobertura caida = (municipioId, barrioId, categoriaId) -> {
+            throw new ServicioExternoNoDisponibleException("Tiempo agotado");
+        };
+        var sinCobertura = new ServicioAsignacion(new DoblesEnMemoria.Areas(e.area), caida, ultimaCandidata);
+        Reclamo reclamo = e.ingresado();
+
+        assertFalse(sinCobertura.asignarAutomaticamente(reclamo, 1L, 1L, ahora));
+        assertEquals(EstadoReclamo.INGRESADO, reclamo.getEstado());
+        assertTrue(reclamo.isAsignacionPendiente());
+        assertNull(reclamo.getArea());
+        assertTrue(candidatasRecibidas.isEmpty());
+    }
+
+    @Test
+    void sinAreasCandidatasNoQuedaMarcadaLaAsignacionPendiente() {
+        var sinAreas = new ServicioAsignacion(new DoblesEnMemoria.Areas(), (m, b, c) -> List.of(), ultimaCandidata);
+        Reclamo reclamo = e.ingresado();
+
+        assertFalse(sinAreas.asignarAutomaticamente(reclamo, 1L, 1L, ahora));
+        assertFalse(reclamo.isAsignacionPendiente());
     }
 }

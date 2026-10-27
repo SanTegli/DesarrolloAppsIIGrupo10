@@ -1,7 +1,8 @@
 # Arquitectura
 
-El sistema es una aplicación en capas: cada capa solo conoce a la que tiene debajo, y el dominio no
-depende de ningún framework.
+El sistema es una aplicación en capas: la interfaz llama a la API REST, la API a los servicios y los
+servicios al dominio. El dominio no depende de ningún framework: define interfaces (Repository,
+estrategias, integraciones) y las capas de afuera las implementan.
 
 ## Capas
 
@@ -26,7 +27,7 @@ flowchart TB
   subgraph DOM["Dominio - reclamos-dominio (Java puro)"]
     MOD["Modelo y PoliticaTransiciones"]
     FAB["ReclamoFactory"]
-    CON["Contratos: Repository, Estrategia, PublicadorEventos, eventos"]
+    CON["Contratos: Repository, Estrategia, PublicadorEventos,<br/>CatalogoCobertura, Geocodificador, eventos"]
   end
   subgraph PERS["Persistencia - reclamos-persistencia"]
     ADP["Adaptadores RepositoryJpa"]
@@ -105,13 +106,15 @@ Cada servicio tiene una responsabilidad y se puede probar por separado.
 | `ServicioVencimientos` | Marcar los reclamos que pasaron su fecha límite y publicar `ReclamoVencido` |
 | `ConsultaReclamosService` | Listar según el rol, buscar por número, avisos y acciones disponibles |
 | `ConsultaCatalogosService` | Usuarios, categorías, barrios y áreas |
-| `PermisosReclamo` | Quién puede crear y quién puede ver cada reclamo |
+
+`PermisosReclamo` no es un servicio de negocio: es el componente que los servicios consultan para saber
+quién puede crear y quién puede ver cada reclamo.
 
 Los servicios se integran entre sí de dos formas:
 
 - **Por interfaces.** Dependen de los contratos del dominio (`ReclamoRepository`,
-  `EstrategiaPrioridad`, `EstrategiaAsignacion`, `PublicadorEventos`) y Spring inyecta la
-  implementación.
+  `EstrategiaPrioridad`, `EstrategiaAsignacion`, `PublicadorEventos`, `CatalogoCobertura`) y Spring
+  inyecta la implementación.
 - **Por eventos de dominio.** `ReclamoService` y `ServicioVencimientos` publican `ReclamoCreado`,
   `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto` y `ReclamoVencido`. Dos listeners
   reaccionan sin que quien publica los conozca: `NotificacionesReclamoListener` genera los avisos
@@ -135,19 +138,25 @@ intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
 | El frontend llama a `/api` en su mismo origen y un proxy reenvía al backend | No hace falta configurar CORS en Spring; funciona igual con Vite y con nginx |
 | `accionesDisponibles` en la respuesta del reclamo | La interfaz no repite las reglas de transición: muestra un botón por cada acción |
 | `open-in-view: false` y DTOs en REST | No se serializan entidades JPA ni se abren consultas durante la respuesta HTTP |
+| Bloqueo optimista con `@Version` en `Reclamo` | Dos operaciones simultáneas sobre el mismo reclamo no se pisan: la segunda recibe `409 CONFLICTO_CONCURRENTE` |
+| OpenAPI generado del código con springdoc | El contrato de Swagger no se desactualiza: `OpenApiTest` lo regenera en `docs/openapi/reclamos.yaml` |
 
-## Preparado para el Hito 2
+## Preparado para la Segunda Parte
 
-Ninguna de estas integraciones está implementada; el diseño deja el lugar donde entran.
+El PR 8 dejó listos los puntos de entrada; las integraciones llegan en los PRs 9 a 12. Los contratos de
+partida están en [`contratos/`](contratos/README.md).
 
-| Integración | Dónde entra | Qué se agrega |
-| --- | --- | --- |
-| Clasificación con IA | `EstrategiaPrioridad` | Una clase `PrioridadPorIA` y un valor más en la configuración |
-| Servicio SOAP de jurisdicción | `EstrategiaAsignacion` | Una clase `AsignacionPorJurisdiccionRemota` |
-| Broker de mensajes | `PublicadorEventos` y los eventos de dominio | Un listener que reenvía los mismos eventos a RabbitMQ después del commit, como hace hoy `AuditoriaListener` |
-| Geolocalización | `ReclamoService.crear` | Un cliente detrás de una interfaz y dos columnas en `Reclamo` |
+| Integración | Dónde entra | Qué hay hoy | Qué se agrega |
+| --- | --- | --- | --- |
+| Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | `origenPrioridad` y `motivoPrioridad` en `Reclamo` | `PrioridadPorIA` y el servicio `servicio-prioridad` |
+| Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | `CoberturaLocal` y el modo degradado `asignacionPendiente` | `CoberturaSoap` y el servicio `servicio-cobertura` |
+| Geocodificación (API externa) | `Geocodificador` | `Ubicacion` en `Reclamo`, siempre `PENDIENTE` | `GeorefGeocodificador` y la elección de la sugerencia en el alta |
+| Mensajería | `ServicioNotificaciones` | Avisos internos | Outbox, RabbitMQ y `servicio-notificaciones` |
 
-## Límites conocidos del Hito 1
+`EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
+`CatalogoCobertura` en lugar del Repository.
+
+## Límites conocidos
 
 - **Avisos simulados.** Las notificaciones se guardan en la base con canal `INTERNO`; no se envían
   correos ni SMS.
@@ -157,13 +166,13 @@ Ninguna de estas integraciones está implementada; el diseño deja el lugar dond
 - **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.
 
-## Decisiones abiertas para el Hito 2
+## Decisiones de la Segunda Parte
 
-| Tema | Qué hay que decidir |
+| Tema | Decisión |
 | --- | --- |
-| Geolocalización | Hoy el ciudadano elige el barrio de una lista y el reclamo no guarda coordenadas. Definir si la API externa solo normaliza la dirección y guarda latitud y longitud, o si además deduce el barrio |
-| Servicio SOAP | Qué recibe la consulta de jurisdicción: barrio y categoría, o coordenadas. Depende de la decisión anterior |
-| IA | La categoría la carga el ciudadano, así que la IA puede estimar la prioridad y sugerir la categoría, no reemplazarla |
-| IA sincrónica o por cola | Llamar al modelo dentro del alta con tiempo límite y vuelta a `PrioridadPorCategoria`, o consumir `ReclamoCreado` desde la cola y actualizar la prioridad después |
-| Identificador de evento | Los eventos no tienen id propio; los consumidores lo necesitan para no procesar dos veces un mensaje |
-| Más de un proceso | El servicio SOAP y el de IA deben ser aplicaciones separadas de `reclamos-app` |
+| Geolocalización | El ciudadano sigue eligiendo el barrio. Georef normaliza la dirección y devuelve sugerencias con coordenadas; el ciudadano elige una. No se deduce el barrio |
+| Servicio SOAP | Recibe municipio, barrio y categoría y devuelve las áreas que los cubren. Es el dueño de la cobertura |
+| IA | Estima la prioridad a partir del texto, con Gemini u OpenAI. La categoría la sigue eligiendo el ciudadano |
+| IA sincrónica o por cola | Sincrónica, dentro del alta, con tiempo límite y respaldo por categoría |
+| Identificador de mensaje | Cada aviso que sale por RabbitMQ lleva el `eventId` de su fila de outbox; los eventos de dominio no cambian |
+| Más de un proceso | Cobertura, prioridad y notificaciones son aplicaciones separadas, en `servicios/` |

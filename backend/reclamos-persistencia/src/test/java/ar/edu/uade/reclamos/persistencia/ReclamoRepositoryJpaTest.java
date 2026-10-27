@@ -121,5 +121,47 @@ class ReclamoRepositoryJpaTest extends PersistenciaTestBase {
         assertThatThrownBy(() -> { reclamos.guardar(duplicado); em.flush(); })
                 .isInstanceOf(DataIntegrityViolationException.class);
     }
-}
 
+    @Test void guardaPrioridadCalculadaUbicacionYAsignacionPendiente() {
+        Reclamo nuevo = nuevoReclamo();
+        nuevo.definirPrioridad(Prioridad.ALTA, OrigenPrioridad.IA, "Riesgo para peatones");
+        nuevo.registrarUbicacion(Ubicacion.confirmada(-34.73614578, -58.3228998575,
+                "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires", "georef"));
+        nuevo.marcarAsignacionPendiente();
+        reclamos.guardar(nuevo);
+        flushYLimpiar();
+
+        Reclamo recuperado = reclamos.buscarPorNumero(nuevo.getNumero()).orElseThrow();
+        assertThat(recuperado.getPrioridad()).isEqualTo(Prioridad.ALTA);
+        assertThat(recuperado.getOrigenPrioridad()).isEqualTo(OrigenPrioridad.IA);
+        assertThat(recuperado.getMotivoPrioridad()).isEqualTo("Riesgo para peatones");
+        assertThat(recuperado.getUbicacion()).isEqualTo(Ubicacion.confirmada(-34.73614578, -58.3228998575,
+                "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires", "georef"));
+        assertThat(recuperado.isAsignacionPendiente()).isTrue();
+    }
+
+    @Test void unReclamoNuevoSeGuardaConUbicacionPendienteYPrioridadDeLaCategoria() {
+        Reclamo guardado = reclamos.guardar(nuevoReclamo());
+        flushYLimpiar();
+
+        Reclamo recuperado = reclamos.buscarPorNumero(guardado.getNumero()).orElseThrow();
+        assertThat(recuperado.getUbicacion()).isEqualTo(Ubicacion.pendiente());
+        assertThat(recuperado.getOrigenPrioridad()).isEqualTo(OrigenPrioridad.CATEGORIA);
+        assertThat(recuperado.getMotivoPrioridad()).isNull();
+        assertThat(recuperado.isAsignacionPendiente()).isFalse();
+    }
+
+    @Test void cadaActualizacionIncrementaLaVersion() {
+        Reclamo guardado = reclamos.guardar(nuevoReclamo());
+        flushYLimpiar();
+        long inicial = reclamos.buscarPorNumero(guardado.getNumero()).orElseThrow().getVersion();
+        flushYLimpiar();
+
+        Reclamo separado = reclamos.buscarPorNumero(guardado.getNumero()).orElseThrow();
+        separado.asignarArea(area, null, "Asignado", AHORA.plusHours(1));
+        reclamos.guardar(separado);
+        flushYLimpiar();
+
+        assertThat(reclamos.buscarPorNumero(guardado.getNumero()).orElseThrow().getVersion()).isGreaterThan(inicial);
+    }
+}

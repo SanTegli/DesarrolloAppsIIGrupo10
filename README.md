@@ -20,9 +20,12 @@ backend/                    Proyecto Maven multimódulo (Java 21, Spring Boot 3)
   reclamos-app/             Servicios, fachada, eventos y API REST
 frontend/                   Interfaz React + Vite
   src/api/                  Única capa que habla con el backend
-  src/componentes/          Pantallas: listado, alta, detalle y administración
+  src/componentes/          Pantallas: listado, alta, detalle, avisos y administración
   mock/                     API simulada para trabajar sin Java ni MySQL
+servicios/                  Servicios de integración de la Segunda Parte (SOAP, IA, notificaciones)
 docs/                       Contrato REST, arquitectura, patrones, secuencias y evidencias
+  contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
+  openapi/                  Contrato OpenAPI de REST 1, generado del código
 docker-compose.yml          MySQL para desarrollo; backend y frontend para la demo
 ```
 
@@ -186,8 +189,14 @@ Las estrategias de asignación reciben únicamente las áreas candidatas del Rep
 por menor ID. Sin candidatas, ambas devuelven vacío. Una estrategia configurada con un
 nombre desconocido impide el arranque con un mensaje de configuración.
 
-No hay bloqueos ni campo de versión: dos operaciones simultáneas sobre el mismo reclamo pueden
-pisarse. Como mejora futura, evaluar bloqueo optimista.
+El reclamo tiene bloqueo optimista (`@Version`): si dos operaciones lo modifican a la vez, la segunda
+recibe `409 CONFLICTO_CONCURRENTE` y tiene que volver a cargarlo.
+
+## Documentación de la API (Swagger)
+
+Con el backend levantado, Swagger UI muestra y permite probar todos los endpoints:
+`http://localhost:8080/swagger-ui.html`. El contrato OpenAPI está en `/v3/api-docs.yaml` y versionado en
+[`docs/openapi/reclamos.yaml`](docs/openapi/README.md), que `./mvnw test` regenera.
 
 ## Control de vencimientos
 
@@ -212,6 +221,7 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 - [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
+- [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte.
 - [Despliegue](docs/despliegue.md): contenedores, puertos y configuración.
 - [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso y capturas de la interfaz.
 - [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
@@ -227,3 +237,14 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 5 | `feature/05-hito1-fixes` | Servicios de asignación, notificaciones y vencimientos; auditoría |
 | 6 | `feature/06-ci-docs` | Integración continua, modelo de dominio e instructivo |
 | 7 | `feature/07-avisos-config` | Bandeja de avisos y configuración de vencimientos validada |
+
+## Plan de trabajo de la Segunda Parte
+
+| PR | Rama | Contenido |
+| --- | --- | --- |
+| 8 | `feature/08-base-segunda-entrega` | OpenAPI de REST 1, puntos de entrada para las integraciones, bloqueo optimista, contratos y correcciones de documentación |
+| 9 | `feature/09-soap-cobertura` | Servicio SOAP de cobertura y su cliente |
+| 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2) |
+| 11 | `feature/11-geocodificacion` | Geocodificación con Georef |
+| 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor y Mailpit |
+| 13 | `feature/13-integracion-demo` | Compose completo, diagramas y evidencias |

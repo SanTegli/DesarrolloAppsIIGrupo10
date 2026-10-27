@@ -270,4 +270,56 @@ class ReclamoTest {
 
         assertThrows(UnsupportedOperationException.class, () -> reclamo.getHistorial().clear());
     }
+    @Test
+    @DisplayName("Un reclamo nuevo tiene prioridad por categoría, ubicación pendiente y asignación al día")
+    void datosDeLaSegundaParteAlCrear() {
+        Reclamo reclamo = datos.reclamoIngresado();
+
+        assertEquals(OrigenPrioridad.CATEGORIA, reclamo.getOrigenPrioridad());
+        assertNull(reclamo.getMotivoPrioridad());
+        assertEquals(Ubicacion.pendiente(), reclamo.getUbicacion());
+        assertFalse(reclamo.isAsignacionPendiente());
+        assertEquals(0L, reclamo.getVersion());
+    }
+
+    @Test
+    @DisplayName("La prioridad calculada guarda su origen y su motivo")
+    void definirPrioridadGuardaOrigenYMotivo() {
+        Reclamo reclamo = datos.reclamoIngresado();
+
+        reclamo.definirPrioridad(Prioridad.CRITICA, OrigenPrioridad.IA, " Cables expuestos ");
+
+        assertEquals(Prioridad.CRITICA, reclamo.getPrioridad());
+        assertEquals(OrigenPrioridad.IA, reclamo.getOrigenPrioridad());
+        assertEquals("Cables expuestos", reclamo.getMotivoPrioridad());
+        reclamo.definirPrioridad(Prioridad.MEDIA, OrigenPrioridad.RESPALDO, "  ");
+        assertNull(reclamo.getMotivoPrioridad());
+        assertThrows(DatosInvalidosException.class, () -> reclamo.definirPrioridad(Prioridad.MEDIA, null, null));
+        assertThrows(DatosInvalidosException.class, () -> reclamo.definirPrioridad(null, OrigenPrioridad.IA, null));
+    }
+
+    @Test
+    @DisplayName("La ubicación confirmada reemplaza a la pendiente")
+    void registrarUbicacion() {
+        Reclamo reclamo = datos.reclamoIngresado();
+        Ubicacion ubicacion = Ubicacion.confirmada(-34.7361, -58.3229, "GRL BELGRANO 450, Bernal Oeste", "georef");
+
+        reclamo.registrarUbicacion(ubicacion);
+
+        assertEquals(ubicacion, reclamo.getUbicacion());
+        assertThrows(DatosInvalidosException.class, () -> reclamo.registrarUbicacion(null));
+    }
+
+    @Test
+    @DisplayName("La asignación pendiente solo marca reclamos INGRESADOS y la borra asignar un área")
+    void asignacionPendiente() {
+        Reclamo reclamo = datos.reclamoIngresado();
+
+        reclamo.marcarAsignacionPendiente();
+        assertTrue(reclamo.isAsignacionPendiente());
+
+        reclamo.asignarArea(datos.alumbrado, datos.admin, "Asignada a mano", AHORA);
+        assertFalse(reclamo.isAsignacionPendiente());
+        assertThrows(ReglaNegocioException.class, reclamo::marcarAsignacionPendiente);
+    }
 }

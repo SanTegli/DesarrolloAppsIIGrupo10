@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.seguridad.PermisosReclamo;
 import ar.edu.uade.reclamos.comun.excepcion.*;
 import ar.edu.uade.reclamos.dominio.estrategia.*;
@@ -26,7 +27,7 @@ class ReclamoServiceTest {
     private final EstrategiaAsignacion asignacion = mock(EstrategiaAsignacion.class);
     private final PublicadorEventos eventos = mock(PublicadorEventos.class);
     private final ReclamoService servicio = new ReclamoService(usuarios, categorias, barrios,
-            reclamos, e.factory, prioridad, new ServicioAsignacion(areas, asignacion), new PermisosReclamo(),
+            reclamos, e.factory, prioridad, new ServicioAsignacion(areas, new CoberturaLocal(areas), asignacion), new PermisosReclamo(),
             e.reloj, eventos);
 
     @BeforeEach
@@ -40,7 +41,8 @@ class ReclamoServiceTest {
     private void prepararCreacion() {
         when(categorias.buscarPorId(1L)).thenReturn(Optional.of(e.categoria));
         when(barrios.buscarPorId(1L)).thenReturn(Optional.of(e.barrio));
-        when(prioridad.calcular(any())).thenReturn(Prioridad.CRITICA);
+        when(prioridad.calcular(any())).thenReturn(
+                new PrioridadCalculada(Prioridad.CRITICA, OrigenPrioridad.IA, "Riesgo para peatones"));
     }
 
     @Test
@@ -52,6 +54,8 @@ class ReclamoServiceTest {
         assertThat(resultado.getEstado()).isEqualTo(EstadoReclamo.ASIGNADO);
         assertThat(resultado.getArea()).isSameAs(e.area);
         assertThat(resultado.getPrioridad()).isEqualTo(Prioridad.CRITICA);
+        assertThat(resultado.getOrigenPrioridad()).isEqualTo(OrigenPrioridad.IA);
+        assertThat(resultado.getMotivoPrioridad()).isEqualTo("Riesgo para peatones");
         assertThat(resultado.getCiudadano()).isSameAs(e.ciudadano);
         assertThat(resultado.getFechaLimite()).isEqualTo(resultado.getFechaCreacion().plusHours(48));
         assertThat(resultado.getHistorial()).hasSize(2);

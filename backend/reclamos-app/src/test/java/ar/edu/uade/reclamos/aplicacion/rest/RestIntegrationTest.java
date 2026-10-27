@@ -131,8 +131,15 @@ class RestIntegrationTest {
         JsonNode dto = leer(resultado);
         assertThat(resultado.getResponse().getHeader("Location")).isEqualTo("/api/reclamos/" + dto.get("numero").asText());
         assertThat(dto.get("numero").asText()).matches("REC-[0-9A-F]{8}");
-        campos(dto, "numero", "descripcion", "direccion", "estado", "prioridad", "vencido", "fechaCreacion",
-                "fechaLimite", "categoria", "barrio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
+        campos(dto, "numero", "descripcion", "direccion", "ubicacion", "estado", "prioridad", "origenPrioridad",
+                "motivoPrioridad", "vencido", "asignacionPendiente", "fechaCreacion", "fechaLimite", "categoria",
+                "barrio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
+        campos(dto.get("ubicacion"), "estado", "latitud", "longitud", "direccionNormalizada", "proveedor");
+        assertThat(dto.get("ubicacion").get("estado").asText()).isEqualTo("PENDIENTE");
+        assertThat(dto.get("ubicacion").get("latitud").isNull()).isTrue();
+        assertThat(dto.get("origenPrioridad").asText()).isEqualTo("CATEGORIA");
+        assertThat(dto.get("motivoPrioridad").isNull()).isTrue();
+        assertThat(dto.get("asignacionPendiente").asBoolean()).isFalse();
         campos(dto.get("ciudadano"), "id", "nombreCompleto");
         campos(dto.get("categoria"), "id", "nombre");
         campos(dto.get("historial").get(0), "estadoAnterior", "estadoNuevo", "fecha", "observacion", "usuario");
@@ -225,8 +232,8 @@ class RestIntegrationTest {
         listado(datos.administrador(), datos.resuelto(), datos.ingresado(), datos.ajeno(), datos.asignado());
         JsonNode resumen = leer(mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.ciudadano()))
                 .andExpect(status().isOk()).andReturn()).get(0);
-        campos(resumen, "numero", "direccion", "estado", "prioridad", "vencido", "fechaCreacion", "fechaLimite",
-                "categoria", "barrio", "ciudadano", "area");
+        campos(resumen, "numero", "direccion", "estado", "prioridad", "vencido", "asignacionPendiente",
+                "fechaCreacion", "fechaLimite", "categoria", "barrio", "ciudadano", "area");
     }
 
     @Test

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Contrato del servicio SOAP de cobertura (borrador del PR 8; lo implementa el PR 9).
+  Spring Web Services publica el WSDL a partir de este XSD en /ws/cobertura.wsdl.
+  Una sola operación: ConsultarCobertura.
+-->
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           xmlns:tns="http://uade.edu.ar/reclamos/cobertura"
+           targetNamespace="http://uade.edu.ar/reclamos/cobertura"
+           elementFormDefault="qualified">
+
+  <!-- Qué áreas atienden una categoría en un barrio de un municipio. -->
+  <xs:element name="ConsultarCoberturaRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="municipioId" type="tns:Identificador"/>
+        <xs:element name="barrioId" type="tns:Identificador"/>
+        <xs:element name="categoriaId" type="tns:Identificador"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- Lista vacía: ninguna área cubre la combinación. No es un error. -->
+  <xs:element name="ConsultarCoberturaResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="area" type="tns:Area" minOccurs="0" maxOccurs="unbounded"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="Area">
+    <xs:sequence>
+      <xs:element name="id" type="tns:Identificador"/>
+      <xs:element name="nombre" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="Identificador">
+    <xs:restriction base="xs:long">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>
