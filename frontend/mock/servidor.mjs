@@ -43,6 +43,43 @@ const usuarios = [
 const reclamos = []
 const notificaciones = []
 
+// Respuestas fijas en lugar de Georef: "Belgrano" devuelve dos opciones, "caido" simula Georef sin responder
+// y cualquier otra dirección, ninguna. Las coordenadas son las que devolvió Georef para Belgrano 450.
+const SUGERENCIAS_BELGRANO = [
+  { direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires', latitud: -34.73614578, longitud: -58.3228998575 },
+  { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.75816353, longitud: -58.29744745 },
+]
+// Recuadro de Quilmes, igual que reclamos.geocodificacion.recuadros en application.yml.
+const RECUADRO_QUILMES = { latitudMinima: -34.82, latitudMaxima: -34.66, longitudMinima: -58.38, longitudMaxima: -58.17 }
+
+function sugerirUbicaciones(parametros) {
+  const direccion = (parametros.get('direccion') ?? '').trim()
+  const barrioId = Number(parametros.get('barrioId'))
+  const detalles = []
+  if (direccion.length < 3 || direccion.length > 200) detalles.push('direccion: entre 3 y 200 caracteres')
+  if (!Number.isInteger(barrioId) || barrioId <= 0) detalles.push('barrioId: es obligatorio')
+  if (detalles.length) throw invalido('Los parametros recibidos no son validos.', detalles)
+  buscar(barrios, barrioId, 'barrio')
+  if (/caido/i.test(direccion)) return { disponible: false, sugerencias: [] }
+  return { disponible: true, sugerencias: /belgrano/i.test(direccion) ? SUGERENCIAS_BELGRANO : [] }
+}
+
+// Igual que ServicioUbicaciones.confirmar: sin elección queda pendiente; fuera del municipio, 400.
+function confirmarUbicacion(ubicacion) {
+  if (ubicacion === undefined || ubicacion === null) {
+    return { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null }
+  }
+  const { latitud, longitud, direccionNormalizada } = ubicacion
+  if (!Number.isFinite(latitud) || !Number.isFinite(longitud) || typeof direccionNormalizada !== 'string' || !direccionNormalizada.trim()) {
+    throw invalido('Los datos recibidos no son validos.', ['ubicacion: latitud, longitud y direccionNormalizada son obligatorias'])
+  }
+  const r = RECUADRO_QUILMES
+  if (latitud < r.latitudMinima || latitud > r.latitudMaxima || longitud < r.longitudMinima || longitud > r.longitudMaxima) {
+    throw invalido('La ubicación elegida queda fuera de Quilmes.')
+  }
+  return { estado: 'CONFIRMADA', latitud, longitud, direccionNormalizada: direccionNormalizada.trim(), proveedor: 'georef' }
+}
+
 // Misma tabla que PoliticaTransiciones en el dominio.
 const TRANSICIONES = [
   ['INGRESADO', 'ASIGNADO', ['SISTEMA', 'ADMINISTRADOR']],
@@ -139,8 +176,7 @@ function detalle(usuario, reclamo) {
   return {
     ...resumen(reclamo),
     descripcion: reclamo.descripcion,
-    // La API simulada no geocodifica ni consulta servicios externos: igual que el backend sin integraciones.
-    ubicacion: { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null },
+    ubicacion: reclamo.ubicacion,
     origenPrioridad: reclamo.origenPrioridad,
     motivoPrioridad: reclamo.motivoPrioridad,
     agente: referenciaUsuario(usuarios.find((u) => u.id === reclamo.agenteId)),
@@ -216,6 +252,7 @@ function crear(usuario, cuerpo) {
   if (usuario.rol !== 'CIUDADANO') throw denegado('Solo un ciudadano puede crear reclamos.')
   const categoria = buscar(categorias, cuerpo.categoriaId, 'categoría')
   const barrio = buscar(barrios, cuerpo.barrioId, 'barrio')
+  const ubicacion = confirmarUbicacion(cuerpo.ubicacion)
 
   const fecha = ahora()
   // Igual que PrioridadPorPalabrasClave: solo cambia el origen si la palabra sube la prioridad.
@@ -232,6 +269,7 @@ function crear(usuario, cuerpo) {
     numero: `REC-${randomUUID().slice(0, 8).toUpperCase()}`,
     descripcion: cuerpo.descripcion.trim(),
     direccion: cuerpo.direccion.trim(),
+    ubicacion,
     estado: 'INGRESADO',
     prioridad,
     origenPrioridad,
@@ -367,6 +405,10 @@ async function atender(peticion) {
       }))
       return [200, lista]
     }
+  }
+
+  if (metodo === 'GET' && partes[1] === 'ubicaciones' && partes[2] === 'sugerencias' && partes.length === 3) {
+    return [200, sugerirUbicaciones(url.searchParams)]
   }
 
   // Bandeja del usuario: sus avisos, del más nuevo al más viejo.

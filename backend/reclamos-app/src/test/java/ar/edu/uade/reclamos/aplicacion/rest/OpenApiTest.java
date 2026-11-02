@@ -41,10 +41,14 @@ class OpenApiTest {
         assertThat(rutas).containsExactlyInAnyOrder("/api/reclamos", "/api/reclamos/{numero}",
                 "/api/reclamos/{numero}/estado", "/api/reclamos/{numero}/asignacion",
                 "/api/reclamos/{numero}/notificaciones", "/api/notificaciones", "/api/usuarios",
-                "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas");
+                "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
+                "/api/ubicaciones/sugerencias");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();
+        assertThat(contrato.at("/components/schemas/CrearReclamoRequest/properties").has("ubicacion")).isTrue();
+        assertThat(contrato.at("/components/schemas/SugerenciasUbicacionResponse/properties").has("disponible"))
+                .isTrue();
 
         JsonNode cambiarEstado = contrato.at("/paths/~1api~1reclamos~1{numero}~1estado/patch");
         for (String codigo : List.of("200", "400", "403", "404", "409", "500")) {

@@ -42,3 +42,21 @@ reclamos:
     origen: local                # local (la base del backend) | soap (servicio-cobertura)
     url: http://localhost:8081/ws
     tiempo-limite: 2s            # si el SOAP no contesta a tiempo, el reclamo queda con la asignación pendiente
+  # Dirección del reclamo en el mapa (API externa). Si Georef no responde, la ubicación queda pendiente.
+  geocodificacion:
+    proveedor: georef
+    url: https://apis.datos.gob.ar/georef/api/v2.0
+    tiempo-conexion: 1s
+    tiempo-respuesta: 3s
+    max-sugerencias: 5
+    cache:
+      duracion: 10m              # la misma dirección en el mismo municipio no se vuelve a consultar
+      maximo: 500
+    # Recuadro aproximado de cada municipio (filtro grueso, no el límite exacto). Un nombre con espacios va
+    # entre corchetes: "[Lomas de Zamora]".
+    recuadros:
+      Quilmes:
+        latitud-minima: -34.82
+        latitud-maxima: -34.66
+        longitud-minima: -58.38
+        longitud-maxima: -58.17

@@ -14,7 +14,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 33 tests: capa de API, etiquetas y componentes
+npm test             # 38 tests: capa de API, etiquetas y componentes
 ```
 
 Guardar en esta carpeta la salida de los tres comandos (`BUILD SUCCESS` y el resumen de Vitest).
@@ -80,6 +80,19 @@ UPDATE reclamos SET fecha_limite = NOW() - INTERVAL 1 DAY WHERE numero = 'REC-XX
 Los casos "solo por API" se prueban con los comandos de PowerShell de
 [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md).
 
+### Segunda Parte: ubicación con Georef (API externa)
+
+Necesitan Internet en la máquina del backend. Los tests automáticos usan respuestas reales de Georef
+grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Georef.
+
+| Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
+| --- | --- | --- | --- |
+| CP27 | Dirección ambigua: varias sugerencias, el ciudadano elige | `UbicacionesIntegrationTest.direccionAmbiguaDevuelveSoloLasOpcionesConCoordenadas`, `GeorefGeocodificadorTest` | Crear reclamo, barrio Bernal, "Belgrano 450", **Buscar en el mapa**: aparecen varias opciones |
+| CP28 | Dirección válida elegida: el reclamo queda con la ubicación confirmada y el enlace a Maps | `UbicacionesIntegrationTest.elAltaConLaSugerenciaElegidaGuardaLaUbicacionConfirmada`, `ServicioUbicacionesTest` | Elegir una opción y crear el reclamo. El detalle muestra **Ver en Google Maps** |
+| CP29 | Dirección inexistente: lista vacía, el reclamo se crea igual | `UbicacionesIntegrationTest.direccionInexistenteDevuelveListaVacia` | Buscar "Calle Inventada 123": avisa que no la encontró |
+| CP30 | Georef caído: el alta no se traba y la ubicación queda pendiente | `UbicacionesIntegrationTest.georefCaidoDevuelveNoDisponibleSinError`, `GeorefGeocodificadorTest.georefQueNoContestaSeCortaEnElTiempoLimite` | Desconectar Internet y buscar: "El mapa no responde en este momento". El reclamo se crea con la ubicación pendiente |
+| CP31 | Una ubicación fuera del municipio se rechaza | `UbicacionesIntegrationTest.elAltaConUnaUbicacionFueraDelMunicipioOIncompletaSeRechaza` | Solo por API: `POST /api/reclamos` con coordenadas de Córdoba. Responde 400 |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -111,6 +124,7 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
 - [ ] Captura del WSDL en el navegador y de una consulta SOAP con su respuesta (CP16, CP17 y CP19).
 - [ ] Captura del detalle de un reclamo con la asignación pendiente, con el servicio detenido (CP20).
+- [ ] Captura de las sugerencias de Georef en el alta y del detalle con el enlace a Google Maps (CP27 y CP28).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).

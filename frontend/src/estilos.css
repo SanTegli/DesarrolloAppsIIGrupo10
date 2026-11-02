@@ -528,3 +528,73 @@ td .secundario {
     min-width: 0;
   }
 }
+
+/* Dirección del reclamo en el mapa */
+.campo-direccion {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.campo-direccion label {
+  flex: 1;
+}
+
+.ayuda-campo,
+.aviso-ubicacion {
+  color: var(--tinta-suave);
+  font-size: 0.875rem;
+  margin: -8px 0 0;
+}
+
+.sugerencias {
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 10px 14px;
+  margin: 0;
+}
+
+.sugerencias legend {
+  font-size: 0.875rem;
+  font-weight: 600;
+  padding: 0 4px;
+}
+
+.sugerencias ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sugerencias li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  padding: 6px 0;
+}
+
+.formulario .sugerencias label {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 8px;
+  font-weight: 400;
+}
+
+.sugerencias a,
+.ubicacion-mapa a {
+  color: var(--primario-fuerte);
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.ubicacion-mapa {
+  display: block;
+}
+
+@media (max-width: 560px) {
+  .campo-direccion {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -9,10 +9,13 @@ import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorPalabrasClave;
 import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
+import ar.edu.uade.reclamos.aplicacion.integracion.GeocodificadorConCache;
+import ar.edu.uade.reclamos.aplicacion.integracion.GeorefGeocodificador;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaAsignacion;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
+import ar.edu.uade.reclamos.dominio.integracion.Geocodificador;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import java.time.Clock;
@@ -79,6 +82,22 @@ public class ConfiguracionAplicacion {
             case "soap" -> new CoberturaSoap(CoberturaSoap.crearCliente(cobertura.url(), cobertura.tiempoLimite()),
                     areas);
             default -> throw new IllegalArgumentException("reclamos.cobertura.origen debe ser local o soap");
+        };
+    }
+
+    /**
+     * Geocodificador de las direcciones: Georef, envuelto en una caché (Proxy). Se piden el doble de resultados
+     * de los que se muestran, porque Georef devuelve varios sin coordenadas.
+     */
+    @Bean
+    public Geocodificador geocodificador(PropiedadesReclamos propiedades, Clock reloj) {
+        PropiedadesReclamos.Geocodificacion geocodificacion = propiedades.geocodificacion();
+        return switch (geocodificacion.proveedor()) {
+            case "georef" -> new GeocodificadorConCache(
+                    GeorefGeocodificador.crear(geocodificacion.url(), geocodificacion.tiempoConexion(),
+                            geocodificacion.tiempoRespuesta(), geocodificacion.maxSugerencias() * 2),
+                    geocodificacion.cache().duracion(), geocodificacion.cache().maximo(), reloj);
+            default -> throw new IllegalArgumentException("reclamos.geocodificacion.proveedor debe ser georef");
         };
     }
 }

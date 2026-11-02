@@ -1,7 +1,21 @@
 import { describe, expect, it } from 'vitest'
-import { describirPrioridad, describirUsuario, esAccionDefinitiva, formatearFecha, nombreDeAccion } from './etiquetas.js'
+import {
+  describirPrioridad,
+  describirUsuario,
+  enlaceMapa,
+  esAccionDefinitiva,
+  formatearFecha,
+  nombreDeAccion,
+} from './etiquetas.js'
 
 describe('etiquetas', () => {
+  it('arma el enlace a Google Maps con las coordenadas, o ninguno si faltan', () => {
+    expect(enlaceMapa(-34.73614578, -58.3228998575)).toBe(
+      'https://www.google.com/maps/search/?api=1&query=-34.73614578%2C-58.3228998575',
+    )
+    expect(enlaceMapa(null, null)).toBeNull()
+  })
+
   it('nombra cada transición como la acción que ve el usuario', () => {
     expect(nombreDeAccion('ASIGNADO', 'EN_PROCESO')).toBe('Tomar reclamo')
     expect(nombreDeAccion('RESUELTO', 'EN_PROCESO')).toBe('Reabrir')

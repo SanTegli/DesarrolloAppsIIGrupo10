@@ -2,13 +2,16 @@ import { pedir } from './cliente.js'
 
 const ruta = (numero) => `/reclamos/${encodeURIComponent(numero)}`
 
-/** POST /api/reclamos. Solo ciudadanos. */
-export function crearReclamo(usuarioId, { categoriaId, barrioId, descripcion, direccion }) {
-  return pedir('/reclamos', {
-    usuarioId,
-    metodo: 'POST',
-    cuerpo: { categoriaId, barrioId, descripcion, direccion },
-  })
+/**
+ * POST /api/reclamos. Solo ciudadanos. `ubicacion` es la sugerencia elegida del mapa; sin ella, el reclamo
+ * queda con la ubicación pendiente.
+ */
+export function crearReclamo(usuarioId, { categoriaId, barrioId, descripcion, direccion, ubicacion }) {
+  const cuerpo = { categoriaId, barrioId, descripcion, direccion }
+  if (ubicacion) {
+    cuerpo.ubicacion = ubicacion
+  }
+  return pedir('/reclamos', { usuarioId, metodo: 'POST', cuerpo })
 }
 
 /** GET /api/reclamos. El backend decide qué reclamos ve cada rol. */

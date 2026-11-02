@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.aplicacion.rest.mapper;
 
 import ar.edu.uade.reclamos.aplicacion.rest.dto.*;
+import ar.edu.uade.reclamos.aplicacion.servicio.SugerenciasUbicacion;
+import ar.edu.uade.reclamos.aplicacion.servicio.UbicacionElegida;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import java.util.Set;
 import org.springframework.stereotype.Component;
@@ -24,6 +26,19 @@ public class RestMapper {
                 reclamo.getFechaCreacion(), reclamo.getFechaLimite(), categoriaReferencia(reclamo.getCategoria()),
                 barrioReferencia(reclamo.getBarrio()), usuarioReferencia(reclamo.getCiudadano()),
                 areaReferencia(reclamo.getArea()));
+    }
+
+    public SugerenciasUbicacionResponse sugerencias(SugerenciasUbicacion resultado) {
+        return new SugerenciasUbicacionResponse(resultado.disponible(), resultado.sugerencias().stream()
+                .map(sugerencia -> new SugerenciaUbicacionResponse(sugerencia.nomenclatura(), sugerencia.latitud(),
+                        sugerencia.longitud()))
+                .toList());
+    }
+
+    /** {@code null} si el ciudadano no eligió ninguna sugerencia. */
+    public UbicacionElegida ubicacionElegida(UbicacionElegidaRequest request) {
+        return request == null ? null
+                : new UbicacionElegida(request.latitud(), request.longitud(), request.direccionNormalizada().strip());
     }
 
     public UbicacionResponse ubicacion(Ubicacion ubicacion) {

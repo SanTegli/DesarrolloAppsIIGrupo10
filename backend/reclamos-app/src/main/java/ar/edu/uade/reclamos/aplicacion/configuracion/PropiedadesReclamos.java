@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.aplicacion.configuracion;
 
 import java.time.Duration;
+import java.util.Map;
+import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -11,7 +13,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  */
 @ConfigurationProperties(prefix = "reclamos", ignoreUnknownFields = false)
 public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultValue Asignacion asignacion,
-                                  @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura) {
+                                  @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura,
+                                  @DefaultValue Geocodificacion geocodificacion) {
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -74,6 +77,70 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
             if (tiempoLimite == null || tiempoLimite.isNegative() || tiempoLimite.isZero()) {
                 throw new IllegalArgumentException("reclamos.cobertura.tiempo-limite debe ser mayor que cero");
             }
+        }
+    }
+
+    /**
+     * Geocodificación de la dirección del reclamo (API externa).
+     *
+     * @param proveedor      por ahora solo {@code georef}, la API oficial de normalización de direcciones
+     * @param url            URL base de la API, sin barra final
+     * @param maxSugerencias cuántas sugerencias con coordenadas se le muestran al ciudadano como máximo
+     * @param cache          cuánto se recuerda una consulta repetida y cuántas se guardan
+     * @param recuadros      recuadro de coordenadas de cada municipio, por nombre; una ubicación elegida
+     *                       fuera del recuadro se rechaza. Sin recuadro, solo se validan los rangos
+     */
+    public record Geocodificacion(@DefaultValue("georef") String proveedor,
+                                  @DefaultValue("https://apis.datos.gob.ar/georef/api/v2.0") String url,
+                                  @DefaultValue("1s") Duration tiempoConexion,
+                                  @DefaultValue("3s") Duration tiempoRespuesta,
+                                  @DefaultValue("5") int maxSugerencias,
+                                  @DefaultValue Cache cache,
+                                  Map<String, Recuadro> recuadros) {
+        public Geocodificacion {
+            if (url == null || url.isBlank()) {
+                throw new IllegalArgumentException("reclamos.geocodificacion.url no puede estar vacía");
+            }
+            requerirPositivo(tiempoConexion, "reclamos.geocodificacion.tiempo-conexion");
+            requerirPositivo(tiempoRespuesta, "reclamos.geocodificacion.tiempo-respuesta");
+            if (maxSugerencias < 1 || maxSugerencias > 10) {
+                throw new IllegalArgumentException("reclamos.geocodificacion.max-sugerencias debe estar entre 1 y 10");
+            }
+            recuadros = recuadros == null ? Map.of() : Map.copyOf(recuadros);
+        }
+
+        /** Recuadro del municipio, buscado por nombre sin distinguir mayúsculas. */
+        public Optional<Recuadro> recuadroDe(String municipio) {
+            return recuadros.entrySet().stream()
+                    .filter(entrada -> entrada.getKey().equalsIgnoreCase(municipio))
+                    .map(Map.Entry::getValue)
+                    .findFirst();
+        }
+    }
+
+    /** Consultas repetidas: se responden de memoria durante {@code duracion}, hasta {@code maximo} distintas. */
+    public record Cache(@DefaultValue("10m") Duration duracion, @DefaultValue("500") int maximo) {
+        public Cache {
+            requerirPositivo(duracion, "reclamos.geocodificacion.cache.duracion");
+            if (maximo < 1) {
+                throw new IllegalArgumentException("reclamos.geocodificacion.cache.maximo debe ser mayor que cero");
+            }
+        }
+    }
+
+    /** Rectángulo de coordenadas que contiene al municipio. Es un filtro grueso, no el límite exacto. */
+    public record Recuadro(double latitudMinima, double latitudMaxima, double longitudMinima,
+                           double longitudMaxima) {
+        public Recuadro {
+            if (latitudMinima >= latitudMaxima || longitudMinima >= longitudMaxima) {
+                throw new IllegalArgumentException(
+                        "reclamos.geocodificacion.recuadros: cada mínimo tiene que ser menor que su máximo");
+            }
+        }
+
+        public boolean contiene(double latitud, double longitud) {
+            return latitud >= latitudMinima && latitud <= latitudMaxima && longitud >= longitudMinima
+                    && longitud <= longitudMaxima;
         }
     }
 

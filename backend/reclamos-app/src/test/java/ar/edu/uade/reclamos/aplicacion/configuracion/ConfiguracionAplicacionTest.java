@@ -9,6 +9,8 @@ import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
+import ar.edu.uade.reclamos.aplicacion.integracion.GeocodificadorConCache;
+import ar.edu.uade.reclamos.dominio.integracion.Geocodificador;
 import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
@@ -54,7 +56,9 @@ class ConfiguracionAplicacionTest {
             "reclamos.cobertura.origen=desconocida", "reclamos.cobertura.origen=",
             "reclamos.cobertura.url=", "reclamos.cobertura.tiempo-limite=0s",
             "reclamos.prioridad.ia.url=", "reclamos.prioridad.ia.tiempo-respuesta=0s",
-            "reclamos.prioridad.ia.circuito.llamadas=0"})
+            "reclamos.prioridad.ia.circuito.llamadas=0",
+            "reclamos.geocodificacion.proveedor=nominatim", "reclamos.geocodificacion.url=",
+            "reclamos.geocodificacion.max-sugerencias=0", "reclamos.geocodificacion.cache.maximo=0"})
     void configuracionInvalidaImpideArrancarConMensajeClaro(String propiedad) {
         contexto.withPropertyValues(propiedad).run(ctx -> {
             assertThat(ctx).hasFailed();
@@ -75,6 +79,23 @@ class ConfiguracionAplicacionTest {
             assertThat(ia.tiempoRespuesta()).isEqualTo(Duration.ofSeconds(6));
             assertThat(ia.circuito().llamadas()).isEqualTo(5);
             assertThat(ia.circuito().espera()).isEqualTo(Duration.ofSeconds(30));
+        });
+    }
+
+    @Test
+    void geocodificadorEsGeorefConCacheYLeeLosRecuadros() {
+        contexto.withPropertyValues("reclamos.geocodificacion.recuadros.Quilmes.latitud-minima=-34.82",
+                "reclamos.geocodificacion.recuadros.Quilmes.latitud-maxima=-34.66",
+                "reclamos.geocodificacion.recuadros.Quilmes.longitud-minima=-58.38",
+                "reclamos.geocodificacion.recuadros.Quilmes.longitud-maxima=-58.17").run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(Geocodificador.class)).isInstanceOf(GeocodificadorConCache.class);
+            PropiedadesReclamos.Geocodificacion geocodificacion =
+                    ctx.getBean(PropiedadesReclamos.class).geocodificacion();
+            assertThat(geocodificacion.url()).isEqualTo("https://apis.datos.gob.ar/georef/api/v2.0");
+            assertThat(geocodificacion.maxSugerencias()).isEqualTo(5);
+            assertThat(geocodificacion.recuadroDe("quilmes")).hasValueSatisfying(recuadro ->
+                    assertThat(recuadro.contiene(-34.736, -58.323)).isTrue());
         });
     }
 

@@ -22,7 +22,8 @@ dependen tres personas a la vez.
 
 `X-Usuario-Id` es obligatorio en todos los endpoints de `/api/reclamos` y en `/api/notificaciones`.
 Los endpoints de consulta de usuarios, barrios, categorías y áreas no lo piden, porque el selector de
-usuario los necesita antes de saber quién es el usuario.
+usuario los necesita antes de saber quién es el usuario. La búsqueda de direcciones
+(`/api/ubicaciones/sugerencias`) tampoco.
 
 ### Enumerados
 
@@ -163,7 +164,12 @@ Solo `CIUDADANO`. El reclamo queda a nombre del usuario del encabezado.
   "categoriaId": 1,
   "barrioId": 2,
   "descripcion": "Farol apagado frente a la plaza",
-  "direccion": "Belgrano 450"
+  "direccion": "Belgrano 450",
+  "ubicacion": {
+    "latitud": -34.73614578,
+    "longitud": -58.3228998575,
+    "direccionNormalizada": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"
+  }
 }
 ```
 
@@ -172,7 +178,8 @@ Solo `CIUDADANO`. El reclamo queda a nombre del usuario del encabezado.
 | `categoriaId` | Obligatorio; debe existir |
 | `barrioId` | Obligatorio; debe existir |
 | `descripcion` | Obligatoria, hasta 1000 caracteres |
-| `direccion` | Obligatoria, hasta 200 caracteres |
+| `direccion` | Obligatoria, hasta 200 caracteres. Es lo que escribió el ciudadano y se guarda siempre |
+| `ubicacion` | Opcional: la sugerencia de [`GET /api/ubicaciones/sugerencias`](#get-apiubicacionessugerencias--buscar-la-dirección-en-el-mapa) que eligió el ciudadano, con sus tres campos. Las coordenadas tienen que caer dentro del recuadro del municipio del barrio. Sin `ubicacion`, el reclamo queda con la ubicación `PENDIENTE` |
 
 Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y el objeto Reclamo.
 
@@ -180,8 +187,8 @@ Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y e
   `ASIGNADO` con esa área.
 - Si ninguna lo cubre, vuelve `INGRESADO` con `area: null`. Sigue siendo `201`.
 
-Errores: `400` datos inválidos, `403` el usuario no es ciudadano, `404` usuario, barrio o categoría
-inexistente.
+Errores: `400` datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de
+Quilmes.`), `403` el usuario no es ciudadano, `404` usuario, barrio o categoría inexistente.
 
 ### `GET /api/reclamos/{numero}` — consultar un reclamo
 
@@ -362,6 +369,46 @@ Para el formulario de asignación manual.
   }
 ]
 ```
+
+## Ubicaciones
+
+### `GET /api/ubicaciones/sugerencias` — buscar la dirección en el mapa
+
+Antes del alta. El backend busca la dirección en [Georef](https://www.argentina.gob.ar/georef), la API
+oficial de normalización de direcciones, dentro del municipio y la provincia del barrio. No pide
+`X-Usuario-Id`.
+
+`GET /api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2`
+
+| Parámetro | Regla |
+| --- | --- |
+| `direccion` | Obligatoria, de 3 a 200 caracteres |
+| `barrioId` | Obligatorio; debe existir |
+
+```json
+{
+  "disponible": true,
+  "sugerencias": [
+    {
+      "direccionNormalizada": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires",
+      "latitud": -34.73614578,
+      "longitud": -58.3228998575
+    }
+  ]
+}
+```
+
+- Devuelve hasta 5 sugerencias, solo las que tienen coordenadas dentro del recuadro del municipio. Una
+  dirección puede ser ambigua (Belgrano 450 existe en Bernal Oeste y en Quilmes): el ciudadano elige.
+- `sugerencias` vacía con `disponible: true`: Georef no encontró la dirección.
+- `disponible: false`: Georef no respondió en 3 segundos o respondió un error. **No es un error HTTP**: el
+  reclamo se puede crear igual, sin `ubicacion`.
+- La misma búsqueda en el mismo municipio se responde de memoria durante 10 minutos, sin volver a Georef.
+
+Errores: `400` parámetros inválidos, `404` barrio inexistente.
+
+El enlace a Google Maps lo arma la interfaz con las coordenadas
+(`https://www.google.com/maps/search/?api=1&query=<latitud>%2C<longitud>`); no hace falta clave.
 
 ## Datos semilla acordados
 
