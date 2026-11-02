@@ -24,6 +24,7 @@
     -->
     <modules>
         <module>servicio-cobertura</module>
+        <module>servicio-prioridad</module>
     </modules>
 
     <properties>

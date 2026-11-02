@@ -12,7 +12,51 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "reclamos", ignoreUnknownFields = false)
 public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultValue Asignacion asignacion,
                                   @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura) {
-    public record Prioridad(@DefaultValue("categoria") String estrategia) { }
+    /**
+     * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
+     * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
+     */
+    public record Prioridad(@DefaultValue("categoria") String estrategia, @DefaultValue Ia ia) { }
+
+    /**
+     * Cliente del servicio de prioridad con IA.
+     *
+     * @param tiempoConexion  cuánto se espera para conectar
+     * @param tiempoRespuesta cuánto se espera la respuesta; el modelo puede tardar unos segundos
+     * @param circuito        cuándo dejar de llamar al servicio si falla seguido
+     */
+    public record Ia(@DefaultValue("http://localhost:8082") String url,
+                     @DefaultValue("1s") Duration tiempoConexion,
+                     @DefaultValue("6s") Duration tiempoRespuesta,
+                     @DefaultValue Circuito circuito) {
+        public Ia {
+            if (url == null || url.isBlank()) {
+                throw new IllegalArgumentException("reclamos.prioridad.ia.url no puede estar vacía");
+            }
+            requerirPositivo(tiempoConexion, "reclamos.prioridad.ia.tiempo-conexion");
+            requerirPositivo(tiempoRespuesta, "reclamos.prioridad.ia.tiempo-respuesta");
+        }
+    }
+
+    /**
+     * Circuit breaker del cliente de IA: mira las últimas {@code llamadas}; si falló la mitad, no vuelve a
+     * llamar durante {@code espera}.
+     */
+    public record Circuito(@DefaultValue("5") int llamadas, @DefaultValue("30s") Duration espera) {
+        public Circuito {
+            if (llamadas < 1) {
+                throw new IllegalArgumentException("reclamos.prioridad.ia.circuito.llamadas debe ser mayor que cero");
+            }
+            requerirPositivo(espera, "reclamos.prioridad.ia.circuito.espera");
+        }
+    }
+
+    private static void requerirPositivo(Duration duracion, String propiedad) {
+        if (duracion == null || duracion.isZero() || duracion.isNegative()) {
+            throw new IllegalArgumentException(propiedad + " debe ser mayor que cero");
+        }
+    }
+
     public record Asignacion(@DefaultValue("jurisdiccion") String estrategia) { }
 
     /**

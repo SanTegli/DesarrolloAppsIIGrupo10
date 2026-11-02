@@ -72,6 +72,14 @@ jobs:
           name: wsdl-cobertura
           path: docs/contratos/soap/cobertura.wsdl
           if-no-files-found: ignore
+      # OpenApiPrioridadTest regenera el contrato de REST 2.
+      - name: Guardar contrato OpenAPI de prioridad
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openapi-prioridad
+          path: docs/openapi/prioridad.yaml
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend (Vitest)

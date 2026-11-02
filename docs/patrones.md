@@ -249,6 +249,12 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Proxy remoto | 9 | `CoberturaSoap` | `ServicioAsignacion` usa un objeto local que en realidad llama a otro proceso |
 | Capa anticorrupción | 9 | Paquete `aplicacion/integracion/soap` | Los mensajes XML del contrato no salen del adaptador |
 | Contract-first | 9 | `servicio-cobertura` | El WSDL y las clases del servicio se generan del XSD, que es la única fuente del contrato |
+| Adapter | 10 | `ProveedorIA`: `GeminiAdapter`, `OpenAiAdapter`, `SimuladoAdapter` | Cada proveedor de IA tiene su propia API; el servicio quiere cambiar de proveedor sin tocar el resto |
+| Factory | 10 | `ConfiguracionProveedor` | Elegir el adaptador según `prioridad.ia.proveedor` en un solo lugar |
+| Strategy | 10 | `PrioridadPorIA` | Una tercera estrategia de prioridad, sin cambiar `ReclamoService` |
+| Decorator | 10 | `PrioridadConRespaldo` | Agregar el respaldo por categoría a cualquier estrategia que dependa de un servicio externo |
+| Circuit breaker | 10 | `ClienteServicioPrioridad` | Si REST 2 falla seguido, dejar de esperarlo en cada alta |
+| Model as a Service | 10 | `servicio-prioridad` | El modelo queda detrás de una API propia, con su contrato OpenAPI |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -302,3 +308,50 @@ entre al nuestro.
 - **Servicio:** `servicios/servicio-cobertura`
 - **Tests:** `CoberturaSoapTest`, `MensajesCoberturaSoapTest`, `AsignacionPorSoapIntegrationTest` y,
   del lado del servicio, `CoberturaEndpointTest` y `ServicioSoapHttpTest`
+
+## Adapter, Factory y Decorator en la prioridad con IA
+
+**Problema.** El sistema tiene que sugerir la prioridad con un modelo de lenguaje, pero cada proveedor
+(Gemini, OpenAI) tiene su URL, su forma de autenticar, su formato de pedido y su forma de devolver el texto.
+Además, el modelo puede tardar, quedarse sin cuota o contestar cualquier cosa, y el alta de un reclamo no
+puede fallar por eso.
+
+**Solución.** Tres patrones, cada uno en su lugar:
+
+```text
+backend                                            servicio-prioridad (REST 2)
+
+ReclamoService                                     EvaluadorPrioridad
+   │ usa EstrategiaPrioridad                          │ usa ProveedorIA (interfaz)
+   ▼                                                  ▼
+PrioridadConRespaldo  ── Decorator                 ┌──────────────┬───────────────┬─────────────────┐
+   │ envuelve                                     GeminiAdapter  OpenAiAdapter   SimuladoAdapter
+   ▼                                              (Adapter)      (Adapter)       (sin red, no es IA)
+PrioridadPorIA  ── Strategy                        elegido por ConfiguracionProveedor (Factory)
+   │
+ClienteServicioPrioridad ── circuit breaker ── HTTP ──▶ POST /api/prioridades/evaluar
+```
+
+| Patrón | Clase | Qué resuelve |
+| --- | --- | --- |
+| Adapter | `GeminiAdapter`, `OpenAiAdapter` | Traducen la misma `ConsultaIA` (instrucciones y reclamo) a la API de cada proveedor, y su respuesta a `RespuestaIA`. Cambiar de Gemini a OpenAI es `prioridad.ia.proveedor: openai` |
+| Factory | `ConfiguracionProveedor` | Es el único lugar que conoce las tres implementaciones |
+| Strategy | `PrioridadPorIA` | Tercera estrategia de prioridad; se elige con `reclamos.prioridad.estrategia: ia`. La IA puede subir la prioridad de la categoría, no bajarla |
+| Decorator | `PrioridadConRespaldo` | Misma interfaz que la estrategia que envuelve. Si la IA falla, devuelve la prioridad de la categoría con origen `RESPALDO`: el reclamo siempre se crea |
+| Circuit breaker | `ClienteServicioPrioridad` (Resilience4j) | Si falló la mitad de las últimas 5 llamadas, durante 30 s no llama y falla enseguida: con Gemini sin cuota, el alta no espera 6 s cada vez |
+
+```java
+public PrioridadCalculada calcular(Reclamo reclamo) {          // PrioridadConRespaldo
+    try {
+        return principal.calcular(reclamo);                      // PrioridadPorIA
+    } catch (ServicioExternoNoDisponibleException error) {
+        return new PrioridadCalculada(respaldo.calcular(reclamo).prioridad(), OrigenPrioridad.RESPALDO, MOTIVO);
+    }
+}
+```
+
+- **Código del backend:** `reclamos-app/…/aplicacion/estrategia/PrioridadPorIA.java`,
+  `PrioridadConRespaldo.java` y `aplicacion/integracion/ClienteServicioPrioridad.java`
+- **Servicio:** `servicios/servicio-prioridad`, paquete `proveedor`
+- **Tests:** `PrioridadPorIATest`, `ClienteServicioPrioridadTest`, `PrioridadPorIAIntegrationTest` y, del
+  lado del servicio, `GeminiAdapterTest`, `OpenAiAdapterTest` y `ConfiguracionProveedorTest`

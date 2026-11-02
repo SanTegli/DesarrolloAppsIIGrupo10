@@ -86,6 +86,8 @@ flowchart LR
   COM["reclamos-comun<br/>validación y excepciones"]
   MYSQL[("MySQL 8.4")]
   COB["servicio-cobertura<br/>SOAP, proceso aparte"]
+  PRI["servicio-prioridad<br/>REST 2, proceso aparte"]
+  LLM["Gemini u OpenAI<br/>API externa"]
 
   FE -->|"REST /api"| APP
   APP --> PERS
@@ -94,11 +96,14 @@ flowchart LR
   DOM --> COM
   PERS --> MYSQL
   APP -.->|"SOAP ConsultarCobertura<br/>si origen es soap"| COB
+  APP -.->|"REST POST /api/prioridades/evaluar<br/>si la estrategia es ia"| PRI
+  PRI -->|"HTTPS"| LLM
 ```
 
-`servicio-cobertura` no es un módulo del backend: es otra aplicación, en `servicios/`, que se compila,
-se prueba y se despliega por separado. Lo único que comparte con el backend es el contrato
-[`cobertura.xsd`](contratos/soap/cobertura.xsd).
+`servicio-cobertura` y `servicio-prioridad` no son módulos del backend: son otras aplicaciones, en
+`servicios/`, que se compilan, se prueban y se despliegan por separado. Lo único que comparten con el
+backend son sus contratos: [`cobertura.xsd`](contratos/soap/cobertura.xsd) y
+[el OpenAPI de REST 2](contratos/README.md#rest-2-post-apiprioridadesevaluar).
 
 ## Servicios orientados a componentes
 
@@ -154,7 +159,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 
 | Integración | Dónde entra | Estado | Qué se agrega |
 | --- | --- | --- | --- |
-| Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | Pendiente (PR 10). Hoy: `origenPrioridad` y `motivoPrioridad` en `Reclamo` | `PrioridadPorIA` y el servicio `servicio-prioridad` |
+| Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | **Hecho (PR 10)**: `PrioridadPorIA`, `PrioridadConRespaldo` y `servicio-prioridad`; ver abajo | — |
 | Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | **Hecho (PR 9)**: `CoberturaSoap` y `servicio-cobertura`; ver abajo | — |
 | Geocodificación (API externa) | `Geocodificador` | `Ubicacion` en `Reclamo`, siempre `PENDIENTE` | `GeorefGeocodificador` y la elección de la sugerencia en el alta |
 | Mensajería | `ServicioNotificaciones` | Avisos internos | Outbox, RabbitMQ y `servicio-notificaciones` |
@@ -209,6 +214,50 @@ sequenceDiagram
 El administrador ve los reclamos con `asignacionPendiente` en la pantalla de administración y los asigna
 a mano, como cualquier reclamo sin área.
 
+### Prioridad con IA
+
+Con `reclamos.prioridad.estrategia: ia`, la estrategia de prioridad es `PrioridadConRespaldo`, que envuelve
+a `PrioridadPorIA`. `ReclamoService` no cambia: sigue pidiendo una `PrioridadCalculada` a la estrategia.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant RS as ReclamoService
+  participant PR as PrioridadConRespaldo<br/>(Decorator)
+  participant PI as PrioridadPorIA
+  participant CL as ClienteServicioPrioridad<br/>(circuit breaker)
+  participant SP as servicio-prioridad<br/>(REST 2)
+  participant LLM as Gemini
+
+  RS->>PR: calcular(reclamo)
+  PR->>PI: calcular(reclamo)
+  PI->>CL: sugerir(categoría, descripción)
+  alt circuito cerrado
+    CL->>SP: POST /api/prioridades/evaluar (hasta 6 s)
+    SP->>LLM: generateContent con el esquema de respuesta
+    LLM-->>SP: {"prioridad": "CRITICA", "motivo": "..."}
+    SP-->>CL: 200 con prioridad, motivo, proveedor y modelo
+    CL-->>PI: sugerencia
+    PI-->>PR: la mayor entre categoría y sugerencia
+    PR-->>RS: PrioridadCalculada
+  else REST 2 falla, tarda o el circuito está abierto
+    CL-->>PI: ServicioExternoNoDisponibleException
+    PI-->>PR: la excepción sigue
+    PR-->>RS: prioridad de la categoría, origen RESPALDO
+  end
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `servicio-prioridad` | El componente de IA, publicado como servicio. Arma la consulta con los criterios de `instrucciones-prioridad.txt`, la manda al proveedor configurado y valida la respuesta. Recibe solo categoría y descripción |
+| `ProveedorIA` y sus adaptadores | `GeminiAdapter`, `OpenAiAdapter` y `SimuladoAdapter`: traducen la consulta a la API de cada proveedor. Se elige con `prioridad.ia.proveedor` |
+| `ClienteServicioPrioridad` | Llama a REST 2 con 1 s para conectar y 6 s para la respuesta. Si la mitad de las últimas 5 llamadas falló, abre el circuito y durante 30 s falla sin llamar |
+| `PrioridadPorIA` | La IA puede subir la prioridad de la categoría, pero no bajarla |
+| `PrioridadConRespaldo` | Si la IA no responde, usa la prioridad de la categoría y marca el origen `RESPALDO` |
+
+La IA se llama dentro de la transacción del alta: en el peor caso, el alta tarda unos 6 segundos más. Con
+el circuito abierto, el respaldo es inmediato.
+
 ## Límites conocidos
 
 - **Avisos simulados.** Las notificaciones se guardan en la base con canal `INTERNO`; no se envían
@@ -225,7 +274,7 @@ a mano, como cualquier reclamo sin área.
 | --- | --- |
 | Geolocalización | El ciudadano sigue eligiendo el barrio. Georef normaliza la dirección y devuelve sugerencias con coordenadas; el ciudadano elige una. No se deduce el barrio |
 | Servicio SOAP | Recibe municipio, barrio y categoría y devuelve las áreas que los cubren. Es el dueño de la cobertura |
-| IA | Estima la prioridad a partir del texto, con Gemini u OpenAI. La categoría la sigue eligiendo el ciudadano |
+| IA | Estima la prioridad a partir del texto. Gemini por su nivel gratuito; OpenAI queda como segundo adaptador. La categoría la sigue eligiendo el ciudadano |
 | IA sincrónica o por cola | Sincrónica, dentro del alta, con tiempo límite y respaldo por categoría |
 | Identificador de mensaje | Cada aviso que sale por RabbitMQ lleva el `eventId` de su fila de outbox; los eventos de dominio no cambian |
 | Más de un proceso | Cobertura, prioridad y notificaciones son aplicaciones separadas, en `servicios/` |

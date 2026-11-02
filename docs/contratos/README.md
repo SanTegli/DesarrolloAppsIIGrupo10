@@ -6,7 +6,7 @@ necesita cambiar un contrato, lo avisa al grupo antes, igual que con [el contrat
 | Integración | Contrato | Lo implementa |
 | --- | --- | --- |
 | SOAP de cobertura | [`soap/cobertura.xsd`](soap/cobertura.xsd) y [`soap/cobertura.wsdl`](soap/cobertura.wsdl) | Hecho en el PR 9: `servicios/servicio-cobertura` y `CoberturaSoap` en el backend |
-| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) (OpenAPI 3.0) | PR 10, `servicios/servicio-prioridad` |
+| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend |
 | Mensajes por RabbitMQ | [`mensajes.md`](mensajes.md) | PR 12, backend y `servicios/servicio-notificaciones` |
 | REST 1 (API de reclamos) | [`../openapi/reclamos.yaml`](../openapi/README.md), generado del código | Backend |
 
@@ -93,3 +93,45 @@ El servicio SOAP es el dueño de la cobertura: qué área atiende qué categorí
 que la semilla del backend; `CatalogoSincronizadoTest` falla si alguien cambia uno solo de los dos. El
 backend conserva los datos de cada área (nombre, email, si está activa) y su propia tabla de cobertura, que
 sigue usando con `reclamos.cobertura.origen: local`.
+
+## REST 2: `POST /api/prioridades/evaluar`
+
+El servicio de prioridad corre en el puerto 8082, con Swagger UI en `http://localhost:8082/swagger-ui.html`.
+Recibe solo la categoría y la descripción del reclamo: nunca el nombre, el email, el DNI, el teléfono, la
+dirección ni la foto del vecino.
+
+```json
+{ "categoria": "Luminaria rota", "descripcion": "Poste inclinado con cables expuestos frente a la escuela" }
+```
+
+```json
+{
+  "prioridad": "CRITICA",
+  "motivo": "Hay cables expuestos frente a una escuela: riesgo eléctrico inmediato.",
+  "proveedor": "gemini",
+  "modelo": "gemini-3.5-flash-lite"
+}
+```
+
+| HTTP | Código | Cuándo | Qué hace el backend |
+| --- | --- | --- | --- |
+| 200 | — | El modelo sugirió una prioridad válida | La usa si no es menor que la de la categoría: origen `IA` |
+| 400 | `DATOS_INVALIDOS` | Falta la categoría o la descripción, o son demasiado largas | Respaldo por categoría |
+| 502 | `RESPUESTA_INVALIDA` | El modelo respondió algo que no es una de las cuatro prioridades con un motivo | Respaldo por categoría |
+| 503 | `PROVEEDOR_NO_DISPONIBLE` | Falta la clave, el proveedor la rechazó, se agotó la cuota o el proveedor falló | Respaldo por categoría |
+| 504 | `TIEMPO_AGOTADO` | El modelo no contestó en 5 segundos | Respaldo por categoría |
+
+En todos los casos de error el reclamo se crea igual, con origen `RESPALDO`. El cuerpo de error es el
+mismo que el de REST 1.
+
+### Probarlo a mano
+
+Con el servicio levantado ([cómo](../../servicios/README.md#servicio-de-prioridad-con-ia-rest-2)), en
+PowerShell:
+
+```powershell
+Invoke-RestMethod http://localhost:8082/api/prioridades/evaluar -Method Post -ContentType "application/json; charset=utf-8" `
+  -Body '{"categoria": "Luminaria rota", "descripcion": "Poste inclinado con cables expuestos frente a la escuela"}'
+```
+
+O desde Swagger UI: `POST /api/prioridades/evaluar`, **Try it out** y **Execute**.

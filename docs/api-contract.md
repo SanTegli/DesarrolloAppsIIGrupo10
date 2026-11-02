@@ -118,7 +118,9 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
 - `ubicacion.estado` es `CONFIRMADA` cuando el ciudadano eligió una sugerencia del geocodificador, con
   coordenadas, dirección normalizada y proveedor; si no, `PENDIENTE` y los demás campos en `null`.
 - `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
-  no respondió y se usó la de la categoría). `motivoPrioridad` la explica; es `null` con `CATEGORIA`.
+  no respondió y se usó la de la categoría). `motivoPrioridad` la explica. Es `null` cuando la prioridad es
+  la de la categoría sin otro análisis; con `reclamos.prioridad.estrategia: ia`, si la IA sugirió menos que
+  la categoría, el origen queda `CATEGORIA` y el motivo dice qué sugirió la IA.
 - `asignacionPendiente` es `true` cuando el servicio de cobertura no respondió a tiempo o rechazó la
   consulta al crear el reclamo: queda `INGRESADO` y un administrador lo asigna a mano. No es lo mismo que
   no tener área compatible. Solo puede pasar con `reclamos.cobertura.origen: soap`.
