@@ -31,6 +31,33 @@ describe('DetalleReclamo', () => {
     expect(screen.getByText('Tu reclamo fue ingresado.')).toBeInTheDocument()
   })
 
+  it('con la ubicación confirmada muestra la dirección normalizada y el enlace a Google Maps', async () => {
+    mostrar(ana, {
+      [`GET ${RUTA}`]: reclamo({
+        ubicacion: {
+          estado: 'CONFIRMADA',
+          latitud: -34.73614578,
+          longitud: -58.3228998575,
+          direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires',
+          proveedor: 'georef',
+        },
+      }),
+    })
+
+    const enlace = await screen.findByRole('link', { name: 'Ver en Google Maps' })
+    expect(enlace).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=-34.73614578%2C-58.3228998575')
+    expect(enlace).toHaveAttribute('target', '_blank')
+    expect(screen.getByText(/GRL BELGRANO 450, Bernal Oeste/)).toBeInTheDocument()
+    expect(screen.getByText('Belgrano 450, Bernal')).toBeInTheDocument()
+  })
+
+  it('con la ubicación pendiente avisa que no está en el mapa', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: reclamo() })
+
+    expect(await screen.findByText('Sin marcar en el mapa')).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Ver en Google Maps' })).not.toBeInTheDocument()
+  })
+
   it('muestra de dónde salió la prioridad y si la cobertura no respondió', async () => {
     mostrar(elena, {
       [`GET ${RUTA}`]: reclamo({

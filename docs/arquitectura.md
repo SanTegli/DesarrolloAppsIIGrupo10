@@ -88,6 +88,7 @@ flowchart LR
   COB["servicio-cobertura<br/>SOAP, proceso aparte"]
   PRI["servicio-prioridad<br/>REST 2, proceso aparte"]
   LLM["Gemini u OpenAI<br/>API externa"]
+  GEO["Georef<br/>API externa"]
 
   FE -->|"REST /api"| APP
   APP --> PERS
@@ -98,6 +99,7 @@ flowchart LR
   APP -.->|"SOAP ConsultarCobertura<br/>si origen es soap"| COB
   APP -.->|"REST POST /api/prioridades/evaluar<br/>si la estrategia es ia"| PRI
   PRI -->|"HTTPS"| LLM
+  APP -->|"HTTPS GET /direcciones"| GEO
 ```
 
 `servicio-cobertura` y `servicio-prioridad` no son módulos del backend: son otras aplicaciones, en
@@ -161,7 +163,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | --- | --- | --- | --- |
 | Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | **Hecho (PR 10)**: `PrioridadPorIA`, `PrioridadConRespaldo` y `servicio-prioridad`; ver abajo | — |
 | Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | **Hecho (PR 9)**: `CoberturaSoap` y `servicio-cobertura`; ver abajo | — |
-| Geocodificación (API externa) | `Geocodificador` | `Ubicacion` en `Reclamo`, siempre `PENDIENTE` | `GeorefGeocodificador` y la elección de la sugerencia en el alta |
+| Geocodificación (API externa) | `Geocodificador` | **Hecho (PR 11)**: `GeorefGeocodificador`, `GeocodificadorConCache` y `ServicioUbicaciones`; ver abajo | — |
 | Mensajería | `ServicioNotificaciones` | Avisos internos | Outbox, RabbitMQ y `servicio-notificaciones` |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
@@ -257,6 +259,50 @@ sequenceDiagram
 
 La IA se llama dentro de la transacción del alta: en el peor caso, el alta tarda unos 6 segundos más. Con
 el circuito abierto, el respaldo es inmediato.
+
+### Ubicación con Georef (API externa)
+
+La dirección se busca antes del alta, fuera de cualquier transacción: el ciudadano escribe la dirección,
+toca "Buscar en el mapa" y elige una de las sugerencias. El alta manda la elegida y el backend la valida.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor C as Ciudadano
+  participant UI as React
+  participant UC as UbicacionController
+  participant SU as ServicioUbicaciones
+  participant CA as GeocodificadorConCache<br/>(Proxy)
+  participant GG as GeorefGeocodificador<br/>(Adapter)
+  participant GR as Georef
+
+  C->>UI: escribe "Belgrano 450" y toca Buscar en el mapa
+  UI->>UC: GET /api/ubicaciones/sugerencias?direccion=…&barrioId=2
+  UC->>SU: sugerir(direccion, barrio)
+  SU->>CA: sugerir(direccion, barrio)
+  alt no está en la caché
+    CA->>GG: sugerir(direccion, barrio)
+    GG->>GR: GET /direcciones?direccion=…&departamento=Quilmes&provincia=Buenos Aires
+    GR-->>GG: direcciones con calle, localidad y ubicación
+    GG-->>CA: SugerenciaUbicacion (nomenclatura y coordenadas)
+  end
+  CA-->>SU: sugerencias
+  SU-->>UI: las que tienen coordenadas dentro de Quilmes, hasta 5
+  C->>UI: elige "GRL BELGRANO 450, Bernal Oeste" y crea el reclamo
+  UI->>SU: POST /api/reclamos con ubicacion (por ReclamoController y la fachada)
+  Note over SU: confirmar: dentro del recuadro → Ubicacion CONFIRMADA, proveedor georef
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `GeorefGeocodificador` | Adapter y capa anticorrupción: arma la consulta de Georef y traduce su respuesta a `SugerenciaUbicacion`. Un 400 de Georef es "no encontrada"; un error, un tiempo agotado (1 s para conectar, 3 s para responder) o una respuesta con otra forma es `ServicioExternoNoDisponibleException` |
+| `GeocodificadorConCache` | Proxy de caché: misma interfaz; la misma dirección en el mismo municipio se responde de memoria durante 10 minutos. Las fallas no se guardan |
+| `ServicioUbicaciones` | Filtra las sugerencias sin coordenadas o fuera del recuadro del municipio y, en el alta, valida la elegida. Si Georef no responde, devuelve `disponible: false` en lugar de fallar |
+| `ReclamoService` | Guarda la `Ubicacion` que le pasa la fachada: confirmada o pendiente |
+
+El recuadro de cada municipio está en `reclamos.geocodificacion.recuadros`. Es un filtro grueso: evita
+coordenadas de otra provincia o inventadas en el navegador, pero no prueba que el punto esté dentro del
+límite exacto del partido.
 
 ## Límites conocidos
 

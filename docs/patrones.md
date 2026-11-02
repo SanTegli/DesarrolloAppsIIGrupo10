@@ -255,6 +255,8 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Decorator | 10 | `PrioridadConRespaldo` | Agregar el respaldo por categoría a cualquier estrategia que dependa de un servicio externo |
 | Circuit breaker | 10 | `ClienteServicioPrioridad` | Si REST 2 falla seguido, dejar de esperarlo en cada alta |
 | Model as a Service | 10 | `servicio-prioridad` | El modelo queda detrás de una API propia, con su contrato OpenAPI |
+| Adapter y capa anticorrupción | 11 | `GeorefGeocodificador` | El JSON de Georef (calles, localidades, ids censales) no entra al dominio: sale como `SugerenciaUbicacion` |
+| Proxy de caché | 11 | `GeocodificadorConCache` | No repetir consultas iguales a una API externa gratuita y compartida |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -355,3 +357,34 @@ public PrioridadCalculada calcular(Reclamo reclamo) {          // PrioridadConRe
 - **Servicio:** `servicios/servicio-prioridad`, paquete `proveedor`
 - **Tests:** `PrioridadPorIATest`, `ClienteServicioPrioridadTest`, `PrioridadPorIAIntegrationTest` y, del
   lado del servicio, `GeminiAdapterTest`, `OpenAiAdapterTest` y `ConfiguracionProveedorTest`
+
+## Adapter y proxy de caché en la geocodificación
+
+**Problema.** El ciudadano escribe la dirección como le sale ("Belgrano 450") y queremos ubicarla en el mapa.
+Georef la entiende, pero responde con su propio modelo: calle con categoría e id, altura, localidad,
+localidad censal, departamento, provincia y coordenadas que a veces vienen en `null`. Además es una API
+pública: buscar dos veces lo mismo no debería consultarla dos veces.
+
+**Solución.** Dos clases con la misma interfaz del dominio, `Geocodificador`, una dentro de la otra:
+
+```text
+ServicioUbicaciones ──usa──▶ Geocodificador (interfaz del dominio)
+                                  ▲ implementa
+                         GeocodificadorConCache  (Proxy: responde de memoria lo repetido)
+                                  │ envuelve
+                         GeorefGeocodificador    (Adapter: JSON de Georef ⇄ SugerenciaUbicacion)
+                                  │ HTTPS
+                               Georef
+```
+
+| Patrón | Clase | Qué hace |
+| --- | --- | --- |
+| Adapter y capa anticorrupción | `GeorefGeocodificador` | Arma `GET /direcciones?direccion=…&departamento=…&provincia=…` y se queda solo con `nomenclatura` y `ubicacion`. Pasar a Nominatim es otra clase con la misma interfaz |
+| Proxy de caché | `GeocodificadorConCache` | Misma interfaz; guarda cada consulta 10 minutos, hasta 500, y descarta primero la menos usada. Las fallas no se guardan |
+
+`ConfiguracionAplicacion` arma el par según `reclamos.geocodificacion.proveedor`, y `ServicioUbicaciones`
+recibe un `Geocodificador` sin saber que hay una caché ni que del otro lado está Georef.
+
+- **Código:** `reclamos-app/…/aplicacion/integracion/GeorefGeocodificador.java` y `GeocodificadorConCache.java`
+- **Tests:** `GeorefGeocodificadorTest` (con respuestas reales grabadas de Georef), `GeocodificadorConCacheTest`
+  y `UbicacionesIntegrationTest`

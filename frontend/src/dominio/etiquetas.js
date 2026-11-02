@@ -32,6 +32,17 @@ export function describirPrioridad({ prioridad, origenPrioridad, motivoPrioridad
   return motivoPrioridad ? `${texto}. ${motivoPrioridad}` : texto
 }
 
+/**
+ * Enlace a Google Maps con el punto del reclamo. Lo arma la interfaz con las coordenadas: no necesita clave
+ * ni un mapa embebido.
+ */
+export function enlaceMapa(latitud, longitud) {
+  if (!Number.isFinite(latitud) || !Number.isFinite(longitud)) {
+    return null
+  }
+  return `https://www.google.com/maps/search/?api=1&query=${latitud}%2C${longitud}`
+}
+
 export const ROLES = {
   CIUDADANO: 'Ciudadano',
   AGENTE_MUNICIPAL: 'Agente municipal',

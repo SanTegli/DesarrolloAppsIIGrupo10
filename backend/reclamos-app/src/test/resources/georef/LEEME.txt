@@ -1,0 +1,2 @@
+Respuestas reales de Georef (apis.datos.gob.ar/georef/api/v2.0/direcciones), grabadas el 2/11/2026 para
+los tests de GeorefGeocodificador. Los tests nunca llaman a Georef.

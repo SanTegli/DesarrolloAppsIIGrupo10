@@ -47,14 +47,26 @@ public class ReclamoService {
         this.eventos = eventos;
     }
 
+    /** Alta sin ubicación en el mapa: queda pendiente. */
     @Transactional
     public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion) {
+        return crear(usuarioId, categoriaId, barrioId, descripcion, direccion, Ubicacion.pendiente());
+    }
+
+    /**
+     * Alta con la ubicación ya validada por {@code ServicioUbicaciones}: confirmada si el ciudadano eligió una
+     * sugerencia del geocodificador, pendiente si no.
+     */
+    @Transactional
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+                         Ubicacion ubicacion) {
         Ciudadano ciudadano = permisos.validarCreacion(usuario(usuarioId));
         Categoria categoria = categorias.buscarPorId(categoriaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
         Barrio barrio = barrios.buscarPorId(barrioId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
         Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
+        reclamo.registrarUbicacion(ubicacion);
         PrioridadCalculada calculada = prioridad.calcular(reclamo);
         reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
         asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());

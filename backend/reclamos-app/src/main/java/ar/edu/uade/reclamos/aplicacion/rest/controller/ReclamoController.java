@@ -31,7 +31,7 @@ public class ReclamoController {
     public ResponseEntity<ReclamoResponse> crear(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
                                                 @Valid @RequestBody CrearReclamoRequest request) {
         Reclamo reclamo = facade.crear(usuarioId, request.categoriaId(), request.barrioId(),
-                request.descripcion(), request.direccion());
+                request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()));
         return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
                 .body(respuesta(usuarioId, reclamo));
     }

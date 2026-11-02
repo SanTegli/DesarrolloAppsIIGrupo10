@@ -155,6 +155,7 @@ asignación al crear el reclamo. En el Hito 1 todos los avisos usan el canal `IN
 | Un reclamo vence una sola vez y sube un nivel de prioridad | `Reclamo.marcarVencido` |
 | Solo un reclamo `INGRESADO` queda con la asignación pendiente; asignarle un área la borra | `Reclamo.marcarAsignacionPendiente` y `asignarArea` |
 | Una ubicación confirmada tiene coordenadas válidas, dirección y proveedor; nunca se inventan | `Ubicacion.confirmada` |
+| Una ubicación solo se confirma si el ciudadano eligió una sugerencia del geocodificador dentro de su municipio | `ServicioUbicaciones.confirmar` |
 | Todo reclamo nace `INGRESADO`, con número, fecha límite e historial | `ReclamoFactory.crear` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).

@@ -494,6 +494,18 @@ Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cable
 
 **Evaluación con los 25 casos.** Con el servicio levantado con la clave, desde la raíz: `java servicios/servicio-prioridad/evaluacion/EvaluarPrioridades.java`. Tarda unos tres minutos y deja el resultado en `docs/evidencias/ia-evaluacion.md`, que se commitea como evidencia.
 
+### Probar la ubicación con Georef
+
+No necesita clave ni ningún servicio extra: el backend consulta Georef, la API oficial de direcciones de Argentina. Hace falta conexión a Internet.
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2" | ConvertTo-Json -Depth 4
+```
+
+Responde `disponible: true` y las sugerencias con coordenadas dentro de Quilmes; para Belgrano 450 hay más de una, porque la calle existe en varias localidades. Con una dirección inventada, la lista vuelve vacía. Sin Internet responde `disponible: false`: no es un error.
+
+En la interfaz, como Ana Pérez: **Crear reclamo**, elegir el barrio, escribir la dirección y tocar **Buscar en el mapa**. Elegir una opción y crear el reclamo: el detalle muestra la dirección normalizada y el enlace **Ver en Google Maps**. Si no se elige ninguna, el reclamo se crea igual y el detalle dice "Sin marcar en el mapa".
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -510,6 +522,7 @@ Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cable
 | GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |
 | GET | `/api/barrios` | Listar barrios y nombre de municipio. |
 | GET | `/api/areas` | Listar áreas, estado activo y cobertura. |
+| GET | `/api/ubicaciones/sugerencias` | Buscar una dirección en el mapa (Georef) dentro del municipio del barrio. Parámetros `direccion` y `barrioId`. |
 | GET | `/swagger-ui.html` | Swagger UI: documentación de todos los endpoints y un formulario para probarlos. |
 | GET | `/v3/api-docs.yaml` | Contrato OpenAPI de la API. |
 

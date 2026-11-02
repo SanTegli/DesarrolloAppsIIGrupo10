@@ -1,6 +1,13 @@
 import { useState } from 'react'
 import { asignarArea, cambiarEstado, listarNotificaciones, obtenerReclamo } from '../api/reclamos.js'
-import { ESTADOS, describirPrioridad, esAccionDefinitiva, formatearFecha, nombreDeAccion } from '../dominio/etiquetas.js'
+import {
+  ESTADOS,
+  describirPrioridad,
+  enlaceMapa,
+  esAccionDefinitiva,
+  formatearFecha,
+  nombreDeAccion,
+} from '../dominio/etiquetas.js'
 import { useCarga } from '../hooks/useCarga.js'
 import { AvisoError, AvisoExito } from './Aviso.jsx'
 import { InsigniaEstado, InsigniaPrioridad, InsigniaVencido } from './Insignias.jsx'
@@ -85,7 +92,10 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
             <dd>{describirPrioridad(reclamo)}</dd>
             <dt>Ubicación</dt>
             <dd>
-              {reclamo.direccion}, {reclamo.barrio.nombre}
+              <span>
+                {reclamo.direccion}, {reclamo.barrio.nombre}
+              </span>
+              <UbicacionEnMapa ubicacion={reclamo.ubicacion} />
             </dd>
             <dt>Ciudadano</dt>
             <dd>{reclamo.ciudadano.nombreCompleto}</dd>
@@ -207,5 +217,21 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
         </div>
       </div>
     </section>
+  )
+}
+
+/** Si el ciudadano eligió la dirección en el mapa: cómo la normalizó el geocodificador y el enlace a Maps. */
+function UbicacionEnMapa({ ubicacion }) {
+  const enlace = ubicacion?.estado === 'CONFIRMADA' ? enlaceMapa(ubicacion.latitud, ubicacion.longitud) : null
+  if (!enlace) {
+    return <small className="secundario ubicacion-mapa">Sin marcar en el mapa</small>
+  }
+  return (
+    <small className="ubicacion-mapa">
+      {ubicacion.direccionNormalizada}.{' '}
+      <a href={enlace} target="_blank" rel="noopener noreferrer">
+        Ver en Google Maps
+      </a>
+    </small>
   )
 }

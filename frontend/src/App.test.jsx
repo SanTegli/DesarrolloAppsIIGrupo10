@@ -82,6 +82,74 @@ describe('App', () => {
     })
   })
 
+  it('el ciudadano busca la dirección en el mapa, elige una opción y la manda en el alta', async () => {
+    const bernal = {
+      direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires',
+      latitud: -34.73614578,
+      longitud: -58.3228998575,
+    }
+    const quilmes = { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.758, longitud: -58.297 }
+    const creado = reclamo({ ubicacion: { estado: 'CONFIRMADA', ...bernal, proveedor: 'georef' } })
+    const llamadas = simularApi({
+      ...CATALOGOS,
+      'GET /api/reclamos': [],
+      'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [bernal, quilmes] },
+      'POST /api/reclamos': { status: 201, cuerpo: creado },
+      'GET /api/reclamos/REC-4F2A91BC': creado,
+      'GET /api/reclamos/REC-4F2A91BC/notificaciones': [],
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
+    const buscar = screen.getByRole('button', { name: 'Buscar en el mapa' })
+    expect(buscar).toBeDisabled()
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
+    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
+    await usuario.click(buscar)
+
+    const opcion = await screen.findByRole('radio', { name: bernal.direccionNormalizada })
+    expect(screen.getByRole('radio', { name: /Ninguna de estas/ })).toBeChecked()
+    expect(screen.getAllByRole('link', { name: 'Ver en el mapa' })).toHaveLength(2)
+    await usuario.click(opcion)
+    await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado frente a la plaza')
+    await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
+
+    expect(await screen.findByRole('link', { name: 'Ver en Google Maps' })).toBeInTheDocument()
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/ubicaciones/sugerencias').consulta).toEqual({
+      direccion: 'Belgrano 450',
+      barrioId: '2',
+    })
+    expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo.ubicacion).toEqual(bernal)
+  })
+
+  it('si el mapa no responde lo avisa, y cambiar la dirección borra la búsqueda', async () => {
+    const llamadas = simularApi({
+      ...CATALOGOS,
+      'GET /api/reclamos': [],
+      'GET /api/ubicaciones/sugerencias': { disponible: false, sugerencias: [] },
+      'POST /api/reclamos': { status: 400, cuerpo: { status: 400, codigo: 'DATOS_INVALIDOS', mensaje: 'Prueba', detalles: [] } },
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
+    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
+    await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
+
+    expect(await screen.findByText(/El mapa no responde en este momento/)).toBeInTheDocument()
+    await usuario.type(screen.getByLabelText('Dirección'), '0')
+    expect(screen.queryByText(/El mapa no responde en este momento/)).not.toBeInTheDocument()
+
+    await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
+    await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
+    await screen.findByRole('alert')
+    expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo).not.toHaveProperty('ubicacion')
+  })
+
   it('muestra los errores de validación del backend en el formulario', async () => {
     simularApi({
       ...CATALOGOS,

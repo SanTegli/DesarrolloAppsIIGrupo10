@@ -46,6 +46,17 @@ class ReclamoServiceTest {
     }
 
     @Test
+    void crearGuardaLaUbicacionConfirmadaYSinUbicacionQuedaPendiente() {
+        prepararCreacion();
+        var confirmada = Ubicacion.confirmada(-34.736, -58.323, "GRL BELGRANO 450, Bernal Oeste, Quilmes", "georef");
+
+        assertThat(servicio.crear(1L, 1L, 1L, "Pozo", "Belgrano 450", confirmada).getUbicacion())
+                .isEqualTo(confirmada);
+        assertThat(servicio.crear(1L, 1L, 1L, "Pozo", "Belgrano 450").getUbicacion())
+                .isEqualTo(Ubicacion.pendiente());
+    }
+
+    @Test
     void crearCalculaPrioridadAsignaAutomaticamenteYPersisteEnOrden() {
         prepararCreacion();
         when(areas.buscarCandidatas(1L, 1L)).thenReturn(List.of(e.area));

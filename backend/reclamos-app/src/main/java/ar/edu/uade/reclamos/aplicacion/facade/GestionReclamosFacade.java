@@ -12,16 +12,30 @@ public class GestionReclamosFacade {
     private final ReclamoService escritura;
     private final ConsultaReclamosService consultas;
     private final ConsultaCatalogosService catalogos;
+    private final ServicioUbicaciones ubicaciones;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
-                                  ConsultaCatalogosService catalogos) {
+                                  ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones) {
         this.escritura = escritura;
         this.consultas = consultas;
         this.catalogos = catalogos;
+        this.ubicaciones = ubicaciones;
     }
 
     public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion) {
         return escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion);
+    }
+
+    /** Alta con la sugerencia de ubicación que eligió el ciudadano, o {@code null} si no eligió ninguna. */
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+                         UbicacionElegida ubicacion) {
+        return escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion,
+                ubicaciones.confirmar(barrioId, ubicacion));
+    }
+
+    /** Sugerencias del geocodificador para la dirección, antes del alta. */
+    public SugerenciasUbicacion sugerirUbicaciones(String direccion, Long barrioId) {
+        return ubicaciones.sugerir(direccion, barrioId);
     }
 
     public Reclamo asignar(Long usuarioId, String numero, Long areaId, String observacion) {

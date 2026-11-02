@@ -2,8 +2,8 @@
 
 El sistema se despliega en cinco contenedores. El navegador solo habla con el contenedor del
 frontend, que sirve la interfaz y reenvía las llamadas a `/api` al backend. El backend consulta la
-cobertura al servicio SOAP y la prioridad al servicio de IA por la red interna de Compose; solo el
-servicio de IA sale a Internet, a la API de Gemini.
+cobertura al servicio SOAP y la prioridad al servicio de IA por la red interna de Compose. Salen a
+Internet el servicio de IA, a la API de Gemini, y el backend, a Georef para ubicar las direcciones.
 
 ```mermaid
 flowchart LR
@@ -29,6 +29,7 @@ flowchart LR
     VOL[["Volumen reclamos-mysql-data"]]
   end
   GEM["API de Gemini<br/>generativelanguage.googleapis.com"]
+  GEO["Georef<br/>apis.datos.gob.ar"]
 
   NAV -->|"HTTP 5173"| NGINX
   NGINX -->|"HTTP 8080, /api"| APP
@@ -36,6 +37,7 @@ flowchart LR
   APP -->|"SOAP sobre HTTP 8081, /ws"| SOAP
   APP -->|"REST 8082, /api/prioridades"| IA
   IA -->|"HTTPS, GEMINI_API_KEY"| GEM
+  APP -->|"HTTPS, sin clave"| GEO
   DB --- VOL
 ```
 
@@ -67,6 +69,7 @@ máquina; el backend no los necesita, porque llega por la red de Compose con el 
 | `GEMINI_API_KEY` | `.env`, leído por Compose; contenedor `servicio-prioridad` | Clave de Gemini. Sin clave el servicio responde 503 y el backend usa el respaldo. **Nunca se commitea** |
 | `PRIORIDAD_IA_PROVEEDOR` | `.env`; contenedor `servicio-prioridad` | `gemini` (por defecto), `openai` o `simulado` |
 | `OPENAI_API_KEY` | `.env`; contenedor `servicio-prioridad` | Solo si se usa `openai` |
+| `reclamos.geocodificacion.*` | `application.yml` | Georef: URL, tiempos (1 s y 3 s), cantidad de sugerencias, caché de 10 minutos y recuadro de cada municipio. No usa clave |
 | `springdoc.*` | `application.yml` | Swagger UI en `/swagger-ui.html`, publicado por el puerto 8080 del backend |
 | `VITE_BACKEND_URL` | `frontend/.env`, solo en desarrollo | Adónde reenvía Vite las llamadas a `/api` |
 

@@ -17,7 +17,9 @@ class GestionReclamosFacadeTest {
     private final ReclamoService escritura = mock(ReclamoService.class);
     private final ConsultaReclamosService consultas = mock(ConsultaReclamosService.class);
     private final ConsultaCatalogosService catalogos = mock(ConsultaCatalogosService.class);
-    private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos);
+    private final ServicioUbicaciones ubicaciones = mock(ServicioUbicaciones.class);
+    private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
+            ubicaciones);
 
     @Test
     void crearDelegaParametrosYResultadoSinOtrasInteracciones() {
@@ -25,6 +27,29 @@ class GestionReclamosFacadeTest {
         when(escritura.crear(1L, 2L, 3L, "Pozo", "Calle")).thenReturn(resultado);
         assertThat(facade.crear(1L, 2L, 3L, "Pozo", "Calle")).isSameAs(resultado);
         verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle");
+        verifyNoMoreInteractions(escritura, consultas, catalogos);
+    }
+
+    @Test
+    void crearConUbicacionLaValidaYDespuesCreaElReclamo() {
+        var elegida = new UbicacionElegida(-34.736, -58.323, "GRL BELGRANO 450, Bernal Oeste, Quilmes");
+        var confirmada = Ubicacion.confirmada(-34.736, -58.323, "GRL BELGRANO 450, Bernal Oeste, Quilmes", "georef");
+        when(ubicaciones.confirmar(3L, elegida)).thenReturn(confirmada);
+        when(escritura.crear(1L, 2L, 3L, "Pozo", "Calle", confirmada)).thenReturn(reclamo);
+
+        assertThat(facade.crear(1L, 2L, 3L, "Pozo", "Calle", elegida)).isSameAs(reclamo);
+        var orden = inOrder(ubicaciones, escritura);
+        orden.verify(ubicaciones).confirmar(3L, elegida);
+        orden.verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle", confirmada);
+        verifyNoMoreInteractions(escritura, consultas, catalogos, ubicaciones);
+    }
+
+    @Test
+    void sugerirUbicacionesDelegaEnElServicio() {
+        var resultado = SugerenciasUbicacion.noDisponible();
+        when(ubicaciones.sugerir("Belgrano 450", 3L)).thenReturn(resultado);
+
+        assertThat(facade.sugerirUbicaciones("Belgrano 450", 3L)).isSameAs(resultado);
         verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 
