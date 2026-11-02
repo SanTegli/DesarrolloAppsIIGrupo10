@@ -9,8 +9,9 @@ asigna cada reclamo al área municipal que corresponde y los agentes lo resuelve
 
 Este repositorio contiene el **Trabajo Práctico Primera Parte (Hito 1)**: aplicación empresarial en
 capas con los patrones Factory, Repository, Strategy, Observer y Facade. La **Segunda Parte**
-(integración SOAP, REST, mensajería, API externa e IA) está en curso: el servicio SOAP de cobertura ya
-está; el resto, en el [plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
+(integración SOAP, REST, mensajería, API externa e IA) está en curso: ya están el servicio SOAP de
+cobertura y el servicio de prioridad con IA; el resto, en el
+[plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
 
 ## Estructura
 
@@ -26,6 +27,7 @@ frontend/                   Interfaz React + Vite
   mock/                     API simulada para trabajar sin Java ni MySQL
 servicios/                  Servicios de integración de la Segunda Parte, cada uno un proceso aparte
   servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
+  servicio-prioridad/       REST 2: prioridad sugerida por IA con Gemini (Swagger en el puerto 8082)
 docs/                       Contrato REST, arquitectura, patrones, secuencias y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
@@ -226,8 +228,8 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 
 - [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
 - [Modelo de dominio](docs/modelo-dominio.md): clases, reglas del dominio y tablas.
-- [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade; Adapter y
-  proxy remoto en la integración SOAP.
+- [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade; Adapter,
+  proxy remoto, Decorator y circuit breaker en las integraciones.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
 - [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte.
@@ -253,7 +255,7 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | --- | --- | --- |
 | 8 | `feature/08-base-segunda-entrega` | OpenAPI de REST 1, puntos de entrada para las integraciones, bloqueo optimista, contratos y correcciones de documentación |
 | 9 | `feature/09-soap-cobertura` | Servicio SOAP de cobertura (WSDL, catálogo, faults) y su cliente `CoberturaSoap` con modo degradado |
-| 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2) |
+| 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2): adaptadores de Gemini, OpenAI y simulado, respaldo por categoría y circuit breaker |
 | 11 | `feature/11-geocodificacion` | Geocodificación con Georef |
 | 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor y Mailpit |
 | 13 | `feature/13-integracion-demo` | Compose completo, diagramas y evidencias |

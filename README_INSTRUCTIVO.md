@@ -76,6 +76,7 @@ DesarrolloAppsIIGrupo10/
     pom.xml
     mvnw.cmd
     servicio-cobertura/
+    servicio-prioridad/
   docker-compose.yml
   .env.example
 ```
@@ -87,6 +88,7 @@ DesarrolloAppsIIGrupo10/
 | `reclamos-persistencia` | Mappings XML, repositorios Spring Data y adaptadores JPA. |
 | `reclamos-app` | Inicio de Spring Boot, perfiles, servicios, Facade, Strategies, Observer y REST. |
 | `servicios/servicio-cobertura` | Servicio SOAP de cobertura, aparte del backend: otro proyecto Maven, otro proceso, puerto 8081. |
+| `servicios/servicio-prioridad` | Servicio REST 2 de prioridad con IA (Gemini), también aparte, puerto 8082. |
 
 `docs/api-contract.md` contiene el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
 
@@ -107,6 +109,9 @@ Editar `.env` en un editor de texto y definir las credenciales locales antes de 
 | `DB_PASSWORD` | Contraseña local del usuario de aplicación. Obligatoria para Compose y Spring en `dev`. |
 | `MYSQL_ROOT_PASSWORD` | Contraseña local del administrador MySQL. Compose la requiere; Spring no la usa para conectarse. |
 | `DB_PORT` | Puerto publicado en Windows; plantilla: `3306`. |
+| `PRIORIDAD_IA_PROVEEDOR` | Proveedor del servicio de prioridad: `gemini` (plantilla), `openai` o `simulado`. |
+| `GEMINI_API_KEY` | Clave gratuita de Google AI Studio, vacía en la plantilla. Ver «Probar el servicio de prioridad con IA», en la sección 10. |
+| `OPENAI_API_KEY` | Solo si se usa `openai`; vacía en la plantilla. |
 
 **`.env` no debe subirse a Git** y está excluido por `.gitignore`. Docker Compose carga automáticamente el `.env` de la raíz. Spring Boot ejecutado directamente desde PowerShell **no necesariamente lee `.env`**; este proyecto obtiene las variables desde el entorno del proceso.
 
@@ -200,7 +205,9 @@ cd servicios
 ```
 
 `ServicioSoapHttpTest` levanta el servicio SOAP en un puerto libre y deja actualizado
-`docs/contratos/soap/cobertura.wsdl`; si cambió, también se commitea.
+`docs/contratos/soap/cobertura.wsdl`; `OpenApiPrioridadTest` hace lo mismo con
+`docs/openapi/prioridad.yaml`. Si cambiaron, también se commitean. Los tests nunca llaman a Gemini: simulan
+su API, así que no necesitan clave.
 
 H2 en memoria se usa para pruebas, en modo MySQL y con `ddl-auto: create-drop`; el perfil `dev` usa MySQL real. La semilla de desarrollo no se carga automáticamente con `test`; las pruebas preparan sus escenarios y `DatosSemillaTest` ejecuta el SQL de manera explícita.
 
@@ -243,9 +250,9 @@ Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuar
 
 ### Alternativa: todo en contenedores (modo demo)
 
-En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los cuatro contenedores: MySQL, backend, frontend y el servicio SOAP de cobertura. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
+En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los cinco contenedores: MySQL, backend, frontend, el servicio SOAP de cobertura y el servicio de prioridad con IA. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
 
-Antes de empezar, detener el backend, el frontend y el servicio de cobertura locales si están corriendo: el modo demo usa los mismos puertos, 8080, 5173 y 8081.
+Antes de empezar, detener el backend, el frontend y el servicio de cobertura locales si están corriendo: el modo demo usa los mismos puertos, 8080, 5173, 8081 y 8082.
 
 Desde la raíz del repositorio:
 
@@ -261,6 +268,7 @@ La primera vez tarda varios minutos, porque compila el backend dentro del conten
 | `reclamos-backend` | Spring Boot con el perfil `dev` | 8080 |
 | `reclamos-frontend` | nginx con la interfaz compilada; reenvía `/api` al backend | 5173 |
 | `servicio-cobertura` | Servicio SOAP de cobertura; el backend le consulta las áreas de cada reclamo nuevo | 8081 |
+| `servicio-prioridad` | Servicio de prioridad con IA; el backend le pide la prioridad de cada reclamo nuevo | 8082 |
 
 Para ver el estado y los logs, en otra terminal:
 
@@ -269,7 +277,9 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap`: la asignación automática pasa por el servicio SOAP. Su WSDL queda en `http://localhost:8081/ws/cobertura.wsdl`.
+En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap` y `RECLAMOS_PRIORIDAD_ESTRATEGIA=ia`: la asignación automática pasa por el servicio SOAP y la prioridad por el servicio de IA. El WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` y Swagger del servicio de IA en `http://localhost:8082/swagger-ui.html`.
+
+Para que la IA funcione, `.env` tiene que tener `GEMINI_API_KEY` (ver «Probar el servicio de prioridad con IA», en la sección 10). Sin clave todo arranca igual, pero cada reclamo sale con la prioridad de la categoría y origen `RESPALDO`.
 
 Después de cambiar código, volver a ejecutar `docker compose up --build` para reconstruir las imágenes. Los datos de MySQL se conservan en el volumen `reclamos-mysql-data`, que es el mismo del modo desarrollo.
 
@@ -453,6 +463,37 @@ Crear un reclamo "Bache" en Bernal: queda `ASIGNADO` y en el log del servicio ap
 
 Para volver a la cobertura local: `Remove-Item Env:RECLAMOS_COBERTURA_ORIGEN` y reiniciar el backend.
 
+### Probar el servicio de prioridad con IA
+
+**Crear la clave de Gemini (una sola vez).** Entrar a `https://aistudio.google.com/apikey` con una cuenta de Google, aceptar los términos y crear una clave. Es gratis y no pide tarjeta. Copiarla en `.env`, en la raíz del repositorio:
+
+```text
+GEMINI_API_KEY=la-clave-copiada
+```
+
+**Nunca** pegar la clave en el código, en un commit, en un issue ni en el chat del grupo: `.env` ya está en `.gitignore`. Con el nivel gratuito, Google puede usar lo que se le manda para mejorar sus productos, así que solo se prueban reclamos inventados. El servicio nunca recibe nombre, email, DNI, teléfono ni dirección.
+
+En una terminal nueva, desde la raíz:
+
+```powershell
+$env:GEMINI_API_KEY="la-clave-copiada"
+cd servicios
+.\mvnw.cmd -pl servicio-prioridad spring-boot:run
+```
+
+Esperar `Started ServicioPrioridadApplication` y la línea `Proveedor de IA: gemini con el modelo ...`. Abrir `http://localhost:8082/swagger-ui.html`, elegir `POST /api/prioridades/evaluar`, **Try it out** y **Execute** con el ejemplo: responde una prioridad, un motivo, `"proveedor": "gemini"` y el modelo. Sin clave responde 503 `PROVEEDOR_NO_DISPONIBLE`. Para probar sin cuenta de Google, `$env:PRIORIDAD_IA_PROVEEDOR="simulado"`: responde con palabras clave y lo aclara en el motivo, porque no es IA.
+
+Para que el backend lo use, reiniciarlo con:
+
+```powershell
+$env:RECLAMOS_PRIORIDAD_ESTRATEGIA="ia"
+.\mvnw.cmd -pl reclamos-app spring-boot:run
+```
+
+Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cables expuestos frente a la escuela": la prioridad sale `CRITICA` (o la que sugiera el modelo) con origen `IA` y el motivo que escribió. Después detener el servicio de prioridad con **Ctrl+C** y crear otro: el alta igual responde 201, con la prioridad de la categoría y origen `RESPALDO`.
+
+**Evaluación con los 25 casos.** Con el servicio levantado con la clave, desde la raíz: `java servicios/servicio-prioridad/evaluacion/EvaluarPrioridades.java`. Tarda unos tres minutos y deja el resultado en `docs/evidencias/ia-evaluacion.md`, que se commitea como evidencia.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -558,4 +599,5 @@ docker compose down
 - [ ] `/api/reclamos` responde con `X-Usuario-Id`.
 - [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.
 - [ ] `servicios`: `.\mvnw.cmd verify` termina con `BUILD SUCCESS`.
-- [ ] Modo demo: `docker compose up --build` levanta los cuatro contenedores, la interfaz responde y `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL.
+- [ ] `.env` tiene `GEMINI_API_KEY` y la clave no aparece en `git status` ni en ningún commit.
+- [ ] Modo demo: `docker compose up --build` levanta los cinco contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.

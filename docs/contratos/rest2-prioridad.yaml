@@ -1,9 +1,10 @@
-# Contrato de REST 2, servicio de prioridad con IA (borrador del PR 8; lo implementa el PR 10).
-# Cuando exista el servicio, el contrato generado por springdoc reemplaza a este en docs/openapi/prioridad.yaml.
+# Contrato de REST 2, servicio de prioridad con IA. Lo implementa servicios/servicio-prioridad (PR 10).
+# Este archivo fue el acuerdo de partida; el contrato vigente es el que genera el código en
+# docs/openapi/prioridad.yaml (lo regenera OpenApiPrioridadTest) y Swagger UI en http://localhost:8082.
 openapi: 3.0.3
 info:
   title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
-  version: 0.1.0
+  version: 1.0.0
   description: >
     Sugiere la prioridad de un reclamo a partir de su categoría y su descripción usando un modelo de
     lenguaje externo (Gemini u OpenAI). No recibe datos personales: ni nombre, ni email, ni DNI, ni foto.
@@ -34,7 +35,7 @@ paths:
                 prioridad: CRITICA
                 motivo: Se describe un riesgo eléctrico en un lugar con chicos.
                 proveedor: gemini
-                modelo: nombre-del-modelo-configurado
+                modelo: gemini-3.5-flash-lite
         '400':
           description: Entrada inválida (DATOS_INVALIDOS)
           content:
@@ -83,7 +84,7 @@ components:
           maxLength: 300
         proveedor:
           type: string
-          enum: [gemini, openai]
+          enum: [gemini, openai, simulado]
         modelo:
           type: string
     ErrorResponse:

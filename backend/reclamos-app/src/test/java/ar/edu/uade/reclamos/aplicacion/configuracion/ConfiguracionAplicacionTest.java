@@ -52,12 +52,29 @@ class ConfiguracionAplicacionTest {
     @ValueSource(strings = {"reclamos.prioridad.estrategia=desconocida", "reclamos.asignacion.estrategia=desconocida",
             "reclamos.prioridad.estrategia=", "reclamos.asignacion.estrategia=",
             "reclamos.cobertura.origen=desconocida", "reclamos.cobertura.origen=",
-            "reclamos.cobertura.url=", "reclamos.cobertura.tiempo-limite=0s"})
+            "reclamos.cobertura.url=", "reclamos.cobertura.tiempo-limite=0s",
+            "reclamos.prioridad.ia.url=", "reclamos.prioridad.ia.tiempo-respuesta=0s",
+            "reclamos.prioridad.ia.circuito.llamadas=0"})
     void configuracionInvalidaImpideArrancarConMensajeClaro(String propiedad) {
         contexto.withPropertyValues(propiedad).run(ctx -> {
             assertThat(ctx).hasFailed();
             assertThat(ctx.getStartupFailure()).hasRootCauseInstanceOf(IllegalArgumentException.class)
                     .hasStackTraceContaining(propiedad.substring(0, propiedad.indexOf('=')));
+        });
+    }
+
+    @Test
+    void prioridadPorIaQuedaEnvueltaEnElRespaldoConLosTiemposConfigurados() {
+        contexto.withPropertyValues("reclamos.prioridad.estrategia=ia",
+                "reclamos.prioridad.ia.url=http://servicio-prioridad:8082").run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(EstrategiaPrioridad.class)).isInstanceOf(PrioridadConRespaldo.class);
+            PropiedadesReclamos.Ia ia = ctx.getBean(PropiedadesReclamos.class).prioridad().ia();
+            assertThat(ia.url()).isEqualTo("http://servicio-prioridad:8082");
+            assertThat(ia.tiempoConexion()).isEqualTo(Duration.ofSeconds(1));
+            assertThat(ia.tiempoRespuesta()).isEqualTo(Duration.ofSeconds(6));
+            assertThat(ia.circuito().llamadas()).isEqualTo(5);
+            assertThat(ia.circuito().espera()).isEqualTo(Duration.ofSeconds(30));
         });
     }
 

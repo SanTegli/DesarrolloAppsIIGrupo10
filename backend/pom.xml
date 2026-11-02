@@ -32,6 +32,8 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <!-- Rama 2.x de springdoc, la de Spring Boot 3. La 2.8.15 sube a Spring Boot 3.5.9. -->
         <springdoc.version>2.8.15</springdoc.version>
+        <!-- Circuit breaker del cliente de REST 2 (PrioridadPorIA). Spring Boot no maneja su versión. -->
+        <resilience4j.version>2.2.0</resilience4j.version>
     </properties>
 
     <dependencyManagement>

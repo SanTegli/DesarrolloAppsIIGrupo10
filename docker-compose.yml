@@ -3,7 +3,8 @@
 #
 # Demo: todos los contenedores. La interfaz queda en http://localhost:5173.
 #   docker compose up --build
-# En la demo el backend toma la cobertura del servicio SOAP (WSDL en http://localhost:8081/ws/cobertura.wsdl).
+# En la demo el backend toma la cobertura del servicio SOAP (WSDL en http://localhost:8081/ws/cobertura.wsdl)
+# y la prioridad del servicio de IA (Swagger en http://localhost:8082/swagger-ui.html).
 services:
   mysql:
     image: mysql:8.4
@@ -37,6 +38,20 @@ services:
     ports:
       - "8081:8081"
 
+  servicio-prioridad:
+    build:
+      context: ./servicios
+      dockerfile: servicio-prioridad/Dockerfile
+    container_name: servicio-prioridad
+    environment:
+      # gemini necesita GEMINI_API_KEY en .env; simulado funciona sin clave, pero no es IA.
+      PRIORIDAD_IA_PROVEEDOR: ${PRIORIDAD_IA_PROVEEDOR:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "8082:8082"
+
   backend:
     build: ./backend
     container_name: reclamos-backend
@@ -45,6 +60,8 @@ services:
         condition: service_healthy
       servicio-cobertura:
         condition: service_started
+      servicio-prioridad:
+        condition: service_started
     environment:
       DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-reclamos}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Argentina/Buenos_Aires&characterEncoding=UTF-8"
       DB_USER: ${DB_USER:-reclamos}
@@ -52,6 +69,8 @@ services:
       # Entre contenedores se usa el nombre del servicio, no localhost.
       RECLAMOS_COBERTURA_ORIGEN: soap
       RECLAMOS_COBERTURA_URL: http://servicio-cobertura:8081/ws
+      RECLAMOS_PRIORIDAD_ESTRATEGIA: ia
+      RECLAMOS_PRIORIDAD_IA_URL: http://servicio-prioridad:8082
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8080:8080"

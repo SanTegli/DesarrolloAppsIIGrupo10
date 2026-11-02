@@ -23,7 +23,14 @@ springdoc:
 # Estrategias activas (patrón Strategy).
 reclamos:
   prioridad:
-    estrategia: categoria        # categoria | palabras-clave
+    estrategia: categoria        # categoria | palabras-clave | ia (servicio-prioridad, con respaldo por categoría)
+    ia:
+      url: http://localhost:8082
+      tiempo-conexion: 1s
+      tiempo-respuesta: 6s
+      circuito:
+        llamadas: 5              # si falla la mitad de las últimas 5 llamadas, deja de llamar...
+        espera: 30s              # ...durante 30 segundos y después prueba de nuevo
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
   # Control de vencimientos (SLA): cada cuánto se buscan reclamos que pasaron su fecha límite.

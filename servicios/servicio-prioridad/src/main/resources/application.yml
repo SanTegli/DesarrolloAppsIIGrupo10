@@ -1,0 +1,31 @@
+# Servicio REST 2: prioridad sugerida por IA.
+#   POST http://localhost:8082/api/prioridades/evaluar
+#   Swagger UI: http://localhost:8082/swagger-ui.html
+spring:
+  application:
+    name: servicio-prioridad
+
+server:
+  port: 8082
+
+springdoc:
+  paths-to-match: /api/**
+  # Las respuestas de error se documentan en el controlador; no se mezclan las del @RestControllerAdvice.
+  override-with-generic-response: false
+  swagger-ui:
+    path: /swagger-ui.html
+
+prioridad:
+  ia:
+    # gemini (nivel gratuito, sin tarjeta) | openai (pago) | simulado (sin red ni clave; no es IA)
+    proveedor: ${PRIORIDAD_IA_PROVEEDOR:gemini}
+    tiempo-limite: 5s            # el backend espera hasta 6 s a este servicio
+    instrucciones: classpath:instrucciones-prioridad.txt
+    gemini:
+      url: https://generativelanguage.googleapis.com
+      clave: ${GEMINI_API_KEY:}
+      modelo: ${GEMINI_MODELO:gemini-3.5-flash-lite}
+    openai:
+      url: https://api.openai.com
+      clave: ${OPENAI_API_KEY:}
+      modelo: ${OPENAI_MODELO:gpt-5.4-mini}

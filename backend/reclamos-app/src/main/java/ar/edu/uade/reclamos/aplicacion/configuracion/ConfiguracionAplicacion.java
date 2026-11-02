@@ -2,8 +2,11 @@ package ar.edu.uade.reclamos.aplicacion.configuracion;
 
 import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorCargaDeTrabajo;
 import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorJurisdiccion;
+import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadConRespaldo;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorCategoria;
+import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorIA;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorPalabrasClave;
+import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaAsignacion;
@@ -32,14 +35,25 @@ public class ConfiguracionAplicacion {
         return new ReclamoFactory(reloj);
     }
 
+    /**
+     * Estrategia de prioridad activa. Con {@code ia}, la estrategia que llama a REST 2 va envuelta en el
+     * respaldo por categoría (Decorator): si la IA falla, el reclamo se crea igual.
+     */
     @Bean
     public EstrategiaPrioridad estrategiaPrioridad(PropiedadesReclamos propiedades) {
         return switch (propiedades.prioridad().estrategia()) {
             case "categoria" -> new PrioridadPorCategoria();
             case "palabras-clave" -> new PrioridadPorPalabrasClave();
+            case "ia" -> new PrioridadConRespaldo(new PrioridadPorIA(clienteIA(propiedades.prioridad().ia())),
+                    new PrioridadPorCategoria());
             default -> throw new IllegalArgumentException(
-                    "reclamos.prioridad.estrategia debe ser categoria o palabras-clave");
+                    "reclamos.prioridad.estrategia debe ser categoria, palabras-clave o ia");
         };
+    }
+
+    private static ClienteServicioPrioridad clienteIA(PropiedadesReclamos.Ia ia) {
+        return ClienteServicioPrioridad.crear(ia.url(), ia.tiempoConexion(), ia.tiempoRespuesta(),
+                ia.circuito().llamadas(), ia.circuito().espera());
     }
 
     @Bean
