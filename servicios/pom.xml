@@ -23,6 +23,7 @@
       Los PRs de cada integración agregan su módulo acá.
     -->
     <modules>
+        <module>servicio-cobertura</module>
     </modules>
 
     <properties>

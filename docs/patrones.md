@@ -1,7 +1,7 @@
 # Patrones de diseño aplicados
 
 Los cinco patrones que pide la Primera Parte, con el problema que resuelve cada uno en este sistema,
-las clases que lo implementan y cómo comprobarlo.
+las clases que lo implementan y cómo comprobarlo. Al final están los que suma la Segunda Parte.
 
 Las rutas son relativas a `backend/`. `…` abrevia `src/main/java/ar/edu/uade/reclamos`.
 
@@ -237,3 +237,68 @@ la usaría igual que los controladores.
 
 - **Código:** `reclamos-app/…/aplicacion/facade/GestionReclamosFacade.java`
 - **Tests:** `GestionReclamosFacadeTest`, `RestIntegrationTest`
+
+## Patrones de la Segunda Parte
+
+Los patrones que se suman con las integraciones. Cada uno resuelve un problema concreto de una
+integración; el plan completo, PR por PR, está en el documento de planificación del grupo.
+
+| Patrón | PR | Dónde | Problema que resuelve |
+| --- | --- | --- | --- |
+| Adapter | 9 | `CoberturaSoap` | El backend necesita `CatalogoCobertura` y el servicio ofrece una operación SOAP |
+| Proxy remoto | 9 | `CoberturaSoap` | `ServicioAsignacion` usa un objeto local que en realidad llama a otro proceso |
+| Capa anticorrupción | 9 | Paquete `aplicacion/integracion/soap` | Los mensajes XML del contrato no salen del adaptador |
+| Contract-first | 9 | `servicio-cobertura` | El WSDL y las clases del servicio se generan del XSD, que es la única fuente del contrato |
+
+## Adapter y proxy remoto: `CoberturaSoap`
+
+**Problema.** `ServicioAsignacion` pide las áreas candidatas a un `CatalogoCobertura`. En la Segunda
+Parte la cobertura la decide otro proceso, que solo habla SOAP: recibe un `ConsultarCoberturaRequest` en XML
+y devuelve ids y nombres. Las dos interfaces no encajan, y no queremos que `ServicioAsignacion` sepa de
+XML, de WSDL ni de tiempos límite.
+
+**Solución.** `CoberturaSoap` implementa `CatalogoCobertura` y por dentro llama al servicio con
+`WebServiceTemplate`. Es un Adapter, porque hace compatible una interfaz que no lo era, y un proxy remoto,
+porque quien lo usa no nota que la llamada sale de la aplicación.
+
+```text
+ServicioAsignacion ──usa──▶ CatalogoCobertura (interfaz del dominio)
+                                 ▲ implementan
+                 ┌───────────────┴────────────────┐
+           CoberturaLocal                   CoberturaSoap ──SOAP──▶ servicio-cobertura
+       (base del backend)            (Adapter: XML ⇄ AreaMunicipal)
+```
+
+```java
+public List<AreaMunicipal> buscarCandidatas(Long municipioId, Long barrioId, Long categoriaId) {
+    ConsultarCoberturaResponse respuesta = consultar(new ConsultarCoberturaRequest(municipioId, barrioId,
+            categoriaId));
+    // ids del servicio → áreas del backend: descarta las que no existen, las inactivas y las de otro municipio
+}
+```
+
+| Qué hace el adaptador | Cómo |
+| --- | --- |
+| Traducir el pedido | Arma `ConsultarCoberturaRequest` con los tres ids |
+| Traducir la respuesta | Carga cada id con `AreaMunicipalRepository` y devuelve `AreaMunicipal` del dominio |
+| Esconder las fallas de red | SOAP Fault, tiempo agotado, conexión rechazada o XML ilegible se convierten en `ServicioExternoNoDisponibleException`; `ServicioAsignacion` deja la asignación pendiente |
+| Respetar el tiempo límite | 2 segundos para conectar y para leer (`reclamos.cobertura.tiempo-limite`) |
+
+La implementación se elige por configuración, igual que las estrategias:
+
+```yaml
+reclamos:
+  cobertura:
+    origen: soap                  # local | soap
+    url: http://localhost:8081/ws
+    tiempo-limite: 2s
+```
+
+Los mensajes XML viven en `aplicacion/integracion/soap` y solo los usa `CoberturaSoap`: es la capa
+anticorrupción que propone el material de la cátedra para integrar un sistema externo sin que su modelo
+entre al nuestro.
+
+- **Código:** `reclamos-app/…/aplicacion/integracion/CoberturaSoap.java` y el paquete `soap`
+- **Servicio:** `servicios/servicio-cobertura`
+- **Tests:** `CoberturaSoapTest`, `MensajesCoberturaSoapTest`, `AsignacionPorSoapIntegrationTest` y,
+  del lado del servicio, `CoberturaEndpointTest` y `ServicioSoapHttpTest`

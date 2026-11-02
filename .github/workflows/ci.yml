@@ -54,9 +54,24 @@ jobs:
           distribution: temurin
           java-version: '21'
           cache: maven
-      # Los servicios de integración tienen su propio pom; Maven ya viene instalado en el runner.
+      # Los servicios de integración tienen su propio pom y su propio wrapper de Maven.
+      # Algunos tests leen archivos de backend/ y docs/: por eso se hace checkout del repositorio entero.
       - name: Tests
-        run: mvn -B -ntp verify
+        run: ./mvnw -B -ntp verify
+      - name: Guardar reportes de tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reportes-surefire-servicios
+          path: servicios/**/target/surefire-reports/
+      # ServicioSoapHttpTest regenera el WSDL de cobertura; queda descargable para commitearlo si cambió.
+      - name: Guardar WSDL de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wsdl-cobertura
+          path: docs/contratos/soap/cobertura.wsdl
+          if-no-files-found: ignore
 
   frontend:
     name: Frontend (Vitest)

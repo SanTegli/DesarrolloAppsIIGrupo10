@@ -1,8 +1,9 @@
 # Desarrollo: solo MySQL corre en Docker. Backend y frontend se ejecutan en la máquina.
 #   docker compose up -d mysql
 #
-# Demo: los tres contenedores. La interfaz queda en http://localhost:5173.
+# Demo: todos los contenedores. La interfaz queda en http://localhost:5173.
 #   docker compose up --build
+# En la demo el backend toma la cobertura del servicio SOAP (WSDL en http://localhost:8081/ws/cobertura.wsdl).
 services:
   mysql:
     image: mysql:8.4
@@ -26,16 +27,31 @@ services:
       timeout: 5s
       retries: 10
 
+  servicio-cobertura:
+    build:
+      context: ./servicios
+      dockerfile: servicio-cobertura/Dockerfile
+    container_name: servicio-cobertura
+    environment:
+      TZ: America/Argentina/Buenos_Aires
+    ports:
+      - "8081:8081"
+
   backend:
     build: ./backend
     container_name: reclamos-backend
     depends_on:
       mysql:
         condition: service_healthy
+      servicio-cobertura:
+        condition: service_started
     environment:
       DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-reclamos}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Argentina/Buenos_Aires&characterEncoding=UTF-8"
       DB_USER: ${DB_USER:-reclamos}
       DB_PASSWORD: ${DB_PASSWORD:?Definir DB_PASSWORD en .env}
+      # Entre contenedores se usa el nombre del servicio, no localhost.
+      RECLAMOS_COBERTURA_ORIGEN: soap
+      RECLAMOS_COBERTURA_URL: http://servicio-cobertura:8081/ws
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8080:8080"

@@ -8,7 +8,9 @@ Los ciudadanos reportan problemas en la vía pública (baches, luminarias rotas,
 asigna cada reclamo al área municipal que corresponde y los agentes lo resuelven.
 
 Este repositorio contiene el **Trabajo Práctico Primera Parte (Hito 1)**: aplicación empresarial en
-capas con los patrones Factory, Repository, Strategy, Observer y Facade.
+capas con los patrones Factory, Repository, Strategy, Observer y Facade. La **Segunda Parte**
+(integración SOAP, REST, mensajería, API externa e IA) está en curso: el servicio SOAP de cobertura ya
+está; el resto, en el [plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
 
 ## Estructura
 
@@ -22,11 +24,12 @@ frontend/                   Interfaz React + Vite
   src/api/                  Única capa que habla con el backend
   src/componentes/          Pantallas: listado, alta, detalle, avisos y administración
   mock/                     API simulada para trabajar sin Java ni MySQL
-servicios/                  Servicios de integración de la Segunda Parte (SOAP, IA, notificaciones)
+servicios/                  Servicios de integración de la Segunda Parte, cada uno un proceso aparte
+  servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
 docs/                       Contrato REST, arquitectura, patrones, secuencias y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
-docker-compose.yml          MySQL para desarrollo; backend y frontend para la demo
+docker-compose.yml          MySQL para desarrollo; backend, frontend y servicios para la demo
 ```
 
 Las dependencias entre módulos van en un solo sentido: `app → persistencia → dominio → comun`.
@@ -48,10 +51,15 @@ cd backend
 ./mvnw test
 ```
 
-En Windows, `.\mvnw.cmd test`.
+En Windows, `.\mvnw.cmd test`. Los servicios de integración tienen su propio proyecto:
 
-GitHub Actions corre los tests del backend y del frontend en cada pull request y en cada push a
-`main` (`.github/workflows/ci.yml`). Un PR con la verificación en rojo no se mergea.
+```bash
+cd servicios
+./mvnw verify
+```
+
+GitHub Actions corre los tests del backend, de los servicios y del frontend en cada pull request y en
+cada push a `main` (`.github/workflows/ci.yml`). Un PR con la verificación en rojo no se mergea.
 
 ## Cómo levantar el backend
 
@@ -218,7 +226,8 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 
 - [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
 - [Modelo de dominio](docs/modelo-dominio.md): clases, reglas del dominio y tablas.
-- [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade.
+- [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade; Adapter y
+  proxy remoto en la integración SOAP.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
 - [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte.
@@ -243,7 +252,7 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | PR | Rama | Contenido |
 | --- | --- | --- |
 | 8 | `feature/08-base-segunda-entrega` | OpenAPI de REST 1, puntos de entrada para las integraciones, bloqueo optimista, contratos y correcciones de documentación |
-| 9 | `feature/09-soap-cobertura` | Servicio SOAP de cobertura y su cliente |
+| 9 | `feature/09-soap-cobertura` | Servicio SOAP de cobertura (WSDL, catálogo, faults) y su cliente `CoberturaSoap` con modo degradado |
 | 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2) |
 | 11 | `feature/11-geocodificacion` | Geocodificación con Georef |
 | 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor y Mailpit |

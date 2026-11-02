@@ -85,6 +85,7 @@ flowchart LR
   DOM["reclamos-dominio<br/>modelo, reglas, contratos"]
   COM["reclamos-comun<br/>validación y excepciones"]
   MYSQL[("MySQL 8.4")]
+  COB["servicio-cobertura<br/>SOAP, proceso aparte"]
 
   FE -->|"REST /api"| APP
   APP --> PERS
@@ -92,7 +93,12 @@ flowchart LR
   PERS --> DOM
   DOM --> COM
   PERS --> MYSQL
+  APP -.->|"SOAP ConsultarCobertura<br/>si origen es soap"| COB
 ```
+
+`servicio-cobertura` no es un módulo del backend: es otra aplicación, en `servicios/`, que se compila,
+se prueba y se despliega por separado. Lo único que comparte con el backend es el contrato
+[`cobertura.xsd`](contratos/soap/cobertura.xsd).
 
 ## Servicios orientados a componentes
 
@@ -141,20 +147,67 @@ intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
 | Bloqueo optimista con `@Version` en `Reclamo` | Dos operaciones simultáneas sobre el mismo reclamo no se pisan: la segunda recibe `409 CONFLICTO_CONCURRENTE` |
 | OpenAPI generado del código con springdoc | El contrato de Swagger no se desactualiza: `OpenApiTest` lo regenera en `docs/openapi/reclamos.yaml` |
 
-## Preparado para la Segunda Parte
+## Integraciones de la Segunda Parte
 
-El PR 8 dejó listos los puntos de entrada; las integraciones llegan en los PRs 9 a 12. Los contratos de
-partida están en [`contratos/`](contratos/README.md).
+El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. Los contratos están en
+[`contratos/`](contratos/README.md).
 
-| Integración | Dónde entra | Qué hay hoy | Qué se agrega |
+| Integración | Dónde entra | Estado | Qué se agrega |
 | --- | --- | --- | --- |
-| Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | `origenPrioridad` y `motivoPrioridad` en `Reclamo` | `PrioridadPorIA` y el servicio `servicio-prioridad` |
-| Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | `CoberturaLocal` y el modo degradado `asignacionPendiente` | `CoberturaSoap` y el servicio `servicio-cobertura` |
+| Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | Pendiente (PR 10). Hoy: `origenPrioridad` y `motivoPrioridad` en `Reclamo` | `PrioridadPorIA` y el servicio `servicio-prioridad` |
+| Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | **Hecho (PR 9)**: `CoberturaSoap` y `servicio-cobertura`; ver abajo | — |
 | Geocodificación (API externa) | `Geocodificador` | `Ubicacion` en `Reclamo`, siempre `PENDIENTE` | `GeorefGeocodificador` y la elección de la sugerencia en el alta |
 | Mensajería | `ServicioNotificaciones` | Avisos internos | Outbox, RabbitMQ y `servicio-notificaciones` |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
+
+### Cobertura por SOAP
+
+Con `reclamos.cobertura.origen: soap`, `ServicioAsignacion` recibe `CoberturaSoap` en lugar de
+`CoberturaLocal`. No cambia nada más: la interfaz es la misma, y `ServicioAsignacion` no sabe si las
+candidatas salen de la base o de otro proceso.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant RS as ReclamoService
+  participant SA as ServicioAsignacion
+  participant CS as CoberturaSoap<br/>(Adapter)
+  participant WS as servicio-cobertura<br/>(SOAP)
+  participant AR as AreaMunicipalRepository
+  participant EA as EstrategiaAsignacion
+
+  RS->>SA: asignarAutomaticamente(reclamo)
+  SA->>CS: buscarCandidatas(municipio, barrio, categoría)
+  CS->>WS: ConsultarCoberturaRequest (HTTP POST /ws, hasta 2 s)
+  alt responde con áreas
+    WS-->>CS: ConsultarCoberturaResponse con ids 2 y 4
+    CS->>AR: buscarPorId(2), buscarPorId(4)
+    AR-->>CS: áreas del backend
+    CS-->>SA: candidatas activas del municipio, por id
+    SA->>EA: seleccionarArea(reclamo, candidatas)
+    EA-->>SA: área elegida
+    SA-->>RS: reclamo ASIGNADO
+  else responde sin áreas
+    WS-->>CS: ConsultarCoberturaResponse vacía
+    CS-->>SA: lista vacía
+    SA-->>RS: reclamo INGRESADO
+  else SOAP Fault o no contesta a tiempo
+    CS-->>SA: ServicioExternoNoDisponibleException
+    SA-->>RS: INGRESADO con asignacionPendiente
+  end
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `servicio-cobertura` | Dueño de la cobertura: qué área atiende qué categoría en qué barrio, en `cobertura.json`. Publica el WSDL generado de `cobertura.xsd` y valida cada pedido contra el XSD |
+| `CoberturaSoap` | Adapter entre `CatalogoCobertura` y la operación SOAP. Traduce los mensajes, aplica el tiempo límite y convierte cualquier falla en `ServicioExternoNoDisponibleException` |
+| `ServicioAsignacion` | Igual que antes: si la cobertura no está disponible, marca la asignación pendiente; si no, la estrategia elige |
+| Backend | Sigue siendo dueño de los datos de cada área (nombre, email, activa). Descarta las áreas que no tiene, las inactivas y las de otro municipio |
+
+El administrador ve los reclamos con `asignacionPendiente` en la pantalla de administración y los asigna
+a mano, como cualquier reclamo sin área.
 
 ## Límites conocidos
 

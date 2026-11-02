@@ -73,6 +73,9 @@ DesarrolloAppsIIGrupo10/
     openapi/
     evidencias/
   servicios/
+    pom.xml
+    mvnw.cmd
+    servicio-cobertura/
   docker-compose.yml
   .env.example
 ```
@@ -83,6 +86,7 @@ DesarrolloAppsIIGrupo10/
 | `reclamos-dominio` | Modelo, reglas, Factory, eventos e interfaces Repository y Strategy; Java sin Spring ni JPA. |
 | `reclamos-persistencia` | Mappings XML, repositorios Spring Data y adaptadores JPA. |
 | `reclamos-app` | Inicio de Spring Boot, perfiles, servicios, Facade, Strategies, Observer y REST. |
+| `servicios/servicio-cobertura` | Servicio SOAP de cobertura, aparte del backend: otro proyecto Maven, otro proceso, puerto 8081. |
 
 `docs/api-contract.md` contiene el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
 
@@ -188,6 +192,16 @@ GitHub Actions corre la misma suite en cada pull request; el resultado se ve en 
 
 Al terminar, `OpenApiTest` deja actualizado `docs/openapi/reclamos.yaml`, el contrato OpenAPI de la API. Si cambió, se commitea junto con el código.
 
+Los servicios de integración se prueban aparte, desde la raíz:
+
+```powershell
+cd servicios
+.\mvnw.cmd verify
+```
+
+`ServicioSoapHttpTest` levanta el servicio SOAP en un puerto libre y deja actualizado
+`docs/contratos/soap/cobertura.wsdl`; si cambió, también se commitea.
+
 H2 en memoria se usa para pruebas, en modo MySQL y con `ddl-auto: create-drop`; el perfil `dev` usa MySQL real. La semilla de desarrollo no se carga automáticamente con `test`; las pruebas preparan sus escenarios y `DatosSemillaTest` ejecuta el SQL de manera explícita.
 
 ## 8. Levantar Spring Boot contra MySQL
@@ -229,9 +243,9 @@ Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuar
 
 ### Alternativa: todo en contenedores (modo demo)
 
-En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los tres servicios: MySQL, backend y frontend. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
+En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los cuatro contenedores: MySQL, backend, frontend y el servicio SOAP de cobertura. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
 
-Antes de empezar, detener el backend y el frontend locales si están corriendo: el modo demo usa los mismos puertos, 8080 y 5173.
+Antes de empezar, detener el backend, el frontend y el servicio de cobertura locales si están corriendo: el modo demo usa los mismos puertos, 8080, 5173 y 8081.
 
 Desde la raíz del repositorio:
 
@@ -246,6 +260,7 @@ La primera vez tarda varios minutos, porque compila el backend dentro del conten
 | `reclamos-mysql` | MySQL 8.4 | 3306, o el valor de `DB_PORT` |
 | `reclamos-backend` | Spring Boot con el perfil `dev` | 8080 |
 | `reclamos-frontend` | nginx con la interfaz compilada; reenvía `/api` al backend | 5173 |
+| `servicio-cobertura` | Servicio SOAP de cobertura; el backend le consulta las áreas de cada reclamo nuevo | 8081 |
 
 Para ver el estado y los logs, en otra terminal:
 
@@ -253,6 +268,8 @@ Para ver el estado y los logs, en otra terminal:
 docker compose ps
 docker compose logs -f backend
 ```
+
+En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap`: la asignación automática pasa por el servicio SOAP. Su WSDL queda en `http://localhost:8081/ws/cobertura.wsdl`.
 
 Después de cambiar código, volver a ejecutar `docker compose up --build` para reconstruir las imágenes. Los datos de MySQL se conservan en el volumen `reclamos-mysql-data`, que es el mismo del modo desarrollo.
 
@@ -414,6 +431,28 @@ INFO ... auditoria : ReclamoCreado reclamo=REC-XXXXXXXX fecha=... detalle=...
 
 El formato exacto de la línea depende de la configuración de logs; lo que hay que buscar es la palabra `auditoria` seguida del nombre del evento.
 
+### Probar el servicio SOAP de cobertura
+
+En una terminal nueva, desde la raíz del repositorio:
+
+```powershell
+cd servicios
+.\mvnw.cmd -pl servicio-cobertura spring-boot:run
+```
+
+Esperar `Started ServicioCoberturaApplication` y el mensaje `Catálogo de cobertura versión 1 cargado ... 4 áreas`. Abrir `http://localhost:8081/ws/cobertura.wsdl` en el navegador: es el contrato. Para hacer una consulta, usar el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano). Bache (2) en Bernal (2) responde Obras Públicas y Mantenimiento Vial; con `categoriaId` 99 responde un SOAP Fault `No existe la categoría 99`.
+
+Para que el backend use el servicio, reiniciarlo con la variable puesta, en la terminal del backend:
+
+```powershell
+$env:RECLAMOS_COBERTURA_ORIGEN="soap"
+.\mvnw.cmd -pl reclamos-app spring-boot:run
+```
+
+Crear un reclamo "Bache" en Bernal: queda `ASIGNADO` y en el log del servicio aparece la línea `ConsultarCobertura municipio=1 barrio=2 categoria=2: 2 áreas`. Después detener el servicio con **Ctrl+C** y crear otro: el alta igual responde 201, el reclamo queda `INGRESADO` con `asignacionPendiente: true` y el detalle muestra que el servicio de cobertura no respondió. El administrador lo asigna a mano.
+
+Para volver a la cobertura local: `Remove-Item Env:RECLAMOS_COBERTURA_ORIGEN` y reiniciar el backend.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -490,7 +529,7 @@ Comprobar que Docker Desktop esté abierto, use contenedores Linux y que su moto
 
 ## 14. Cómo apagar todo
 
-En la terminal del backend y en la del frontend: **Ctrl+C**. En modo demo, **Ctrl+C** en la terminal de `docker compose up` detiene los tres contenedores.
+En la terminal del backend y en la del frontend: **Ctrl+C**. En modo demo, **Ctrl+C** en la terminal de `docker compose up` detiene todos los contenedores.
 
 En otra terminal, desde la raíz del repositorio:
 
@@ -518,4 +557,5 @@ docker compose down
 - [ ] `/api/usuarios` responde 200.
 - [ ] `/api/reclamos` responde con `X-Usuario-Id`.
 - [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.
-- [ ] Modo demo: `docker compose up --build` levanta los tres contenedores y la interfaz responde.
+- [ ] `servicios`: `.\mvnw.cmd verify` termina con `BUILD SUCCESS`.
+- [ ] Modo demo: `docker compose up --build` levanta los cuatro contenedores, la interfaz responde y `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL.

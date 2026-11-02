@@ -119,8 +119,9 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
   coordenadas, dirección normalizada y proveedor; si no, `PENDIENTE` y los demás campos en `null`.
 - `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
   no respondió y se usó la de la categoría). `motivoPrioridad` la explica; es `null` con `CATEGORIA`.
-- `asignacionPendiente` es `true` cuando el servicio de cobertura no respondió al crear el reclamo: queda
-  `INGRESADO` y un administrador lo asigna a mano. No es lo mismo que no tener área compatible.
+- `asignacionPendiente` es `true` cuando el servicio de cobertura no respondió a tiempo o rechazó la
+  consulta al crear el reclamo: queda `INGRESADO` y un administrador lo asigna a mano. No es lo mismo que
+  no tener área compatible. Solo puede pasar con `reclamos.cobertura.origen: soap`.
 - `area` es `null` mientras el reclamo está `INGRESADO`.
 - `agente` es `null` hasta que un agente toma el reclamo.
 - `usuario` en el historial es `null` cuando el cambio lo hizo el sistema.

@@ -8,6 +8,7 @@ import ar.edu.uade.reclamos.dominio.estrategia.*;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
 import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
@@ -50,12 +51,37 @@ class ConfiguracionAplicacionTest {
     @ParameterizedTest
     @ValueSource(strings = {"reclamos.prioridad.estrategia=desconocida", "reclamos.asignacion.estrategia=desconocida",
             "reclamos.prioridad.estrategia=", "reclamos.asignacion.estrategia=",
-            "reclamos.cobertura.origen=desconocida", "reclamos.cobertura.origen="})
+            "reclamos.cobertura.origen=desconocida", "reclamos.cobertura.origen=",
+            "reclamos.cobertura.url=", "reclamos.cobertura.tiempo-limite=0s"})
     void configuracionInvalidaImpideArrancarConMensajeClaro(String propiedad) {
         contexto.withPropertyValues(propiedad).run(ctx -> {
             assertThat(ctx).hasFailed();
             assertThat(ctx.getStartupFailure()).hasRootCauseInstanceOf(IllegalArgumentException.class)
                     .hasStackTraceContaining(propiedad.substring(0, propiedad.indexOf('=')));
+        });
+    }
+
+    @Test
+    void coberturaPorDefectoEsLocalYApuntaAlServicioSoapDeDesarrollo() {
+        contexto.run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            PropiedadesReclamos.Cobertura cobertura = ctx.getBean(PropiedadesReclamos.class).cobertura();
+            assertThat(cobertura.origen()).isEqualTo("local");
+            assertThat(cobertura.url()).isEqualTo("http://localhost:8081/ws");
+            assertThat(cobertura.tiempoLimite()).isEqualTo(Duration.ofSeconds(2));
+        });
+    }
+
+    @Test
+    void coberturaSoapUsaElAdapterConLaUrlYElTiempoLimiteConfigurados() {
+        contexto.withPropertyValues("reclamos.cobertura.origen=soap",
+                "reclamos.cobertura.url=http://servicio-cobertura:8081/ws",
+                "reclamos.cobertura.tiempo-limite=3s").run(ctx -> {
+            assertThat(ctx).hasNotFailed();
+            assertThat(ctx.getBean(CatalogoCobertura.class)).isInstanceOf(CoberturaSoap.class);
+            PropiedadesReclamos.Cobertura cobertura = ctx.getBean(PropiedadesReclamos.class).cobertura();
+            assertThat(cobertura.url()).isEqualTo("http://servicio-cobertura:8081/ws");
+            assertThat(cobertura.tiempoLimite()).isEqualTo(Duration.ofSeconds(3));
         });
     }
 
