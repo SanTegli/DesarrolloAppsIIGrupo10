@@ -29,9 +29,10 @@ servicios/                  Servicios de integración de la Segunda Parte, cada 
   servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
   servicio-prioridad/       REST 2: prioridad sugerida por IA con Gemini (Swagger en el puerto 8082)
   servicio-notificaciones/  Consumidor de RabbitMQ: manda los avisos por correo (Mailpit)
-docs/                       Contrato REST, arquitectura, patrones, secuencias y evidencias
+docs/                       Contrato REST, arquitectura, patrones, secuencias, guion de demo y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
+scripts/                    Verificación de la demo de punta a punta (Node, sin dependencias)
 docker-compose.yml          MySQL para desarrollo; backend, frontend y servicios para la demo
 ```
 
@@ -62,7 +63,8 @@ cd servicios
 ```
 
 GitHub Actions corre los tests del backend, de los servicios y del frontend en cada pull request y en
-cada push a `main` (`.github/workflows/ci.yml`). Un PR con la verificación en rojo no se mergea.
+cada push a `main` (`.github/workflows/ci.yml`). Además levanta los ocho contenedores con Docker Compose y
+recorre la demo con `scripts/verificar-demo.mjs`. Un PR con la verificación en rojo no se mergea.
 
 ## Cómo levantar el backend
 
@@ -130,14 +132,24 @@ Tests del frontend: `npm test`.
 
 ## Demo completa con Docker
 
-Levanta MySQL, backend y frontend en tres contenedores. Solo hace falta Docker y el archivo `.env`:
+Levanta el sistema completo en ocho contenedores: MySQL, backend, frontend, los servicios de cobertura
+(SOAP), prioridad (IA) y notificaciones, RabbitMQ y Mailpit. Solo hace falta Docker y el archivo `.env`:
 
 ```bash
 docker compose up --build
 ```
 
 La interfaz queda en `http://localhost:5173` y la API en `http://localhost:8080/api`. La primera
-vez tarda varios minutos porque compila el backend dentro del contenedor.
+vez tarda varios minutos porque compila el backend y los servicios dentro de los contenedores.
+
+Para comprobar que todo anda de punta a punta, con la demo levantada y en otra terminal:
+
+```bash
+docker compose run --rm verificar-demo
+```
+
+Crea un reclamo de prueba y sigue su recorrido por Georef, la IA, el servicio SOAP, RabbitMQ y el correo en
+Mailpit. El [guion de la demo](docs/demo.md) tiene el recorrido para presentar y la matriz de fallos.
 
 ## Perfiles
 
@@ -227,15 +239,19 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 
 ## Documentación
 
-- [Arquitectura](docs/arquitectura.md): capas, componentes, servicios y decisiones de diseño.
+- [Arquitectura](docs/arquitectura.md): capas, componentes con sus interfaces provistas y requeridas,
+  servicios y decisiones de diseño.
 - [Modelo de dominio](docs/modelo-dominio.md): clases, reglas del dominio y tablas.
 - [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade; Adapter,
   proxy remoto, proxy de caché, Decorator, circuit breaker, outbox y consumidor idempotente en las
   integraciones.
-- [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación y cambio de estado.
+- [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación (con las cinco
+  integraciones) y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
 - [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte.
-- [Despliegue](docs/despliegue.md): contenedores, puertos y configuración.
+- [Despliegue](docs/despliegue.md): contenedores, puertos, arranque, memoria y configuración.
+- [Guion de la demo](docs/demo.md): recorrido para presentar, fallas a propósito, matriz de fallos y
+  verificación automática.
 - [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso y capturas de la interfaz.
 - [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
 
@@ -260,4 +276,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2): adaptadores de Gemini, OpenAI y simulado, respaldo por categoría y circuit breaker |
 | 11 | `feature/11-geocodificacion` | Geocodificación con Georef: búsqueda de la dirección, elección de la sugerencia en el alta, enlace a Google Maps y caché |
 | 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor idempotente con reintentos y cola de errores, y Mailpit |
-| 13 | `feature/13-integracion-demo` | Compose completo, diagramas y evidencias |
+| 13 | `feature/13-integracion-demo` | Compose con orden de arranque, chequeos de salud y memoria acotada; verificación de punta a punta en el CI; diagrama de componentes UML, secuencia completa, guion de demo y matriz de fallos |

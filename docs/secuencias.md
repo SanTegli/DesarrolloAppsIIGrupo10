@@ -113,6 +113,64 @@ sequenceDiagram
 Intervienen los cinco patrones: Facade (paso 3), Factory (7), Strategy (9 y 14), Repository (5, 12,
 18) y Observer (19 a 25).
 
+## Secuencia: alta con las cinco integraciones
+
+La secuencia anterior muestra las clases del backend. Esta muestra los procesos, tal como corre en la demo
+(`docker compose up`): el mismo reclamo pasa por Georef, la IA, el servicio SOAP y RabbitMQ hasta llegar como
+correo. Cada llamada externa tiene su respaldo; el detalle está en la [matriz de fallos](demo.md#matriz-de-fallos).
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor U as Ciudadano
+  participant UI as React
+  participant B as Backend (REST 1)
+  participant GEO as Georef
+  participant PRI as servicio-prioridad
+  participant LLM as Gemini
+  participant COB as servicio-cobertura
+  participant DB as MySQL
+  participant MQ as RabbitMQ
+  participant NOT as servicio-notificaciones
+  participant MAIL as Mailpit
+
+  U->>UI: escribe la dirección y toca "Buscar en el mapa"
+  UI->>B: GET /api/ubicaciones/sugerencias
+  B->>GEO: GET /direcciones (tiempo límite 3 s)
+  GEO-->>B: direcciones con coordenadas
+  B-->>UI: sugerencias dentro del municipio
+  U->>UI: elige una sugerencia y crea el reclamo
+  UI->>B: POST /api/reclamos con la ubicación elegida
+  B->>B: valida que la ubicación caiga en el municipio
+  Note over B,DB: comienza la transacción
+  B->>PRI: POST /api/prioridades/evaluar (categoría y descripción)
+  PRI->>LLM: generateContent con las instrucciones
+  LLM-->>PRI: JSON con prioridad y motivo
+  PRI-->>B: prioridad sugerida
+  Note right of B: si falla o pasan 6 s: prioridad de la categoría (RESPALDO)
+  B->>COB: ConsultarCobertura (municipio, barrio, categoría)
+  COB-->>B: áreas que lo cubren
+  Note right of B: si falla o pasan 2 s: asignación pendiente
+  B->>DB: guarda el reclamo, sus avisos y una fila PENDIENTE por aviso en mensajes_salientes
+  Note over B,DB: confirma la transacción
+  B-->>UI: 201 Created con el reclamo
+  loop cada 2 segundos
+    B->>DB: lee los mensajes PENDIENTES
+    B->>MQ: publica en reclamos.eventos (aviso.*)
+    MQ-->>B: confirmación
+    B->>DB: los marca PUBLICADOS
+  end
+  MQ->>NOT: entrega desde notificaciones.email
+  NOT->>NOT: ¿eventId ya procesado? descarta
+  NOT->>MAIL: SMTP: "Reclamo REC-…: lo recibimos"
+  NOT->>NOT: registra el eventId
+  NOT-->>MQ: ack
+```
+
+Georef se consulta antes del alta, cuando el ciudadano busca; el alta solo valida la sugerencia que eligió. La
+IA y el SOAP corren dentro de la transacción: en el peor caso el alta espera unos 8 segundos (6 de la IA y 2 del
+SOAP). La publicación en RabbitMQ y el correo pasan después de responder: el ciudadano no los espera.
+
 ## Secuencia: cambio de estado
 
 El ejemplo es un agente que toma un reclamo. Las demás transiciones recorren el mismo camino.

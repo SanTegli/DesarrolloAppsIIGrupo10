@@ -68,6 +68,55 @@ flowchart LR
 Los puertos 8081 y 8082 se publican para poder abrir el WSDL y Swagger y probar los servicios desde la
 máquina; el backend no los necesita, porque llega por la red de Compose con el nombre de cada servicio.
 
+## Arranque, salud y memoria
+
+Compose levanta los contenedores en orden y espera a que cada uno esté **sano** antes de arrancar el que
+depende de él. Así el primer reclamo de la demo ya pasa por la IA y por el SOAP, en lugar de caer en el
+respaldo porque el servicio todavía estaba arrancando.
+
+```mermaid
+flowchart LR
+  MY["reclamos-mysql"] --> BE["reclamos-backend"]
+  RB["reclamos-rabbitmq"] --> BE
+  RB --> NT["servicio-notificaciones"]
+  MP["reclamos-mailpit"] --> NT
+  CO["servicio-cobertura"] --> BE
+  PR["servicio-prioridad"] --> BE
+  BE --> FR["reclamos-frontend"]
+```
+
+| Contenedor | Cuándo está sano | Cómo se comprueba |
+| --- | --- | --- |
+| `reclamos-mysql` | Acepta conexiones del usuario de la aplicación | `mysqladmin ping` |
+| `reclamos-rabbitmq` | El broker responde | `rabbitmq-diagnostics ping` |
+| `servicio-cobertura`, `servicio-prioridad`, `reclamos-backend` | Spring Boot terminó de arrancar y abrió su puerto | `bash` abre una conexión al puerto: la imagen `eclipse-temurin` no trae `curl` |
+| `reclamos-frontend` | nginx sirve la interfaz | `wget --spider` |
+| `servicio-notificaciones`, `reclamos-mailpit` | Están corriendo | Sin chequeo propio: nadie espera por ellos para arrancar |
+
+Cada flecha va del contenedor que tiene que estar listo al que lo espera, y vale solo para el arranque. Si un servicio se cae después, el backend sigue andando con su respaldo
+(ver la [matriz de fallos](demo.md#matriz-de-fallos)).
+
+**Memoria.** Cada servicio Java tiene un tope de heap en `JAVA_TOOL_OPTIONS`, con el recolector serial, que
+ocupa menos memoria que el predeterminado:
+
+| Contenedor | Heap máximo |
+| --- | --- |
+| `reclamos-backend` | 512 MB |
+| `servicio-cobertura`, `servicio-prioridad`, `servicio-notificaciones` | 256 MB cada uno |
+
+Con lo que suma cada JVM fuera del heap, más MySQL y RabbitMQ, el total estimado ronda los 2,5 GB: alcanza con
+asignarle 4 GB a Docker Desktop. El consumo real de cada contenedor lo muestra el trabajo «Demo completa» del
+CI, en el paso «Memoria de cada contenedor».
+
+**Construcción.** Los cuatro Dockerfile de Java compilan con Maven dentro de la imagen y guardan las
+dependencias en una caché de BuildKit (`RUN --mount=type=cache`). La primera construcción las baja de Internet;
+las siguientes las toman de la caché, aunque cambie el código.
+
+**Verificación.** `docker compose run --rm verificar-demo` corre `scripts/verificar-demo.mjs` en un contenedor
+de Node, dentro de la misma red: crea un reclamo y sigue su recorrido por las cinco integraciones. Ese
+contenedor está en el perfil `verificacion`, así que `docker compose up` no lo levanta. El detalle está en
+[demo.md](demo.md#verificación-automática).
+
 ## Configuración externalizada
 
 | Variable | Dónde se usa | Para qué |
@@ -90,6 +139,7 @@ máquina; el backend no los necesita, porque llega por la red de Compose con el 
 | `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | `.env`, leído por Compose; backend y `servicio-notificaciones` | Usuario de RabbitMQ. El usuario `guest` solo entra desde el mismo contenedor, por eso Compose crea este |
 | `RABBITMQ_HOST`, `SMTP_HOST`, `SMTP_PORT` | Contenedores del backend y del consumidor | `rabbitmq` y `mailpit` entre contenedores; `localhost` en desarrollo |
 | `springdoc.*` | `application.yml` | Swagger UI en `/swagger-ui.html`, publicado por el puerto 8080 del backend |
+| `JAVA_TOOL_OPTIONS` | `docker-compose.yml`, en cada servicio Java | Tope de heap y recolector serial (ver «Arranque, salud y memoria») |
 | `VITE_BACKEND_URL` | `frontend/.env`, solo en desarrollo | Adónde reenvía Vite las llamadas a `/api` |
 
 ## Dos formas de ejecutar
@@ -98,6 +148,7 @@ máquina; el backend no los necesita, porque llega por la red de Compose con el 
 | --- | --- | --- | --- | --- |
 | Desarrollo | Contenedor | En la máquina, con Maven | En la máquina, con Vite | `docker compose up -d mysql` y después backend y frontend a mano |
 | Demo | Contenedor | Contenedor | Contenedor | `docker compose up --build` |
+| Verificación de la demo | — | — | — | Con la demo levantada: `docker compose run --rm verificar-demo` |
 
 En desarrollo el backend usa la cobertura local; para probar el SOAP se levanta `servicio-cobertura` con
 `./mvnw -pl servicio-cobertura spring-boot:run` desde `servicios/` (o `docker compose up -d servicio-cobertura`)

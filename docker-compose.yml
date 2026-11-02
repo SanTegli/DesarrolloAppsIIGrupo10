@@ -3,6 +3,8 @@
 #
 # Demo: todos los contenedores. La interfaz queda en http://localhost:5173.
 #   docker compose up --build
+# Para comprobar que la demo anda de punta a punta, con todo levantado y en otra terminal:
+#   docker compose run --rm verificar-demo
 # En la demo el backend toma la cobertura del servicio SOAP (WSDL en http://localhost:8081/ws/cobertura.wsdl)
 # y la prioridad del servicio de IA (Swagger en http://localhost:8082/swagger-ui.html). Los avisos salen por
 # RabbitMQ (consola en http://localhost:15672) y llegan como correo a Mailpit (http://localhost:8025).
@@ -72,6 +74,8 @@ services:
       SMTP_HOST: mailpit
       SMTP_PORT: 1025
       NOTIFICACIONES_DB_URL: jdbc:h2:file:/datos/notificaciones
+      # Cada servicio Java con memoria acotada, para que los ocho contenedores entren en una notebook.
+      JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
     volumes:
       - notificaciones-datos:/datos
@@ -82,9 +86,16 @@ services:
       dockerfile: servicio-cobertura/Dockerfile
     container_name: servicio-cobertura
     environment:
+      JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8081:8081"
+    # Sano cuando Spring Boot ya abrió el puerto. La imagen no trae curl: bash prueba la conexión.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/8081"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
 
   servicio-prioridad:
     build:
@@ -96,20 +107,29 @@ services:
       PRIORIDAD_IA_PROVEEDOR: ${PRIORIDAD_IA_PROVEEDOR:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8082:8082"
+    # Sano cuando Spring Boot ya abrió el puerto. La imagen no trae curl: bash prueba la conexión.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/8082"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
 
   backend:
     build: ./backend
     container_name: reclamos-backend
+    # Espera a que los servicios estén listos: así el primer reclamo de la demo ya pasa por la IA y el SOAP.
+    # Si uno se cae después, el backend sigue andando con su respaldo (docs/demo.md, matriz de fallos).
     depends_on:
       mysql:
         condition: service_healthy
       servicio-cobertura:
-        condition: service_started
+        condition: service_healthy
       servicio-prioridad:
-        condition: service_started
+        condition: service_healthy
       rabbitmq:
         condition: service_healthy
     environment:
@@ -125,17 +145,49 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-reclamos}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
+      JAVA_TOOL_OPTIONS: -Xmx512m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8080:8080"
+    # Sano cuando Spring Boot ya abrió el puerto. La imagen no trae curl: bash prueba la conexión.
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/127.0.0.1/8080"]
+      interval: 5s
+      timeout: 3s
+      retries: 60
 
   frontend:
     build: ./frontend
     container_name: reclamos-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "5173:80"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # Recorre la demo de punta a punta (scripts/verificar-demo.mjs). No arranca con up: se corre a pedido con
+  #   docker compose run --rm verificar-demo
+  # Crea un reclamo de prueba como Ana Pérez.
+  verificar-demo:
+    image: node:22-alpine
+    profiles: ["verificacion"]
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["node", "/scripts/verificar-demo.mjs"]
+    environment:
+      FRONTEND_URL: http://frontend
+      BACKEND_URL: http://backend:8080
+      COBERTURA_URL: http://servicio-cobertura:8081
+      PRIORIDAD_URL: http://servicio-prioridad:8082
+      RABBITMQ_API_URL: http://rabbitmq:15672
+      RABBITMQ_USER: ${RABBITMQ_USER:-reclamos}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
+      MAILPIT_URL: http://mailpit:8025
 
 volumes:
   reclamos-mysql-data:

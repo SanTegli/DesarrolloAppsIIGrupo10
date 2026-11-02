@@ -1,5 +1,5 @@
 # Corre los tests del backend, de los servicios de integración y del frontend en cada pull request
-# y en cada push a main.
+# y en cada push a main, y levanta la demo completa con Docker Compose para recorrerla de punta a punta.
 # Un PR no debería mergearse si alguno de los trabajos falla.
 name: CI
 
@@ -135,3 +135,36 @@ jobs:
         run: npm test
       - name: Compilación
         run: npm run build
+      # El script que recorre la demo se prueba contra un sistema simulado; no necesita npm install.
+      - name: Tests del script de verificación de la demo
+        run: node --test ../scripts/verificar-demo.test.mjs
+
+  demo:
+    name: Demo completa (Docker Compose)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      # Sin clave de Gemini en el CI: el servicio de prioridad usa el proveedor simulado, que no es IA pero
+      # contesta por el mismo contrato. Georef sí se consulta de verdad; si no responde, es un aviso, no una falla.
+      - name: Preparar .env
+        run: |
+          cp .env.example .env
+          sed -i 's/^PRIORIDAD_IA_PROVEEDOR=.*/PRIORIDAD_IA_PROVEEDOR=simulado/' .env
+      - name: Construir y levantar los ocho contenedores
+        run: docker compose up --build --detach --wait --wait-timeout 600
+      # Crea un reclamo y sigue su recorrido: Georef, IA, SOAP, outbox, RabbitMQ y correo en Mailpit.
+      - name: Recorrer la demo
+        run: docker compose run --rm verificar-demo
+      - name: Memoria de cada contenedor
+        if: always()
+        run: docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"
+      - name: Juntar los logs
+        if: failure()
+        run: docker compose logs --no-color --timestamps > compose.log
+      - name: Guardar los logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-demo
+          path: compose.log
