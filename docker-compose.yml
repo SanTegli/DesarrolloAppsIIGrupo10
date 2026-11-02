@@ -4,7 +4,8 @@
 # Demo: todos los contenedores. La interfaz queda en http://localhost:5173.
 #   docker compose up --build
 # En la demo el backend toma la cobertura del servicio SOAP (WSDL en http://localhost:8081/ws/cobertura.wsdl)
-# y la prioridad del servicio de IA (Swagger en http://localhost:8082/swagger-ui.html).
+# y la prioridad del servicio de IA (Swagger en http://localhost:8082/swagger-ui.html). Los avisos salen por
+# RabbitMQ (consola en http://localhost:15672) y llegan como correo a Mailpit (http://localhost:8025).
 services:
   mysql:
     image: mysql:8.4
@@ -27,6 +28,53 @@ services:
       interval: 10s
       timeout: 5s
       retries: 10
+
+  rabbitmq:
+    image: rabbitmq:4.1-management
+    container_name: reclamos-rabbitmq
+    environment:
+      # guest solo puede entrar desde el mismo contenedor: el backend y el consumidor usan este usuario.
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-reclamos}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-reclamos_dev}
+    ports:
+      - "5672:5672"     # AMQP
+      - "15672:15672"   # consola web
+    volumes:
+      - reclamos-rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Buzón SMTP de prueba: recibe los correos y los muestra en la web. No los entrega a casillas reales.
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: reclamos-mailpit
+    ports:
+      - "1025:1025"     # SMTP
+      - "8025:8025"     # buzón web
+
+  servicio-notificaciones:
+    build:
+      context: ./servicios
+      dockerfile: servicio-notificaciones/Dockerfile
+    container_name: servicio-notificaciones
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      mailpit:
+        condition: service_started
+    environment:
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-reclamos}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
+      SMTP_HOST: mailpit
+      SMTP_PORT: 1025
+      NOTIFICACIONES_DB_URL: jdbc:h2:file:/datos/notificaciones
+      TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - notificaciones-datos:/datos
 
   servicio-cobertura:
     build:
@@ -62,6 +110,8 @@ services:
         condition: service_started
       servicio-prioridad:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     environment:
       DB_URL: "jdbc:mysql://mysql:3306/${DB_NAME:-reclamos}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=America/Argentina/Buenos_Aires&characterEncoding=UTF-8"
       DB_USER: ${DB_USER:-reclamos}
@@ -71,6 +121,10 @@ services:
       RECLAMOS_COBERTURA_URL: http://servicio-cobertura:8081/ws
       RECLAMOS_PRIORIDAD_ESTRATEGIA: ia
       RECLAMOS_PRIORIDAD_IA_URL: http://servicio-prioridad:8082
+      RECLAMOS_MENSAJERIA_HABILITADA: "true"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_USER: ${RABBITMQ_USER:-reclamos}
+      RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
       TZ: America/Argentina/Buenos_Aires
     ports:
       - "8080:8080"
@@ -85,3 +139,5 @@ services:
 
 volumes:
   reclamos-mysql-data:
+  reclamos-rabbitmq-data:
+  notificaciones-datos:

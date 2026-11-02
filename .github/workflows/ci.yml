@@ -15,6 +15,21 @@ jobs:
     defaults:
       run:
         working-directory: backend
+    # RabbitMQ de verdad para PublicacionRabbitIntegrationTest; sin RABBITMQ_HOST ese test se saltea.
+    services:
+      rabbitmq:
+        image: rabbitmq:4.1-management
+        env:
+          RABBITMQ_DEFAULT_USER: reclamos
+          RABBITMQ_DEFAULT_PASS: reclamos_ci
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-timeout 5s --health-retries 10
+    env:
+      RABBITMQ_HOST: localhost
+      RABBITMQ_USER: reclamos
+      RABBITMQ_PASSWORD: reclamos_ci
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -47,6 +62,27 @@ jobs:
     defaults:
       run:
         working-directory: servicios
+    # RabbitMQ y Mailpit de verdad para FlujoCorreoIntegrationTest; sin las variables, ese test se saltea.
+    services:
+      rabbitmq:
+        image: rabbitmq:4.1-management
+        env:
+          RABBITMQ_DEFAULT_USER: reclamos
+          RABBITMQ_DEFAULT_PASS: reclamos_ci
+        ports:
+          - 5672:5672
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping" --health-interval 10s --health-timeout 5s --health-retries 10
+      mailpit:
+        image: axllent/mailpit:latest
+        ports:
+          - 1025:1025
+          - 8025:8025
+    env:
+      RABBITMQ_HOST: localhost
+      RABBITMQ_USER: reclamos
+      RABBITMQ_PASSWORD: reclamos_ci
+      MAILPIT_URL: http://localhost:8025
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4

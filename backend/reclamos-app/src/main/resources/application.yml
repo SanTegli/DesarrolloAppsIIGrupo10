@@ -7,6 +7,13 @@ spring:
     default: dev
   jpa:
     open-in-view: false
+  # RabbitMQ: solo se conecta si reclamos.mensajeria.habilitada es true. Las credenciales salen de .env.
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    publisher-confirm-type: correlated   # un mensaje cuenta como publicado cuando el broker lo confirma
   # El backend usa Spring Web Services solo como cliente (CoberturaSoap): no publica servicios SOAP.
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.webservices.WebServicesAutoConfiguration
@@ -42,6 +49,12 @@ reclamos:
     origen: local                # local (la base del backend) | soap (servicio-cobertura)
     url: http://localhost:8081/ws
     tiempo-limite: 2s            # si el SOAP no contesta a tiempo, el reclamo queda con la asignación pendiente
+  # Avisos por correo: outbox + RabbitMQ + servicio-notificaciones. Apagada sin broker; Compose la enciende.
+  mensajeria:
+    habilitada: false
+    intervalo-ms: 2000           # cada cuánto se publican los pendientes de la outbox
+    lote: 50
+    espera-confirmacion: 5s
   # Dirección del reclamo en el mapa (API externa). Si Georef no responde, la ubicación queda pendiente.
   geocodificacion:
     proveedor: georef

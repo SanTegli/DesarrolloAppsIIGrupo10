@@ -40,3 +40,6 @@ dist/
 .env
 *.log
 .DS_Store
+
+### Base H2 local de servicio-notificaciones ###
+servicios/servicio-notificaciones/datos/

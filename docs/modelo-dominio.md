@@ -94,6 +94,15 @@ classDiagram
     -String mensaje
     -LocalDateTime fechaEnvio
   }
+  class MensajeSaliente {
+    -String eventId
+    -String claveRuteo
+    -String contenido
+    -EstadoMensaje estado
+    -int intentos
+    +marcarPublicado(LocalDateTime)
+    +registrarFalla(String)
+  }
   class PoliticaTransiciones {
     <<utility>>
     +validar(EstadoReclamo, EstadoReclamo, Rol)$
@@ -128,9 +137,10 @@ classDiagram
   ReclamoFactory ..> Reclamo : crea
 ```
 
-`Municipio`, `Barrio`, `Categoria`, `HistorialEstado` y `Notificacion` también heredan de `Entidad`;
-no se dibuja para no cargar el diagrama. `Ubicacion` no es una entidad: es un valor que se guarda en
-columnas de la tabla `reclamos`.
+`Municipio`, `Barrio`, `Categoria`, `HistorialEstado`, `Notificacion` y `MensajeSaliente` también heredan
+de `Entidad`; no se dibuja para no cargar el diagrama. `Ubicacion` no es una entidad: es un valor que se
+guarda en columnas de la tabla `reclamos`. `MensajeSaliente` no tiene reglas de negocio: es la fila de la
+outbox (tabla `mensajes_salientes`) con un aviso que tiene que salir por RabbitMQ.
 
 | Enum | Valores |
 | --- | --- |
@@ -140,9 +150,11 @@ columnas de la tabla `reclamos`.
 | `CanalNotificacion` | `EMAIL`, `SMS`, `INTERNO` |
 | `OrigenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` |
 | `EstadoUbicacion` | `CONFIRMADA`, `PENDIENTE` |
+| `EstadoMensaje` | `PENDIENTE`, `PUBLICADO` |
 
 `Rol.SISTEMA` no corresponde a ningún usuario: representa las acciones automáticas, como la
-asignación al crear el reclamo. En el Hito 1 todos los avisos usan el canal `INTERNO`.
+asignación al crear el reclamo. Todos los avisos se guardan con el canal `INTERNO`; con la mensajería
+habilitada, además salen por correo a través de la outbox.
 
 ## Reglas que viven en el dominio
 
@@ -254,10 +266,25 @@ erDiagram
   }
   notificaciones {
     bigint id PK
-    string canal "siempre INTERNO en el Hito 1"
+    string canal "siempre INTERNO"
     string mensaje
     datetime fecha_envio
     bigint reclamo_id FK
     bigint destinatario_id FK
   }
+  mensajes_salientes {
+    bigint id PK
+    string event_id UK
+    string clave_ruteo
+    string tipo_evento
+    string contenido "JSON del mensaje"
+    string estado "PENDIENTE o PUBLICADO"
+    int intentos
+    datetime fecha_creacion
+    datetime fecha_publicacion
+    string ultimo_error
+  }
 ```
+
+`mensajes_salientes` es la outbox: no tiene claves foráneas, porque el mensaje ya lleva todo lo que necesita
+el consumidor y tiene que poder publicarse aunque cambien los datos del reclamo.

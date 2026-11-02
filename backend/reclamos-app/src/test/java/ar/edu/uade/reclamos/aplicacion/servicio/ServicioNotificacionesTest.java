@@ -15,6 +15,7 @@ import ar.edu.uade.reclamos.dominio.modelo.Notificacion;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -64,6 +65,22 @@ class ServicioNotificacionesTest {
                 "Tu reclamo " + numero + " fue asignado al area Obras.",
                 "El reclamo " + numero + " fue asignado a tu area Obras.",
                 "El reclamo " + numero + " fue asignado a tu area Obras."), avisos.mensajes());
+    }
+
+    @Test
+    void cadaAvisoSaleTambienPorLaSalidaConSuTipoDeEvento() {
+        List<String> enviados = new ArrayList<>();
+        ServicioNotificaciones conSalida = new ServicioNotificaciones(reclamos, avisos, usuarios,
+                (aviso, tipo) -> enviados.add(tipo + " " + aviso.getDestinatario().getId()));
+        String numero = guardar(e.asignado());
+
+        conSalida.avisarIngreso(numero, fecha);
+        conSalida.avisarAsignacion(numero, e.area.getId(), e.area.getNombre(), fecha);
+        conSalida.avisarResolucion(numero, fecha);
+
+        assertEquals(List.of("RECLAMO_CREADO 1", "RECLAMO_ASIGNADO 1", "RECLAMO_ASIGNADO 3", "RECLAMO_ASIGNADO 6",
+                "RECLAMO_RESUELTO 1"), enviados);
+        assertEquals(enviados.size(), avisos.guardadas.size());
     }
 
     @Test

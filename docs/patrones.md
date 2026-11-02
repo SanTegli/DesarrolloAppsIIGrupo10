@@ -257,6 +257,11 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Model as a Service | 10 | `servicio-prioridad` | El modelo queda detrás de una API propia, con su contrato OpenAPI |
 | Adapter y capa anticorrupción | 11 | `GeorefGeocodificador` | El JSON de Georef (calles, localidades, ids censales) no entra al dominio: sale como `SugerenciaUbicacion` |
 | Proxy de caché | 11 | `GeocodificadorConCache` | No repetir consultas iguales a una API externa gratuita y compartida |
+| Outbox | 12 | `OutboxAvisos`, `PublicadorMensajes`, tabla `mensajes_salientes` | No perder un aviso si RabbitMQ está caído, ni publicar uno de un alta que se revirtió |
+| Publicar y suscribir | 12 | Exchange `reclamos.eventos` (topic) | El backend publica sin saber quién consume; sumar otro consumidor es ligar otra cola |
+| Reintentos y cola de errores | 12 | `ConfiguracionReintentos`, `notificaciones.email.dlq` | Una falla pasajera del SMTP se reintenta; un mensaje que no se puede procesar no traba la cola |
+| Consumidor idempotente | 12 | `ProcesadorAvisos`, tabla `mensajes_procesados` | Un mensaje repetido no manda dos correos |
+| Adapter | 12 | `BrokerRabbit` | La outbox habla con `BrokerMensajes`; RabbitMQ queda detrás |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -388,3 +393,42 @@ recibe un `Geocodificador` sin saber que hay una caché ni que del otro lado est
 - **Código:** `reclamos-app/…/aplicacion/integracion/GeorefGeocodificador.java` y `GeocodificadorConCache.java`
 - **Tests:** `GeorefGeocodificadorTest` (con respuestas reales grabadas de Georef), `GeocodificadorConCacheTest`
   y `UbicacionesIntegrationTest`
+
+## Outbox, publicar y suscribir, reintentos y consumidor idempotente
+
+**Problema.** Cada aviso tiene que salir por correo. Si el backend publicara en RabbitMQ en medio del alta,
+habría dos fallas posibles: el broker caído hace fallar el alta, o el alta se revierte después de publicar y
+sale un correo de un reclamo que no existe. Del otro lado, RabbitMQ puede entregar un mensaje más de una vez,
+y el SMTP puede fallar un rato.
+
+**Solución.** Los patrones de mensajería de la cátedra (clase 8), cada uno en su lugar:
+
+```text
+backend                                                            servicio-notificaciones
+ServicioNotificaciones ─▶ OutboxAvisos ─▶ mensajes_salientes       ListenerAvisos
+          (misma transacción que el alta)        │                       │
+                                PublicadorMensajes (cada 2 s)          ProcesadorAvisos
+                                        │ confirmación                 │ ¿eventId ya procesado? → descartar
+                                        ▼                              │ correo → registrar eventId
+                     reclamos.eventos (topic) ──aviso.#──▶ notificaciones.email
+                                                              │ 3 intentos fallidos o mensaje inválido
+                                                              ▼
+                                         reclamos.eventos.dlx ──▶ notificaciones.email.dlq
+```
+
+| Patrón | Dónde | Qué garantiza |
+| --- | --- | --- |
+| Outbox | `OutboxAvisos` y `PublicadorMensajes` | El mensaje se guarda con el aviso, en la misma transacción; si RabbitMQ está caído, espera y sale después |
+| Publicar y suscribir | Exchange topic `reclamos.eventos`, claves `aviso.*` | El productor no conoce a los consumidores |
+| Mensaje persistente y confirmado | `BrokerRabbit`, `publisher-confirm-type: correlated` | Un mensaje cuenta como publicado recién cuando RabbitMQ lo confirma |
+| Reintentos y cola de errores | `spring.rabbitmq.listener.simple.retry` y `ConfiguracionReintentos` | Tres intentos con espera creciente; después, o si el mensaje es inválido, a `notificaciones.email.dlq` |
+| Consumidor idempotente | `ProcesadorAvisos` y `RegistroProcesados` | El `eventId` se registra con clave primaria: un repetido no manda otro correo |
+
+Hay entrega al menos una vez, no exactamente una vez: si el consumidor cae entre el envío del correo y el
+registro del `eventId`, el correo se repite. Es la ventana que deja cualquier sistema que combine una base y un
+SMTP, y está escrita en [el contrato](contratos/mensajes.md).
+
+- **Código del backend:** `reclamos-app/…/aplicacion/mensajeria/`
+- **Servicio:** `servicios/servicio-notificaciones`
+- **Tests:** `OutboxIntegrationTest`, `PublicadorMensajesTest`, `OutboxAvisosTest`, `PublicacionRabbitIntegrationTest`
+  y, del lado del consumidor, `ProcesadorAvisosTest`, `ConfiguracionReintentosTest` y `FlujoCorreoIntegrationTest`

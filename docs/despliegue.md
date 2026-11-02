@@ -1,6 +1,6 @@
 # Despliegue
 
-El sistema se despliega en cinco contenedores. El navegador solo habla con el contenedor del
+El sistema se despliega en ocho contenedores. El navegador solo habla con el contenedor del
 frontend, que sirve la interfaz y reenvía las llamadas a `/api` al backend. El backend consulta la
 cobertura al servicio SOAP y la prioridad al servicio de IA por la red interna de Compose. Salen a
 Internet el servicio de IA, a la API de Gemini, y el backend, a Georef para ubicar las direcciones.
@@ -26,6 +26,15 @@ flowchart LR
     subgraph CP["Contenedor servicio-prioridad"]
       IA["servicio-prioridad.jar<br/>REST 2, sin base de datos"]
     end
+    subgraph CR["Contenedor reclamos-rabbitmq"]
+      MQ[("RabbitMQ 4.1<br/>reclamos.eventos")]
+    end
+    subgraph CN["Contenedor servicio-notificaciones"]
+      NOT["servicio-notificaciones.jar<br/>consumidor, H2 propia"]
+    end
+    subgraph CMP["Contenedor reclamos-mailpit"]
+      MP["Mailpit<br/>SMTP y buzón web"]
+    end
     VOL[["Volumen reclamos-mysql-data"]]
   end
   GEM["API de Gemini<br/>generativelanguage.googleapis.com"]
@@ -38,6 +47,10 @@ flowchart LR
   APP -->|"REST 8082, /api/prioridades"| IA
   IA -->|"HTTPS, GEMINI_API_KEY"| GEM
   APP -->|"HTTPS, sin clave"| GEO
+  APP -->|"AMQP 5672"| MQ
+  MQ -->|"AMQP 5672"| NOT
+  NOT -->|"SMTP 1025"| MP
+  NAV -.->|"HTTP 8025, buzón"| MP
   DB --- VOL
 ```
 
@@ -48,6 +61,9 @@ flowchart LR
 | `reclamos-mysql` | `mysql:8.4` | 3306 | Base de datos, con los datos en un volumen |
 | `servicio-cobertura` | `eclipse-temurin:21-jre`, construida desde `servicios/servicio-cobertura/Dockerfile` | 8081 | Servicio SOAP de cobertura; el WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` |
 | `servicio-prioridad` | `eclipse-temurin:21-jre`, construida desde `servicios/servicio-prioridad/Dockerfile` | 8082 | Servicio de prioridad con IA (REST 2); Swagger UI en `http://localhost:8082/swagger-ui.html` |
+| `reclamos-rabbitmq` | `rabbitmq:4.1-management` | 5672 y 15672 | Broker de mensajes, con sus datos en un volumen; consola web en `http://localhost:15672` |
+| `servicio-notificaciones` | `eclipse-temurin:21-jre`, construida desde `servicios/servicio-notificaciones/Dockerfile` | Ninguno | Consumidor de la cola `notificaciones.email`; guarda los `eventId` procesados en el volumen `notificaciones-datos` |
+| `reclamos-mailpit` | `axllent/mailpit` | 1025 y 8025 | SMTP de prueba; los correos se ven en `http://localhost:8025` |
 
 Los puertos 8081 y 8082 se publican para poder abrir el WSDL y Swagger y probar los servicios desde la
 máquina; el backend no los necesita, porque llega por la red de Compose con el nombre de cada servicio.
@@ -70,6 +86,9 @@ máquina; el backend no los necesita, porque llega por la red de Compose con el 
 | `PRIORIDAD_IA_PROVEEDOR` | `.env`; contenedor `servicio-prioridad` | `gemini` (por defecto), `openai` o `simulado` |
 | `OPENAI_API_KEY` | `.env`; contenedor `servicio-prioridad` | Solo si se usa `openai` |
 | `reclamos.geocodificacion.*` | `application.yml` | Georef: URL, tiempos (1 s y 3 s), cantidad de sugerencias, caché de 10 minutos y recuadro de cada municipio. No usa clave |
+| `reclamos.mensajeria.habilitada` | `application.yml` (`false`); `RECLAMOS_MENSAJERIA_HABILITADA` en Compose (`true`) | Outbox y publicación en RabbitMQ. Apagada, los avisos quedan solo internos |
+| `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | `.env`, leído por Compose; backend y `servicio-notificaciones` | Usuario de RabbitMQ. El usuario `guest` solo entra desde el mismo contenedor, por eso Compose crea este |
+| `RABBITMQ_HOST`, `SMTP_HOST`, `SMTP_PORT` | Contenedores del backend y del consumidor | `rabbitmq` y `mailpit` entre contenedores; `localhost` en desarrollo |
 | `springdoc.*` | `application.yml` | Swagger UI en `/swagger-ui.html`, publicado por el puerto 8080 del backend |
 | `VITE_BACKEND_URL` | `frontend/.env`, solo en desarrollo | Adónde reenvía Vite las llamadas a `/api` |
 

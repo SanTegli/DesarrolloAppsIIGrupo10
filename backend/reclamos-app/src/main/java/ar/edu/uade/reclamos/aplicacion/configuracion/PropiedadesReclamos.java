@@ -14,7 +14,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 @ConfigurationProperties(prefix = "reclamos", ignoreUnknownFields = false)
 public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultValue Asignacion asignacion,
                                   @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura,
-                                  @DefaultValue Geocodificacion geocodificacion) {
+                                  @DefaultValue Geocodificacion geocodificacion,
+                                  @DefaultValue Mensajeria mensajeria) {
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -141,6 +142,29 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
         public boolean contiene(double latitud, double longitud) {
             return latitud >= latitudMinima && latitud <= latitudMaxima && longitud >= longitudMinima
                     && longitud <= longitudMaxima;
+        }
+    }
+
+    /**
+     * Mensajería con RabbitMQ y outbox. Apagada por defecto: así los tests y el desarrollo sin broker no
+     * acumulan mensajes. Docker Compose la enciende.
+     *
+     * @param intervaloMs        cada cuánto se publican los pendientes de la outbox
+     * @param lote               cuántos pendientes se publican por pasada como máximo
+     * @param esperaConfirmacion cuánto se espera la confirmación del broker por cada mensaje
+     */
+    public record Mensajeria(@DefaultValue("false") boolean habilitada,
+                             @DefaultValue("2000") long intervaloMs,
+                             @DefaultValue("50") int lote,
+                             @DefaultValue("5s") Duration esperaConfirmacion) {
+        public Mensajeria {
+            if (intervaloMs <= 0) {
+                throw new IllegalArgumentException("reclamos.mensajeria.intervalo-ms debe ser mayor que cero");
+            }
+            if (lote < 1) {
+                throw new IllegalArgumentException("reclamos.mensajeria.lote debe ser mayor que cero");
+            }
+            requerirPositivo(esperaConfirmacion, "reclamos.mensajeria.espera-confirmacion");
         }
     }
 

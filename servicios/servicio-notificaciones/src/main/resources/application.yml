@@ -1,0 +1,42 @@
+# Servicio de notificaciones: consume avisos de RabbitMQ y los manda por correo.
+# No publica ningún puerto HTTP: solo escucha la cola notificaciones.email.
+spring:
+  application:
+    name: servicio-notificaciones
+  main:
+    web-application-type: none
+  rabbitmq:
+    host: ${RABBITMQ_HOST:localhost}
+    port: ${RABBITMQ_PORT:5672}
+    username: ${RABBITMQ_USER:guest}
+    password: ${RABBITMQ_PASSWORD:guest}
+    listener:
+      simple:
+        acknowledge-mode: auto        # ACK cuando el listener termina bien
+        prefetch: 10
+        default-requeue-rejected: false   # un mensaje rechazado no vuelve a la cola: va a la de errores
+        retry:
+          enabled: true
+          max-attempts: 3               # tres intentos en total...
+          initial-interval: 1s          # ...esperando 1 s y después 2 s
+          multiplier: 2
+          max-interval: 4s
+  # SMTP: Mailpit en el laboratorio (buzón web en http://localhost:8025).
+  mail:
+    host: ${SMTP_HOST:localhost}
+    port: ${SMTP_PORT:1025}
+    properties:
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 5000
+      mail.smtp.writetimeout: 5000
+  # Base propia del servicio: los eventId ya procesados. Un archivo H2; en Compose, en un volumen.
+  datasource:
+    url: ${NOTIFICACIONES_DB_URL:jdbc:h2:file:./datos/notificaciones}
+    username: sa
+    password: ""
+  sql:
+    init:
+      mode: always
+
+notificaciones:
+  remitente: "Reclamos Urbanos Quilmes <reclamos@quilmes.example>"
