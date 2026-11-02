@@ -5,6 +5,7 @@ import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorJurisdiccion;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorCategoria;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorPalabrasClave;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
+import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaAsignacion;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
@@ -52,12 +53,18 @@ public class ConfiguracionAplicacion {
         };
     }
 
-    /** De dónde salen las áreas candidatas. En la Segunda Parte se suma {@code soap}. */
+    /**
+     * De dónde salen las áreas candidatas: la base del backend o el servicio SOAP. {@code ServicioAsignacion}
+     * recibe un {@link CatalogoCobertura} y no sabe cuál de los dos es.
+     */
     @Bean
     public CatalogoCobertura catalogoCobertura(PropiedadesReclamos propiedades, AreaMunicipalRepository areas) {
-        return switch (propiedades.cobertura().origen()) {
+        PropiedadesReclamos.Cobertura cobertura = propiedades.cobertura();
+        return switch (cobertura.origen()) {
             case "local" -> new CoberturaLocal(areas);
-            default -> throw new IllegalArgumentException("reclamos.cobertura.origen debe ser local");
+            case "soap" -> new CoberturaSoap(CoberturaSoap.crearCliente(cobertura.url(), cobertura.tiempoLimite()),
+                    areas);
+            default -> throw new IllegalArgumentException("reclamos.cobertura.origen debe ser local o soap");
         };
     }
 }

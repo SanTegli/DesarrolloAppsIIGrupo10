@@ -7,6 +7,9 @@ spring:
     default: dev
   jpa:
     open-in-view: false
+  # El backend usa Spring Web Services solo como cliente (CoberturaSoap): no publica servicios SOAP.
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.webservices.WebServicesAutoConfiguration
 
 server:
   port: 8080
@@ -29,4 +32,6 @@ reclamos:
     intervalo-ms: 60000
   # De dónde salen las áreas candidatas para la asignación automática.
   cobertura:
-    origen: local                # local (la base del backend); soap se suma en la Segunda Parte
+    origen: local                # local (la base del backend) | soap (servicio-cobertura)
+    url: http://localhost:8081/ws
+    tiempo-limite: 2s            # si el SOAP no contesta a tiempo, el reclamo queda con la asignación pendiente

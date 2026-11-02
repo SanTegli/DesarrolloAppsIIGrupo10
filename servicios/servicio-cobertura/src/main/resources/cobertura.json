@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "municipios": [
+    {
+      "id": 1,
+      "nombre": "Quilmes",
+      "barrios": [
+        { "id": 1, "nombre": "Quilmes Centro" },
+        { "id": 2, "nombre": "Bernal" },
+        { "id": 3, "nombre": "Ezpeleta" }
+      ]
+    }
+  ],
+  "categorias": [
+    { "id": 1, "nombre": "Luminaria rota" },
+    { "id": 2, "nombre": "Bache" },
+    { "id": 3, "nombre": "Residuos" }
+  ],
+  "areas": [
+    { "id": 1, "nombre": "Alumbrado", "municipioId": 1, "barrios": [1, 2], "categorias": [1] },
+    { "id": 2, "nombre": "Obras Públicas", "municipioId": 1, "barrios": [1, 2, 3], "categorias": [2] },
+    { "id": 3, "nombre": "Higiene Urbana", "municipioId": 1, "barrios": [1, 2], "categorias": [3] },
+    { "id": 4, "nombre": "Mantenimiento Vial", "municipioId": 1, "barrios": [2], "categorias": [2] }
+  ]
+}

@@ -1,7 +1,7 @@
 # Evidencias de ejecución
 
-Cómo demostrar cada caso de la Primera Parte: qué test automático lo cubre y cómo reproducirlo a
-mano desde la interfaz.
+Cómo demostrar cada caso de la Primera Parte y de las integraciones de la Segunda Parte: qué test
+automático lo cubre y cómo reproducirlo a mano.
 
 ## Tests automáticos
 
@@ -9,12 +9,15 @@ mano desde la interfaz.
 cd backend
 ./mvnw test          # dominio, persistencia con H2, servicios y REST
 
+cd ../servicios
+./mvnw verify        # servicio SOAP de cobertura
+
 cd ../frontend
 npm install
 npm test             # 33 tests: capa de API, etiquetas y componentes
 ```
 
-Guardar en esta carpeta la salida de los dos comandos (`BUILD SUCCESS` y el resumen de Vitest).
+Guardar en esta carpeta la salida de los tres comandos (`BUILD SUCCESS` y el resumen de Vitest).
 Los mismos tests corren en GitHub Actions en cada pull request; una captura de la verificación en
 verde también sirve de evidencia.
 
@@ -40,6 +43,19 @@ Los usuarios, barrios, categorías y áreas son los de la semilla (ver
 | CP13 | Vencimiento: se marca, sube la prioridad y publica `ReclamoVencido` | `ServicioVencimientosTest`, `FlujoDeAvisosTest.elVencimientoPublicaReclamoVencidoYAvisaAlCiudadanoYAlArea` | Con un reclamo abierto, adelantar su `fecha_limite` en MySQL y esperar un minuto. Aparece la insignia "Vencido" y un aviso nuevo |
 | CP14 | Cada usuario consulta los avisos que recibió | `ConsultaAvisosTest`, `RestIntegrationTest.bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad` | Crear un reclamo como Ana y abrir la pestaña "Avisos": dos avisos. Cambiar a Carla: un aviso, el de la asignación a su área |
 | CP15 | La API de reclamos está documentada en OpenAPI y se puede probar desde Swagger | `OpenApiTest` | Abrir `http://localhost:8080/swagger-ui.html`, elegir `GET /api/categorias` y ejecutarlo |
+
+### Segunda Parte: servicio SOAP de cobertura
+
+Se reproducen con `docker compose up --build`, o con el servicio y el backend levantados a mano como
+explica [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md#probar-el-servicio-soap-de-cobertura).
+
+| Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
+| --- | --- | --- | --- |
+| CP16 | El servicio publica su WSDL, generado del XSD | `ServicioSoapHttpTest.publicaElWsdlConLaOperacionYLaDireccionDelServidor` | Abrir `http://localhost:8081/ws/cobertura.wsdl` |
+| CP17 | Caso válido: el reclamo se asigna con el área que devuelve el SOAP | `AsignacionPorSoapIntegrationTest.casoValidoAsignaElAreaQueDevuelveElServicio`, `CoberturaEndpointTest.casoValidoDevuelveLasAreasQueCubren` | Como Ana Pérez, crear "Bache" en Bernal. Queda en Obras Públicas y el log de `servicio-cobertura` muestra la consulta |
+| CP18 | Lista vacía: sin áreas no es un error | `AsignacionPorSoapIntegrationTest.listaVaciaDejaElReclamoIngresadoSinMarcarlo`, `CoberturaEndpointTest.combinacionSinAreasDevuelveLaRespuestaVacia` | Crear "Luminaria rota" en Ezpeleta: queda `INGRESADO` sin la marca de asignación pendiente |
+| CP19 | Id inválido: SOAP Fault de cliente | `CoberturaEndpointTest.idDesconocidoDevuelveFaultDeCliente`, `ServicioSoapHttpTest.respondeFaultDeClienteConHttp500` | Mandar la petición de ejemplo de [contratos](../contratos/README.md#probarlo-a-mano) con `categoriaId` 99 |
+| CP20 | Servicio caído o lento: el alta sigue y el reclamo queda con la asignación pendiente | `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `CoberturaSoapTest.servicioApagadoEsServicioNoDisponible` | `docker compose stop servicio-cobertura` y crear un reclamo: responde 201, `INGRESADO` y el detalle avisa que la cobertura no respondió. Elena Ruiz lo asigna a mano |
 
 Para CP13, con el número del reclamo:
 
@@ -78,5 +94,8 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Repetir el recorrido de las capturas contra el backend real y reemplazarlas.
 - [ ] Consulta SQL de `reclamos`, `historial_estados` y `notificaciones` después del flujo de CP08.
 - [ ] Log del backend al arrancar con `palabras-clave` y con `carga-trabajo` (CP04 y CP05).
+- [ ] Salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
+- [ ] Captura del WSDL en el navegador y de una consulta SOAP con su respuesta (CP16, CP17 y CP19).
+- [ ] Captura del detalle de un reclamo con la asignación pendiente, con el servicio detenido (CP20).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).
 - [ ] Respuestas `400`, `403`, `404` y `409` de los casos "solo por API".

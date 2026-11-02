@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.configuracion;
 
+import java.time.Duration;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
@@ -14,8 +15,23 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
     public record Prioridad(@DefaultValue("categoria") String estrategia) { }
     public record Asignacion(@DefaultValue("jurisdiccion") String estrategia) { }
 
-    /** De dónde salen las áreas candidatas: {@code local} (la base del backend). */
-    public record Cobertura(@DefaultValue("local") String origen) { }
+    /**
+     * De dónde salen las áreas candidatas: {@code local} (la base del backend) o {@code soap} (el servicio de
+     * cobertura en {@code url}). Si el servicio no contesta dentro de {@code tiempoLimite}, el reclamo queda
+     * con la asignación pendiente.
+     */
+    public record Cobertura(@DefaultValue("local") String origen,
+                            @DefaultValue("http://localhost:8081/ws") String url,
+                            @DefaultValue("2s") Duration tiempoLimite) {
+        public Cobertura {
+            if (url == null || url.isBlank()) {
+                throw new IllegalArgumentException("reclamos.cobertura.url no puede estar vacía");
+            }
+            if (tiempoLimite == null || tiempoLimite.isNegative() || tiempoLimite.isZero()) {
+                throw new IllegalArgumentException("reclamos.cobertura.tiempo-limite debe ser mayor que cero");
+            }
+        }
+    }
 
     /**
      * Control de vencimientos. {@code TareaVencimientos} lee las mismas propiedades:

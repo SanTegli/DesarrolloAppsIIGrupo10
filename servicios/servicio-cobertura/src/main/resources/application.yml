@@ -1,0 +1,14 @@
+# Servicio SOAP de cobertura.
+#   WSDL:     http://localhost:8081/ws/cobertura.wsdl
+#   Mensajes: POST http://localhost:8081/ws (SOAP 1.1, text/xml)
+spring:
+  application:
+    name: servicio-cobertura
+
+server:
+  port: 8081
+
+# Archivo del catálogo. Se puede reemplazar sin recompilar, por ejemplo con
+# COBERTURA_CATALOGO=file:/datos/cobertura.json
+cobertura:
+  catalogo: classpath:cobertura.json
