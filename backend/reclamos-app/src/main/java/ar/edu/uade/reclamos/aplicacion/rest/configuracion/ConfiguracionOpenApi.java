@@ -11,6 +11,8 @@ import io.swagger.v3.oas.models.media.MediaType;
 import io.swagger.v3.oas.models.media.Schema;
 import io.swagger.v3.oas.models.responses.ApiResponse;
 import io.swagger.v3.oas.models.responses.ApiResponses;
+import io.swagger.v3.oas.models.security.SecurityRequirement;
+import io.swagger.v3.oas.models.security.SecurityScheme;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import org.springdoc.core.customizers.OpenApiCustomizer;
@@ -24,15 +26,17 @@ import org.springframework.context.annotation.Configuration;
 @Configuration(proxyBeanMethods = false)
 public class ConfiguracionOpenApi {
 
-    static final String ENCABEZADO_USUARIO = "X-Usuario-Id";
+    static final String ESQUEMA_SESION = "sesion";
     private static final String ESQUEMA_ERROR = "#/components/schemas/ErrorResponse";
 
     /** Respuestas de error comunes a todas las operaciones, con el cuerpo de {@link ErrorResponse}. */
     private static final Map<String, String> ERRORES = new LinkedHashMap<>();
 
     static {
-        ERRORES.put("400", "Datos inválidos, encabezado faltante o formato incorrecto (DATOS_INVALIDOS)");
-        ERRORES.put("403", "El rol no puede hacer la operación o el reclamo no es suyo (ACCESO_DENEGADO)");
+        ERRORES.put("400", "Datos inválidos o formato incorrecto (DATOS_INVALIDOS)");
+        ERRORES.put("401", "Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)");
+        ERRORES.put("403", "El rol no puede hacer la operación o el reclamo no es suyo (ACCESO_DENEGADO), "
+                + "o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)");
         ERRORES.put("404", "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)");
         ERRORES.put("409", "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)");
         ERRORES.put("500", "Error inesperado (ERROR_INTERNO)");
@@ -40,17 +44,25 @@ public class ConfiguracionOpenApi {
 
     @Bean
     public OpenAPI apiReclamos() {
-        return new OpenAPI().info(new Info()
-                .title("Sistema de Reclamos Urbanos — API de reclamos (REST 1)")
-                .version("2.0")
-                .description("Alta, consulta, cambios de estado y asignación de reclamos urbanos. "
-                        + "El usuario que opera se identifica con el encabezado " + ENCABEZADO_USUARIO
-                        + ". Fechas en ISO-8601 sin zona horaria."));
+        return new OpenAPI()
+                .info(new Info()
+                        .title("Sistema de Reclamos Urbanos — API de reclamos (REST 1)")
+                        .version("3.0")
+                        .description("Alta, consulta, cambios de estado y asignación de reclamos urbanos. "
+                                + "Se entra con POST /api/auth/login: la sesión queda en la cookie JSESSIONID. "
+                                + "Cada POST y PATCH lleva el encabezado X-XSRF-TOKEN con el valor de la cookie "
+                                + "XSRF-TOKEN. Fechas en ISO-8601 sin zona horaria."))
+                .components(new Components().addSecuritySchemes(ESQUEMA_SESION, new SecurityScheme()
+                        .type(SecurityScheme.Type.APIKEY)
+                        .in(SecurityScheme.In.COOKIE)
+                        .name("JSESSIONID")
+                        .description("Cookie de sesión que deja POST /api/auth/login")))
+                .addSecurityItem(new SecurityRequirement().addList(ESQUEMA_SESION));
     }
 
-    /** Agrega el esquema de error, las respuestas de error y la descripción del encabezado de identidad. */
+    /** Agrega el esquema de error y las respuestas de error comunes a todas las operaciones. */
     @Bean
-    public OpenApiCustomizer erroresYEncabezadoComunes() {
+    public OpenApiCustomizer erroresComunes() {
         return openApi -> {
             if (openApi.getComponents() == null) {
                 openApi.setComponents(new Components());
@@ -74,11 +86,5 @@ public class ConfiguracionOpenApi {
                                 new MediaType().schema(new Schema<>().$ref(ESQUEMA_ERROR)))));
             }
         });
-        if (operacion.getParameters() != null) {
-            operacion.getParameters().stream()
-                    .filter(parametro -> ENCABEZADO_USUARIO.equals(parametro.getName()))
-                    .forEach(parametro -> parametro.setDescription(
-                            "Id del usuario que opera. Reemplaza al login hasta que se implemente."));
-        }
     }
 }

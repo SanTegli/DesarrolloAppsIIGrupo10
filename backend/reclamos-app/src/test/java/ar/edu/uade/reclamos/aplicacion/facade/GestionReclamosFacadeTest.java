@@ -18,8 +18,9 @@ class GestionReclamosFacadeTest {
     private final ConsultaReclamosService consultas = mock(ConsultaReclamosService.class);
     private final ConsultaCatalogosService catalogos = mock(ConsultaCatalogosService.class);
     private final ServicioUbicaciones ubicaciones = mock(ServicioUbicaciones.class);
+    private final ServicioCuentas cuentas = mock(ServicioCuentas.class);
     private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
-            ubicaciones);
+            ubicaciones, cuentas);
 
     @Test
     void crearDelegaParametrosYResultadoSinOtrasInteracciones() {
@@ -173,9 +174,9 @@ class GestionReclamosFacadeTest {
     @Test
     void usuariosDelegaParametrosYResultadoSinOtrasInteracciones() {
         List<Usuario> resultado = List.of(e.ciudadano);
-        when(catalogos.usuarios()).thenReturn(resultado);
-        assertThat(facade.usuarios()).isSameAs(resultado);
-        verify(catalogos).usuarios();
+        when(catalogos.usuarios(7L)).thenReturn(resultado);
+        assertThat(facade.usuarios(7L)).isSameAs(resultado);
+        verify(catalogos).usuarios(7L);
         verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 
@@ -213,6 +214,26 @@ class GestionReclamosFacadeTest {
         assertThat(facade.usuario(1L)).isSameAs(resultado);
         verify(catalogos).usuario(1L);
         verifyNoMoreInteractions(escritura, consultas, catalogos);
+    }
+
+    @Test
+    void usuarioConsultadoPorOtroDelegaConQuienConsulta() {
+        var resultado = e.ciudadano;
+        when(catalogos.usuario(7L, 1L)).thenReturn(resultado);
+        assertThat(facade.usuario(7L, 1L)).isSameAs(resultado);
+        verify(catalogos).usuario(7L, 1L);
+        verifyNoMoreInteractions(escritura, consultas, catalogos);
+    }
+
+    @Test
+    void registrarCiudadanoDelegaEnLasCuentas() {
+        var resultado = e.ciudadano;
+        when(cuentas.registrarCiudadano("30111222", "Ana", "Pérez", "ana@example.org", "secreta123"))
+                .thenReturn(resultado);
+        assertThat(facade.registrarCiudadano("30111222", "Ana", "Pérez", "ana@example.org", "secreta123"))
+                .isSameAs(resultado);
+        verify(cuentas).registrarCiudadano("30111222", "Ana", "Pérez", "ana@example.org", "secreta123");
+        verifyNoMoreInteractions(escritura, consultas, catalogos, cuentas);
     }
 
     @Test

@@ -71,7 +71,7 @@ sequenceDiagram
   participant L as Listeners
 
   U->>UI: completa el formulario
-  UI->>C: POST /api/reclamos con X-Usuario-Id
+  UI->>C: POST /api/reclamos con la cookie de sesión y X-XSRF-TOKEN
   C->>F: crear(usuarioId, categoriaId, barrioId, descripcion, direccion)
   F->>S: crear(...)
   Note over S: comienza la transacción
@@ -191,7 +191,7 @@ sequenceDiagram
   participant M as ManejadorGlobalErrores
 
   A->>UI: pulsa "Tomar reclamo"
-  UI->>C: PATCH /api/reclamos/{numero}/estado con X-Usuario-Id
+  UI->>C: PATCH /api/reclamos/{numero}/estado con la cookie de sesión y X-XSRF-TOKEN
   C->>F: cambiarEstado(usuarioId, numero, EN_PROCESO, observacion)
   F->>S: cambiarEstado(...)
   S->>R: buscar usuario y reclamo

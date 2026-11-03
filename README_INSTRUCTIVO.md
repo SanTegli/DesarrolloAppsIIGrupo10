@@ -250,7 +250,7 @@ npm install
 npm run dev
 ```
 
-Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuario de la semilla; no hay login. Si la página muestra "El servidor no responde", el backend no está escuchando en 8080.
+Abrir `http://localhost:5173`. Aparece la pantalla de ingreso: entrar con el email de un usuario de la semilla (sección 9), por ejemplo `ana@example.org`, y la contraseña `demo1234`. **Salir** cierra la sesión. Si la página muestra "El servidor no responde", el backend no está escuchando en 8080.
 
 ### Alternativa: todo en contenedores (modo demo)
 
@@ -327,15 +327,17 @@ Se crea el municipio **Quilmes**, provincia **Buenos Aires**, con estos datos fi
 
 Las cuatro áreas están activas. Las relaciones se guardan en `area_barrio` y `area_categoria`.
 
-| ID de usuario | Nombre | Rol | Área |
-| --- | --- | --- | --- |
-| 1 | Ana Pérez | CIUDADANO | — |
-| 2 | Bruno Díaz | CIUDADANO | — |
-| 3 | Carla Gómez | AGENTE_MUNICIPAL | Alumbrado |
-| 4 | Diego Sosa | AGENTE_MUNICIPAL | Obras Públicas |
-| 5 | Fabián Luna | AGENTE_MUNICIPAL | Higiene Urbana |
-| 6 | Gabriela Paz | AGENTE_MUNICIPAL | Mantenimiento Vial |
-| 7 | Elena Ruiz | ADMINISTRADOR | — |
+| ID de usuario | Nombre | Email para entrar | Rol | Área |
+| --- | --- | --- | --- | --- |
+| 1 | Ana Pérez | `ana@example.org` | CIUDADANO | — |
+| 2 | Bruno Díaz | `bruno@example.org` | CIUDADANO | — |
+| 3 | Carla Gómez | `carla@example.org` | AGENTE_MUNICIPAL | Alumbrado |
+| 4 | Diego Sosa | `diego@example.org` | AGENTE_MUNICIPAL | Obras Públicas |
+| 5 | Fabián Luna | `fabian@example.org` | AGENTE_MUNICIPAL | Higiene Urbana |
+| 6 | Gabriela Paz | `gabriela@example.org` | AGENTE_MUNICIPAL | Mantenimiento Vial |
+| 7 | Elena Ruiz | `elena@example.org` | ADMINISTRADOR | — |
+
+Los siete entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
 
 No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v1`** al completar la semilla. El script se invoca en cada arranque de `dev`, pero sus inserciones quedan condicionadas a la ausencia del marcador: la semilla se aplica **una sola vez por base** y las modificaciones posteriores no se restauran en cada reinicio.
 
@@ -343,34 +345,43 @@ En una base existente sin marcador se completan registros y relaciones faltantes
 
 ## 10. Probar la API
 
-Abrir otra PowerShell mientras Spring sigue ejecutándose:
+Abrir otra PowerShell mientras Spring sigue ejecutándose. Los catálogos son públicos:
 
 ```powershell
-Invoke-RestMethod http://localhost:8080/api/usuarios
 Invoke-RestMethod http://localhost:8080/api/categorias
 Invoke-RestMethod http://localhost:8080/api/barrios
 Invoke-RestMethod http://localhost:8080/api/areas
 ```
 
-Estas consultas no requieren identidad. Para comprobar expresamente el HTTP 200:
+Todo lo demás exige **iniciar sesión**. El backend guarda la sesión en la cookie `JSESSIONID` y pide, en cada `POST` y `PATCH`, el encabezado `X-XSRF-TOKEN` con el valor de la cookie `XSRF-TOKEN` (protección CSRF). PowerShell guarda las cookies en una `WebRequestSession`. Pegar esta función una vez en la terminal:
 
 ```powershell
-(Invoke-WebRequest -Uri "http://localhost:8080/api/usuarios" -UseBasicParsing).StatusCode
+function Entrar($email, $contrasena = "demo1234") {
+    $sesion = New-Object Microsoft.PowerShell.Commands.WebRequestSession
+    # Cualquier pedido deja la cookie XSRF-TOKEN.
+    Invoke-RestMethod http://localhost:8080/api/categorias -WebSession $sesion | Out-Null
+    $token = $sesion.Cookies.GetCookies("http://localhost:8080")["XSRF-TOKEN"].Value
+    $credenciales = @{ email = $email; contrasena = $contrasena } | ConvertTo-Json
+    Invoke-RestMethod http://localhost:8080/api/auth/login -Method Post -WebSession $sesion `
+        -Headers @{ "X-XSRF-TOKEN" = $token } -ContentType "application/json; charset=utf-8" `
+        -Body ([System.Text.Encoding]::UTF8.GetBytes($credenciales)) | Out-Null
+    return @{ Sesion = $sesion; Csrf = @{ "X-XSRF-TOKEN" = $token } }
+}
 ```
 
-Todos los endpoints de reclamos requieren **`X-Usuario-Id`**, un entero positivo que corresponde a un usuario existente. Simula al usuario autenticado del Hito 1; todavía no hay login ni JWT real.
+Con ella, cada usuario de la semilla (sección 9) queda en una variable:
 
 ```powershell
-Invoke-RestMethod `
-    -Uri "http://localhost:8080/api/reclamos" `
-    -Headers @{"X-Usuario-Id"="1"}
+$ana = Entrar "ana@example.org"
+Invoke-RestMethod http://localhost:8080/api/auth/yo -WebSession $ana.Sesion
+Invoke-RestMethod http://localhost:8080/api/reclamos -WebSession $ana.Sesion
 ```
 
-Devuelve los reclamos del ciudadano 1; inicialmente puede devolver `[]`.
+`/api/auth/yo` devuelve a Ana Pérez; `/api/reclamos`, sus reclamos (al principio, `[]`). Sin `-WebSession` la respuesta es `401 NO_AUTENTICADO`, y con una contraseña equivocada el login responde `401 CREDENCIALES_INVALIDAS`. La lista completa de usuarios (`/api/usuarios`) solo la ve un administrador.
 
 ### Crear y consultar un reclamo
 
-`CrearReclamoRequest` tiene exactamente cuatro campos: `categoriaId`, `barrioId`, `descripcion` y `direccion`. Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano se obtiene del encabezado.
+`CrearReclamoRequest` lleva `categoriaId`, `barrioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
 
 ```powershell
 $body = @{
@@ -382,50 +393,48 @@ $body = @{
 
 $creado = Invoke-RestMethod `
     -Uri "http://localhost:8080/api/reclamos" `
-    -Method Post `
-    -Headers @{"X-Usuario-Id"="1"} `
+    -Method Post -WebSession $ana.Sesion -Headers $ana.Csrf `
     -ContentType "application/json; charset=utf-8" `
     -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
 
 $creado | ConvertTo-Json -Depth 10
 $numero = $creado.numero
 
-Invoke-RestMethod `
-    -Uri "http://localhost:8080/api/reclamos/$numero" `
-    -Headers @{"X-Usuario-Id"="1"} | ConvertTo-Json -Depth 10
-
-Invoke-RestMethod `
-    -Uri "http://localhost:8080/api/reclamos/$numero/notificaciones" `
-    -Headers @{"X-Usuario-Id"="1"} | ConvertTo-Json -Depth 10
+Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero" -WebSession $ana.Sesion | ConvertTo-Json -Depth 10
+Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/notificaciones" -WebSession $ana.Sesion | ConvertTo-Json -Depth 10
 ```
 
 El POST responde **201 Created**, con `Location: /api/reclamos/{numero}`. Con la semilla y las Strategies predeterminadas, queda `ASIGNADO` a Alumbrado, prioridad `MEDIA`, agente `null`, dos registros de historial y tres notificaciones `INTERNO`: ingreso y asignación para el ciudadano, y el aviso de asignación para la agente de Alumbrado. El número real es generado; reutilizar `$numero`, sin copiar uno ficticio.
+
+Sin `-Headers $ana.Csrf`, el POST responde `403 CSRF_INVALIDO`: es la protección que evita que otro sitio cree reclamos con la sesión del vecino.
 
 Para probar falta de cobertura, usar categoría 1 y barrio 3: queda `INGRESADO`, `area: null`, un historial y una notificación de ingreso; también responde 201. El administrador puede asignarlo manualmente.
 
 ### Probar toma, resolución y cierre
 
-Sobre el ejemplo asignado a Alumbrado, el usuario 3 puede tomarlo y resolverlo; el ciudadano 1 puede cerrar o reabrir cuando está resuelto:
+Sobre el ejemplo asignado a Alumbrado, la agente Carla Gómez puede tomarlo y resolverlo; Ana puede cerrarlo o reabrirlo cuando está resuelto:
 
 ```powershell
+$carla = Entrar "carla@example.org"
+
 $bodyEstado = @{ estado = "EN_PROCESO"; observacion = "Cuadrilla en camino" } | ConvertTo-Json
 Invoke-RestMethod `
     -Uri "http://localhost:8080/api/reclamos/$numero/estado" `
-    -Method Patch -Headers @{"X-Usuario-Id"="3"} `
+    -Method Patch -WebSession $carla.Sesion -Headers $carla.Csrf `
     -ContentType "application/json; charset=utf-8" `
     -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyEstado))
 
 $bodyEstado = @{ estado = "RESUELTO"; observacion = "Luminaria reparada" } | ConvertTo-Json
 Invoke-RestMethod `
     -Uri "http://localhost:8080/api/reclamos/$numero/estado" `
-    -Method Patch -Headers @{"X-Usuario-Id"="3"} `
+    -Method Patch -WebSession $carla.Sesion -Headers $carla.Csrf `
     -ContentType "application/json; charset=utf-8" `
     -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyEstado))
 
 $bodyEstado = @{ estado = "CERRADO"; observacion = "Reparacion confirmada" } | ConvertTo-Json
 Invoke-RestMethod `
     -Uri "http://localhost:8080/api/reclamos/$numero/estado" `
-    -Method Patch -Headers @{"X-Usuario-Id"="1"} `
+    -Method Patch -WebSession $ana.Sesion -Headers $ana.Csrf `
     -ContentType "application/json; charset=utf-8" `
     -Body ([System.Text.Encoding]::UTF8.GetBytes($bodyEstado))
 ```
@@ -516,7 +525,8 @@ Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cable
 No necesita clave ni ningún servicio extra: el backend consulta Georef, la API oficial de direcciones de Argentina. Hace falta conexión a Internet.
 
 ```powershell
-Invoke-RestMethod "http://localhost:8080/api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2" | ConvertTo-Json -Depth 4
+$ana = Entrar "ana@example.org"   # la función de la sección 10
+Invoke-RestMethod "http://localhost:8080/api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2" -WebSession $ana.Sesion | ConvertTo-Json -Depth 4
 ```
 
 Responde `disponible: true` y las sugerencias con coordenadas dentro de Quilmes; para Belgrano 450 hay más de una, porque la calle existe en varias localidades. Con una dirección inventada, la lista vuelve vacía. Sin Internet responde `disponible: false`: no es un error.
@@ -553,9 +563,13 @@ Los mensajes no llevan DNI, teléfono ni la descripción del reclamo: solo el n�
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
 | GET | `/api/reclamos/{numero}/notificaciones` | Consultar avisos del reclamo con los mismos permisos del detalle. |
-| GET | `/api/notificaciones` | Bandeja de avisos del usuario de `X-Usuario-Id`, del más nuevo al más viejo. |
-| GET | `/api/usuarios` | Listar usuarios del selector de identidad. |
-| GET | `/api/usuarios/{id}` | Consultar usuario por ID positivo. |
+| GET | `/api/notificaciones` | Bandeja de avisos del usuario de la sesión, del más nuevo al más viejo. |
+| GET | `/api/usuarios` | Listar usuarios. Solo administradores. |
+| GET | `/api/usuarios/{id}` | Consultar un usuario: el propio, o cualquiera si es administrador. |
+| POST | `/api/auth/login` | Iniciar sesión con `email` y `contrasena`. Deja la cookie `JSESSIONID`. |
+| GET | `/api/auth/yo` | Usuario de la sesión; `401` sin sesión. |
+| POST | `/api/auth/registro` | Crear la cuenta de un ciudadano: `dni`, `nombre`, `apellido`, `email` y `contrasena`. |
+| POST | `/api/auth/logout` | Cerrar la sesión. Responde `204`. |
 | GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |
 | GET | `/api/barrios` | Listar barrios y nombre de municipio. |
 | GET | `/api/areas` | Listar áreas, estado activo y cobertura. |
@@ -622,6 +636,12 @@ Comprobar que Docker Desktop esté abierto, use contenedores Linux y que su moto
 
 `docker compose ps` muestra qué contenedor no llegó a `healthy` y `docker compose logs <servicio>` explica por qué. Lo más común: poca memoria asignada a Docker Desktop (el backend se reinicia o tarda mucho), un puerto ocupado por un backend o frontend que quedó corriendo en la máquina, o la clave de Gemini. La tabla «Si algo sale mal» de `docs/demo.md` tiene cada síntoma con su causa.
 
+### I. 401, 403 CSRF_INVALIDO o "El correo o la contraseña no son correctos"
+
+- **`401 NO_AUTENTICADO`:** falta la sesión. En PowerShell, pasar `-WebSession` con la sesión de `Entrar` (sección 10). En la interfaz, la sesión vence a los 30 minutos sin uso: volver a entrar.
+- **`403 CSRF_INVALIDO`:** un `POST` o `PATCH` sin `-Headers $ana.Csrf`, o con el token de otra sesión de PowerShell.
+- **`401 CREDENCIALES_INVALIDAS` con `demo1234`:** la base se creó con una versión anterior y el backend no arrancó con el perfil `dev`, que es el que carga las contraseñas. Reiniciar Spring con el perfil `dev` (sección 8).
+
 ## 14. Cómo apagar todo
 
 En la terminal del backend y en la del frontend: **Ctrl+C**. En modo demo, **Ctrl+C** en la terminal de `docker compose up` detiene todos los contenedores.
@@ -650,8 +670,8 @@ docker compose down
 - [ ] Artefactos Maven instalados para ejecutar `reclamos-app`.
 - [ ] Spring iniciado con perfil `dev` en 8080.
 - [ ] `/api/usuarios` responde 200.
-- [ ] `/api/reclamos` responde con `X-Usuario-Id`.
-- [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.
+- [ ] `Entrar "ana@example.org"` funciona y `/api/reclamos` responde con `-WebSession`.
+- [ ] El frontend abre en `http://localhost:5173`, muestra el ingreso y entra con `ana@example.org` y `demo1234`.
 - [ ] `servicios`: `.\mvnw.cmd verify` termina con `BUILD SUCCESS`.
 - [ ] `.env` tiene `GEMINI_API_KEY` y la clave no aparece en `git status` ni en ningún commit.
 - [ ] Modo demo: `docker compose up --build` levanta los ocho contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.

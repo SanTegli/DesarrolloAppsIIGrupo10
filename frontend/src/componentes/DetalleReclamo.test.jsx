@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AREAS, USUARIOS, reclamo, simularApi } from '../pruebas/apiFalsa.js'
+import { AREAS, TOKEN_CSRF, USUARIOS, reclamo, simularApi } from '../pruebas/apiFalsa.js'
 import DetalleReclamo from './DetalleReclamo.jsx'
 
 const [ana, carla, elena] = USUARIOS
@@ -107,7 +107,7 @@ describe('DetalleReclamo', () => {
     expect(await screen.findByText('El reclamo pasó a En proceso.')).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'Marcar como resuelto' })).toBeInTheDocument()
     const cambio = llamadas.find((llamada) => llamada.metodo === 'PATCH')
-    expect(cambio).toMatchObject({ usuarioId: '3', cuerpo: { estado: 'EN_PROCESO', observacion: 'Cuadrilla en camino' } })
+    expect(cambio).toMatchObject({ csrf: TOKEN_CSRF, cuerpo: { estado: 'EN_PROCESO', observacion: 'Cuadrilla en camino' } })
   })
 
   it('muestra el mensaje del backend cuando la acción es rechazada y no cambia el estado', async () => {
@@ -145,7 +145,7 @@ describe('DetalleReclamo', () => {
 
     expect(await screen.findByText('El reclamo quedó asignado a Obras Públicas.')).toBeInTheDocument()
     const asignacion = llamadas.find((llamada) => llamada.ruta.endsWith('/asignacion'))
-    expect(asignacion).toMatchObject({ metodo: 'PATCH', usuarioId: '7', cuerpo: { areaId: 2, observacion: null } })
+    expect(asignacion).toMatchObject({ metodo: 'PATCH', csrf: TOKEN_CSRF, cuerpo: { areaId: 2, observacion: null } })
   })
 
   it('al reasignar no ofrece el área actual', async () => {

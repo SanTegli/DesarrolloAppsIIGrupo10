@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -150,7 +151,7 @@ class PrioridadPorIAIntegrationTest {
     }
 
     private ResultActions crearReclamo() throws Exception {
-        return mvc.perform(post("/api/reclamos").header("X-Usuario-Id", ciudadano)
+        return mvc.perform(post("/api/reclamos").with(como(ciudadano))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Poste con cables expuestos",

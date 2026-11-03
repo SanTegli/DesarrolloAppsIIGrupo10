@@ -1,31 +1,16 @@
 import { useEffect, useState } from 'react'
-import { listarAreas, listarBarrios, listarCategorias, listarUsuarios } from './api/catalogos.js'
+import { listarAreas, listarBarrios, listarCategorias } from './api/catalogos.js'
+import { alVencerSesion } from './api/cliente.js'
+import { cerrarSesion, usuarioActual } from './api/sesion.js'
 import { AvisoError } from './componentes/Aviso.jsx'
 import BandejaAvisos from './componentes/BandejaAvisos.jsx'
 import DetalleReclamo from './componentes/DetalleReclamo.jsx'
 import Encabezado from './componentes/Encabezado.jsx'
 import FormularioReclamo from './componentes/FormularioReclamo.jsx'
+import Ingreso from './componentes/Ingreso.jsx'
 import ListaReclamos from './componentes/ListaReclamos.jsx'
 import PanelAdministracion from './componentes/PanelAdministracion.jsx'
 import { useCarga } from './hooks/useCarga.js'
-
-const CLAVE_USUARIO = 'reclamos.usuarioId'
-
-function leerUsuarioGuardado() {
-  try {
-    return Number(localStorage.getItem(CLAVE_USUARIO)) || null
-  } catch {
-    return null
-  }
-}
-
-function guardarUsuario(id) {
-  try {
-    localStorage.setItem(CLAVE_USUARIO, String(id))
-  } catch {
-    // Sin almacenamiento disponible la elección dura lo que dure la pestaña.
-  }
-}
 
 const TITULOS_LISTADO = {
   CIUDADANO: 'Mis reclamos',
@@ -50,38 +35,65 @@ function pestanasPara(rol) {
   return pestanas
 }
 
+const SESION_VENCIDA = 'Tu sesión venció o se cerró. Volvé a entrar para seguir.'
+
 export default function App() {
+  // estado: 'cargando' mientras se consulta /auth/yo, 'sin-sesion' para mostrar el login, 'activa' con usuario.
+  const [sesion, setSesion] = useState({ estado: 'cargando' })
   const catalogos = useCarga(
     () =>
-      Promise.all([listarUsuarios(), listarCategorias(), listarBarrios(), listarAreas()]).then(
-        ([usuarios, categorias, barrios, areas]) => ({ usuarios, categorias, barrios, areas }),
-      ),
+      Promise.all([listarCategorias(), listarBarrios(), listarAreas()]).then(([categorias, barrios, areas]) => ({
+        categorias,
+        barrios,
+        areas,
+      })),
     [],
   )
-  const [usuarioId, setUsuarioId] = useState(leerUsuarioGuardado)
   const [vista, setVista] = useState({ nombre: 'reclamos' })
 
-  const usuarios = catalogos.datos?.usuarios ?? []
-  const usuario = usuarios.find((candidato) => candidato.id === usuarioId) ?? usuarios[0] ?? null
-
   useEffect(() => {
-    if (usuario) {
-      guardarUsuario(usuario.id)
+    let vigente = true
+    usuarioActual().then(
+      (actual) => vigente && setSesion(actual ? { estado: 'activa', usuario: actual } : { estado: 'sin-sesion' }),
+      (error) => vigente && setSesion({ estado: 'error', error }),
+    )
+    return () => {
+      vigente = false
     }
-  }, [usuario])
+  }, [])
 
-  function cambiarUsuario(id) {
-    setUsuarioId(id)
+  // Si un pedido responde 401, la sesión ya no existe: se vuelve al login con un aviso.
+  useEffect(
+    () =>
+      alVencerSesion(() => {
+        setSesion({ estado: 'sin-sesion', aviso: SESION_VENCIDA })
+        setVista({ nombre: 'reclamos' })
+      }),
+    [],
+  )
+
+  function entrar(usuarioNuevo) {
+    setSesion({ estado: 'activa', usuario: usuarioNuevo })
     setVista({ nombre: 'reclamos' })
   }
 
+  async function salir() {
+    try {
+      await cerrarSesion()
+    } finally {
+      setSesion({ estado: 'sin-sesion' })
+      setVista({ nombre: 'reclamos' })
+    }
+  }
+
+  const usuario = sesion.estado === 'activa' && catalogos.datos ? sesion.usuario : null
   const abrir = (numero, aviso) => setVista({ nombre: 'detalle', numero, aviso, origen: vista.nombre })
   const pestanas = usuario ? pestanasPara(usuario.rol) : []
   const pestanaActiva = vista.nombre === 'detalle' ? vista.origen : vista.nombre
 
   return (
     <>
-      <Encabezado usuarios={usuarios} usuario={usuario} onCambiarUsuario={cambiarUsuario} />
+      <Encabezado usuario={sesion.estado === 'activa' ? sesion.usuario : null} onSalir={salir} />
 
       {usuario && (
         <nav className="navegacion" aria-label="Secciones">
@@ -100,13 +112,15 @@ export default function App() {
       )}
 
       <main>
-        <AvisoError error={catalogos.error} />
+        <AvisoError error={catalogos.error ?? sesion.error} />
         {catalogos.error && (
           <button type="button" className="boton-secundario" onClick={catalogos.recargar}>
             Reintentar
           </button>
         )}
-        {catalogos.cargando && <p className="estado-carga">Cargando…</p>}
+        {(catalogos.cargando || sesion.estado === 'cargando') && <p className="estado-carga">Cargando…</p>}
+
+        {sesion.estado === 'sin-sesion' && <Ingreso aviso={sesion.aviso} onIngreso={entrar} />}
 
         {usuario && vista.nombre === 'reclamos' && (
           <>
@@ -123,7 +137,6 @@ export default function App() {
 
         {usuario && vista.nombre === 'crear' && usuario.rol === 'CIUDADANO' && (
           <FormularioReclamo
-            usuario={usuario}
             categorias={catalogos.datos.categorias}
             barrios={catalogos.datos.barrios}
             onCreado={(reclamo) =>

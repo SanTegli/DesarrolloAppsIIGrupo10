@@ -14,7 +14,7 @@ const NINGUNA = ''
  * La dirección se puede buscar en el mapa: si hay varias interpretaciones, el ciudadano elige una. Es
  * opcional: sin elegir, el reclamo se crea igual y la ubicación queda pendiente.
  */
-export default function FormularioReclamo({ usuario, categorias, barrios, onCreado }) {
+export default function FormularioReclamo({ categorias, barrios, onCreado }) {
   const [categoriaId, setCategoriaId] = useState('')
   const [barrioId, setBarrioId] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -53,7 +53,7 @@ export default function FormularioReclamo({ usuario, categorias, barrios, onCrea
     setEnviando(true)
     const sugerencia = elegida === NINGUNA ? null : busqueda?.sugerencias?.[Number(elegida)]
     try {
-      const reclamo = await crearReclamo(usuario.id, {
+      const reclamo = await crearReclamo({
         categoriaId: Number(categoriaId),
         barrioId: Number(barrioId),
         descripcion: descripcion.trim(),

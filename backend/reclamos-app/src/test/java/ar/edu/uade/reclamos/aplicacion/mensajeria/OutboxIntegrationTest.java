@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.mensajeria;
 
+import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doThrow;
@@ -155,7 +156,7 @@ class OutboxIntegrationTest {
     }
 
     private ResultActions crearReclamo(Long usuario) throws Exception {
-        return mvc.perform(post("/api/reclamos").header("X-Usuario-Id", usuario)
+        return mvc.perform(post("/api/reclamos").with(como(usuario))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol apagado frente a la plaza",

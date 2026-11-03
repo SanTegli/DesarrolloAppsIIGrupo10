@@ -32,7 +32,7 @@ Los usuarios, barrios, categorías y áreas son los de la semilla (ver
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo en la interfaz |
 | --- | --- | --- | --- |
 | CP01 | Crear reclamo válido: `201` y `ASIGNADO` | `RestIntegrationTest.postValidoDevuelve201LocationDtoCompletoYNotificaciones` | Como Ana Pérez, crear "Luminaria rota" en Bernal. Queda asignado a Alumbrado |
-| CP02 | Usuario, barrio o categoría inexistente: `404` | `RestIntegrationTest.postUsuarioInexistenteEs404` | Solo por API: `POST /api/reclamos` con `X-Usuario-Id: 999` |
+| CP02 | Barrio o categoría inexistente: `404` | `RestIntegrationTest.postConCategoriaOBarrioInexistenteEs404YNoCreaNada` | Solo por API: `POST /api/reclamos` con `barrioId: 999` |
 | CP03 | Datos inválidos: `400` | `RestIntegrationTest.postConBodyInvalidoEs400`, `beanValidationDevuelveUnDetallePorCampoInvalido` | Solo por API: enviar `descripcion` vacía. El formulario no deja enviar campos vacíos |
 | CP04 | Cambiar la estrategia de prioridad sin tocar `ReclamoService` | `ConfiguracionAplicacionTest.seleccionaLasEstrategiasAlternativasPorPropiedades`, `PrioridadTest` | Poner `reclamos.prioridad.estrategia: palabras-clave`, reiniciar y crear un reclamo con la palabra "peligro". Sale con prioridad Alta |
 | CP05 | Cambiar la estrategia de asignación por configuración | `ConfiguracionAplicacionTest`, `AsignacionTest` | Poner `reclamos.asignacion.estrategia: carga-trabajo`, reiniciar y crear dos reclamos "Bache" en Bernal. Se reparten entre Obras Públicas y Mantenimiento Vial |
@@ -122,6 +122,20 @@ Un solo reclamo atraviesa las cinco integraciones. El guion para presentarlo y l
 | CP39 | Cada pieza que falla tiene su respaldo y el alta no se traba | Los tests de la [matriz de fallos](../demo.md#matriz-de-fallos) | Las fallas a propósito del guion, con `docker compose stop` y `start` |
 | CP40 | Los ocho contenedores entran en la memoria de una notebook | Paso «Memoria de cada contenedor» del CI | `docker stats --no-stream` con la demo levantada |
 
+### Segunda Parte: login con sesión
+
+Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
+([contrato REST](../api-contract.md#sesión)).
+
+| Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
+| --- | --- | --- | --- |
+| CP41 | Login correcto: queda la sesión y la interfaz muestra al usuario | `AutenticacionIntegrationTest.conLaCookieCsrfYLaContrasenaCorrectaQuedaLaSesionYYoDevuelveAlUsuario`, `App.test.jsx` | Entrar como `ana@example.org` / `demo1234`. Arriba a la derecha aparece "Ana Pérez, Ciudadano" |
+| CP42 | Contraseña equivocada, email inexistente o cuenta desactivada: el mismo `401`, sin revelar qué cuentas existen | `AutenticacionIntegrationTest.contrasenaIncorrectaEmailInexistenteCuentaInactivaOSinContrasenaDanElMismo401` | Entrar con otra contraseña: "El correo o la contraseña no son correctos." |
+| CP43 | Sin sesión no se puede operar, y el viejo `X-Usuario-Id` ya no sirve para hacerse pasar por otro | `RestIntegrationTest.todasLasRutasDeReclamosExigenSesion`, `RestIntegrationTest.elViejoEncabezadoXUsuarioIdNoCambiaQuienOpera` | Solo por API: `GET /api/reclamos` sin sesión responde `401`; con la sesión de Ana y `X-Usuario-Id: 7`, sigue viendo solo lo suyo |
+| CP44 | Un `POST` o `PATCH` sin token CSRF se rechaza | `RestIntegrationTest.unPostOPatchConSesionPeroSinTokenCsrfEs403YNoCambiaNada`, `AutenticacionIntegrationTest.sinTokenCsrfElLoginSeRechaza` | Solo por API: el POST de la sección 10 del instructivo sin `-Headers $ana.Csrf` responde `403 CSRF_INVALIDO` |
+| CP45 | Registro de un vecino: queda ciudadano, con la contraseña en BCrypt, y puede entrar. Email o DNI repetidos se rechazan | `AutenticacionIntegrationTest.elRegistroCreaUnCiudadanoQuePuedeEntrar`, `elRegistroRechazaEmailODniRepetidosYContrasenasCortas`, `ServicioCuentasTest` | **Crear una cuenta** en la pantalla de ingreso. Con un email que ya existe: "Ya hay una cuenta con ese correo electrónico." |
+| CP46 | Cerrar sesión la invalida; la lista de usuarios es solo para el administrador | `AutenticacionIntegrationTest.cerrarSesionLaInvalidaYDespuesYoEs401`, `RestIntegrationTest.losUsuariosSonSoloParaElAdministradorYLosCatalogosSonPublicos` | **Salir** vuelve al ingreso. Solo por API: `GET /api/usuarios` con la sesión de Ana responde `403` |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -159,6 +173,8 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Salida de `docker compose run --rm verificar-demo` con la clave de Gemini real, sin fallas (CP38).
 - [ ] Salida de `docker stats --no-stream` con la demo levantada, o la del paso «Memoria de cada contenedor» del CI (CP40).
 - [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
+- [ ] Rehacer las capturas de `interfaz/`: todavía muestran el selector de usuario que el login del PR 14 reemplazó.
+- [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).

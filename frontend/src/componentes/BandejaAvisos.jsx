@@ -8,7 +8,7 @@ import { AvisoError } from './Aviso.jsx'
  * asignaron un reclamo, y donde el ciudadano ve las novedades de los suyos.
  */
 export default function BandejaAvisos({ usuario, onAbrir }) {
-  const { datos, error, cargando, recargar } = useCarga(() => listarAvisos(usuario.id), [usuario.id])
+  const { datos, error, cargando, recargar } = useCarga(() => listarAvisos(), [usuario.id])
   const avisos = datos ?? []
 
   return (

@@ -3,17 +3,24 @@ package ar.edu.uade.reclamos.aplicacion.rest.controller;
 import ar.edu.uade.reclamos.aplicacion.facade.GestionReclamosFacade;
 import ar.edu.uade.reclamos.aplicacion.rest.dto.*;
 import ar.edu.uade.reclamos.aplicacion.rest.mapper.RestMapper;
+import ar.edu.uade.reclamos.aplicacion.seguridad.UsuarioAutenticado;
 import ar.edu.uade.reclamos.dominio.modelo.EstadoReclamo;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
 import java.net.URI;
 import java.util.List;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Operaciones sobre reclamos. Quién opera sale de la sesión ({@link UsuarioAutenticado}); qué puede hacer lo
+ * decide el dominio con el usuario guardado en la base.
+ */
 @RestController
 @Tag(name = "Reclamos", description = "Alta, consulta, cambios de estado y asignación")
 @RequestMapping("/api/reclamos")
@@ -28,51 +35,57 @@ public class ReclamoController {
 
     @Operation(summary = "Crear un reclamo (solo ciudadanos)")
     @PostMapping
-    public ResponseEntity<ReclamoResponse> crear(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
-                                                @Valid @RequestBody CrearReclamoRequest request) {
-        Reclamo reclamo = facade.crear(usuarioId, request.categoriaId(), request.barrioId(),
+    public ResponseEntity<ReclamoResponse> crear(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @Valid @RequestBody CrearReclamoRequest request) {
+        Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.barrioId(),
                 request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()));
         return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
-                .body(respuesta(usuarioId, reclamo));
+                .body(respuesta(usuario.id(), reclamo));
     }
 
     @Operation(summary = "Listar los reclamos que ve el usuario")
     @GetMapping
-    public List<ResumenReclamoResponse> listar(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
-                                              @RequestParam(required = false) EstadoReclamo estado,
-                                              @RequestParam(required = false) @Positive Long areaId,
-                                              @RequestParam(required = false) @Positive Long ciudadanoId) {
-        return facade.listar(usuarioId, estado, areaId, ciudadanoId).stream().map(mapper::resumen).toList();
+    public List<ResumenReclamoResponse> listar(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @RequestParam(required = false) EstadoReclamo estado,
+            @RequestParam(required = false) @Positive Long areaId,
+            @RequestParam(required = false) @Positive Long ciudadanoId) {
+        return facade.listar(usuario.id(), estado, areaId, ciudadanoId).stream().map(mapper::resumen).toList();
     }
 
     @Operation(summary = "Consultar un reclamo con su historial y acciones disponibles")
     @GetMapping("/{numero}")
-    public ReclamoResponse buscar(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
+    public ReclamoResponse buscar(@Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
                                   @PathVariable String numero) {
-        return respuesta(usuarioId, facade.buscarPorNumero(usuarioId, numero));
+        return respuesta(usuario.id(), facade.buscarPorNumero(usuario.id(), numero));
     }
 
     @Operation(summary = "Cambiar el estado de un reclamo")
     @PatchMapping("/{numero}/estado")
-    public ReclamoResponse cambiarEstado(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
-                                         @PathVariable String numero,
-                                         @Valid @RequestBody CambiarEstadoRequest request) {
-        return respuesta(usuarioId, facade.cambiarEstado(usuarioId, numero, request.estado(), request.observacion()));
+    public ReclamoResponse cambiarEstado(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable String numero,
+            @Valid @RequestBody CambiarEstadoRequest request) {
+        return respuesta(usuario.id(),
+                facade.cambiarEstado(usuario.id(), numero, request.estado(), request.observacion()));
     }
 
     @Operation(summary = "Asignar o reasignar el área (solo administradores)")
     @PatchMapping("/{numero}/asignacion")
-    public ReclamoResponse asignar(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
+    public ReclamoResponse asignar(@Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
                                    @PathVariable String numero,
                                    @Valid @RequestBody AsignarReclamoRequest request) {
-        return respuesta(usuarioId, facade.asignar(usuarioId, numero, request.areaId(), request.observacion()));
+        return respuesta(usuario.id(),
+                facade.asignar(usuario.id(), numero, request.areaId(), request.observacion()));
     }
 
     @Operation(summary = "Avisos generados por los eventos de un reclamo")
     @GetMapping("/{numero}/notificaciones")
-    public List<NotificacionResponse> notificaciones(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
-                                                    @PathVariable String numero) {
-        return facade.consultarNotificaciones(usuarioId, numero).stream().map(mapper::notificacion).toList();
+    public List<NotificacionResponse> notificaciones(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable String numero) {
+        return facade.consultarNotificaciones(usuario.id(), numero).stream().map(mapper::notificacion).toList();
     }
 
     private ReclamoResponse respuesta(Long usuarioId, Reclamo reclamo) {

@@ -1,30 +1,65 @@
 import { describe, expect, it, vi } from 'vitest'
-import { simularApi } from '../pruebas/apiFalsa.js'
-import { ErrorApi, pedir } from './cliente.js'
+import { SIN_SESION, TOKEN_CSRF, simularApi } from '../pruebas/apiFalsa.js'
+import { ErrorApi, alVencerSesion, pedir } from './cliente.js'
 import { asignarArea, cambiarEstado, crearReclamo, listarAvisos, listarReclamos } from './reclamos.js'
 
 describe('cliente HTTP', () => {
-  it('envía X-Usuario-Id y pide JSON', async () => {
+  it('pide JSON y manda la cookie de sesión, sin ningún encabezado de identidad', async () => {
     const llamadas = simularApi({ 'GET /api/reclamos': [] })
 
-    await pedir('/reclamos', { usuarioId: 3 })
+    await pedir('/reclamos')
 
-    expect(llamadas[0].usuarioId).toBe('3')
-    expect(fetch.mock.calls[0][1].headers.Accept).toBe('application/json')
+    const encabezados = fetch.mock.calls[0][1].headers
+    expect(encabezados.Accept).toBe('application/json')
+    expect(encabezados).not.toHaveProperty('X-Usuario-Id')
+    expect(llamadas[0].credenciales).toBe('same-origin')
   })
 
-  it('no envía X-Usuario-Id en las consultas de apoyo', async () => {
-    const llamadas = simularApi({ 'GET /api/usuarios': [] })
+  it('manda el token CSRF de la cookie en POST y PATCH, y no en GET', async () => {
+    const llamadas = simularApi({ 'GET /api/reclamos': [], 'POST /api/reclamos': { status: 201, cuerpo: {} }, 'PATCH /api/reclamos/REC-1/estado': {} })
 
-    await pedir('/usuarios')
+    await pedir('/reclamos')
+    await pedir('/reclamos', { metodo: 'POST', cuerpo: {} })
+    await pedir('/reclamos/REC-1/estado', { metodo: 'PATCH', cuerpo: {} })
 
-    expect(llamadas[0].usuarioId).toBeUndefined()
+    expect(llamadas.map((llamada) => llamada.csrf)).toEqual([undefined, TOKEN_CSRF, TOKEN_CSRF])
+  })
+
+  it('si todavía no hay cookie CSRF, la pide con un GET público antes del POST', async () => {
+    document.cookie = 'XSRF-TOKEN=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/'
+    const llamadas = simularApi({
+      'GET /api/categorias': () => {
+        document.cookie = 'XSRF-TOKEN=token-nuevo; path=/'
+        return []
+      },
+      'POST /api/auth/login': { id: 1 },
+    })
+
+    await pedir('/auth/login', { metodo: 'POST', cuerpo: {}, avisarSiNoHaySesion: false })
+
+    expect(llamadas.map((llamada) => llamada.ruta)).toEqual(['/api/categorias', '/api/auth/login'])
+    expect(llamadas[1].csrf).toBe('token-nuevo')
+  })
+
+  it('un 401 avisa que la sesión venció, salvo en las llamadas de login', async () => {
+    simularApi({ 'GET /api/reclamos': SIN_SESION, 'GET /api/auth/yo': SIN_SESION })
+    const vencida = vi.fn()
+    const darDeBaja = alVencerSesion(vencida)
+
+    await expect(pedir('/auth/yo', { avisarSiNoHaySesion: false })).rejects.toMatchObject({ status: 401 })
+    expect(vencida).not.toHaveBeenCalled()
+    await expect(pedir('/reclamos')).rejects.toMatchObject({ status: 401, codigo: 'NO_AUTENTICADO' })
+    expect(vencida).toHaveBeenCalledTimes(1)
+
+    darDeBaja()
+    await expect(pedir('/reclamos')).rejects.toMatchObject({ status: 401 })
+    expect(vencida).toHaveBeenCalledTimes(1)
   })
 
   it('arma la consulta solo con los filtros que tienen valor', async () => {
     const llamadas = simularApi({ 'GET /api/reclamos': [] })
 
-    await listarReclamos(7, { estado: 'INGRESADO', areaId: '', ciudadanoId: undefined })
+    await listarReclamos({ estado: 'INGRESADO', areaId: '', ciudadanoId: undefined })
 
     expect(llamadas[0].consulta).toEqual({ estado: 'INGRESADO' })
   })
@@ -32,12 +67,12 @@ describe('cliente HTTP', () => {
   it('crea un reclamo con POST y el cuerpo del contrato', async () => {
     const llamadas = simularApi({ 'POST /api/reclamos': { status: 201, cuerpo: { numero: 'REC-1' } } })
 
-    const creado = await crearReclamo(1, { categoriaId: 1, barrioId: 2, descripcion: 'Farol apagado', direccion: 'Belgrano 450' })
+    const creado = await crearReclamo({ categoriaId: 1, barrioId: 2, descripcion: 'Farol apagado', direccion: 'Belgrano 450' })
 
     expect(creado.numero).toBe('REC-1')
     expect(llamadas[0]).toMatchObject({
       metodo: 'POST',
-      usuarioId: '1',
+      csrf: TOKEN_CSRF,
       cuerpo: { categoriaId: 1, barrioId: 2, descripcion: 'Farol apagado', direccion: 'Belgrano 450' },
     })
     expect(fetch.mock.calls[0][1].headers['Content-Type']).toBe('application/json')
@@ -46,25 +81,25 @@ describe('cliente HTTP', () => {
   it('cambia el estado con PATCH y manda null cuando no hay observación', async () => {
     const llamadas = simularApi({ 'PATCH /api/reclamos/REC-1/estado': {} })
 
-    await cambiarEstado(3, 'REC-1', 'EN_PROCESO', '')
+    await cambiarEstado('REC-1', 'EN_PROCESO', '')
 
-    expect(llamadas[0]).toMatchObject({ metodo: 'PATCH', usuarioId: '3', cuerpo: { estado: 'EN_PROCESO', observacion: null } })
+    expect(llamadas[0]).toMatchObject({ metodo: 'PATCH', csrf: TOKEN_CSRF, cuerpo: { estado: 'EN_PROCESO', observacion: null } })
   })
 
   it('asigna el área con PATCH a /asignacion', async () => {
     const llamadas = simularApi({ 'PATCH /api/reclamos/REC-1/asignacion': {} })
 
-    await asignarArea(7, 'REC-1', 2, 'Corresponde a Obras')
+    await asignarArea('REC-1', 2, 'Corresponde a Obras')
 
     expect(llamadas[0].cuerpo).toEqual({ areaId: 2, observacion: 'Corresponde a Obras' })
   })
 
-  it('pide la bandeja de avisos con el X-Usuario-Id del usuario', async () => {
+  it('pide la bandeja de avisos del usuario de la sesión', async () => {
     const llamadas = simularApi({ 'GET /api/notificaciones': [] })
 
-    await listarAvisos(3)
+    await listarAvisos()
 
-    expect(llamadas[0]).toMatchObject({ metodo: 'GET', ruta: '/api/notificaciones', usuarioId: '3' })
+    expect(llamadas[0]).toMatchObject({ metodo: 'GET', ruta: '/api/notificaciones' })
   })
 
   it('convierte el error del contrato en ErrorApi con status, código, mensaje y detalles', async () => {
@@ -75,7 +110,7 @@ describe('cliente HTTP', () => {
       },
     })
 
-    const error = await crearReclamo(1, {}).catch((fallo) => fallo)
+    const error = await crearReclamo({}).catch((fallo) => fallo)
 
     expect(error).toBeInstanceOf(ErrorApi)
     expect(error).toMatchObject({ status: 400, codigo: 'DATOS_INVALIDOS', message: 'Los datos recibidos no son validos.' })
@@ -85,7 +120,7 @@ describe('cliente HTTP', () => {
   it('explica que el backend no responde cuando el proxy devuelve un 5xx sin JSON', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => ({ ok: false, status: 502, json: async () => { throw new SyntaxError('no es JSON') } })))
 
-    const error = await pedir('/usuarios').catch((fallo) => fallo)
+    const error = await pedir('/categorias').catch((fallo) => fallo)
 
     expect(error).toMatchObject({ status: 502, codigo: 'SIN_CONEXION' })
     expect(error.message).toMatch(/backend/)
@@ -94,7 +129,7 @@ describe('cliente HTTP', () => {
   it('explica el fallo de red cuando fetch no llega a conectar', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
 
-    const error = await pedir('/usuarios').catch((fallo) => fallo)
+    const error = await pedir('/categorias').catch((fallo) => fallo)
 
     expect(error).toMatchObject({ status: 0, codigo: 'SIN_CONEXION' })
   })

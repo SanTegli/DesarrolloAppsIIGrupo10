@@ -3,6 +3,7 @@ package ar.edu.uade.reclamos.aplicacion.servicio;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
+import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.repositorio.*;
 import java.util.List;
@@ -22,10 +23,11 @@ class ConsultaCatalogosServiceTest {
         e.area.desactivar();
         when(usuarios.buscarTodos()).thenReturn(List.of(e.ciudadano, e.agente, e.administrador));
         when(usuarios.buscarPorId(1L)).thenReturn(Optional.of(e.ciudadano));
+        when(usuarios.buscarPorId(5L)).thenReturn(Optional.of(e.administrador));
         when(categorias.buscarTodas()).thenReturn(List.of(e.categoria));
         when(barrios.buscarTodos()).thenReturn(List.of(e.barrio));
         when(areas.buscarTodas()).thenReturn(List.of(e.area));
-        assertThat(servicio.usuarios()).containsExactly(e.ciudadano, e.agente, e.administrador);
+        assertThat(servicio.usuarios(5L)).containsExactly(e.ciudadano, e.agente, e.administrador);
         assertThat(servicio.usuario(1L)).isSameAs(e.ciudadano);
         assertThat(servicio.categorias()).containsExactly(e.categoria);
         assertThat(servicio.barrios()).containsExactly(e.barrio);
@@ -35,5 +37,23 @@ class ConsultaCatalogosServiceTest {
         verify(categorias).buscarTodas();
         verify(barrios).buscarTodos();
         verify(areas).buscarTodas();
+    }
+
+    @Test
+    void laListaDeUsuariosYLosDatosDeOtroSonSoloParaElAdministrador() {
+        var e = new EscenarioAplicacion();
+        var usuarios = mock(UsuarioRepository.class);
+        var servicio = new ConsultaCatalogosService(usuarios, mock(CategoriaRepository.class),
+                mock(BarrioRepository.class), mock(AreaMunicipalRepository.class));
+        when(usuarios.buscarPorId(1L)).thenReturn(Optional.of(e.ciudadano));
+        when(usuarios.buscarPorId(3L)).thenReturn(Optional.of(e.agente));
+        when(usuarios.buscarPorId(5L)).thenReturn(Optional.of(e.administrador));
+
+        assertThatThrownBy(() -> servicio.usuarios(1L)).isInstanceOf(AccesoDenegadoException.class);
+        assertThatThrownBy(() -> servicio.usuarios(3L)).isInstanceOf(AccesoDenegadoException.class);
+        assertThatThrownBy(() -> servicio.usuario(1L, 3L)).isInstanceOf(AccesoDenegadoException.class);
+        assertThat(servicio.usuario(1L, 1L)).isSameAs(e.ciudadano);
+        assertThat(servicio.usuario(5L, 3L)).isSameAs(e.agente);
+        verify(usuarios, never()).buscarTodos();
     }
 }

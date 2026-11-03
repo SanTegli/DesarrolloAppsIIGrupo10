@@ -103,8 +103,10 @@ npm install
 npm run dev
 ```
 
-La interfaz queda en `http://localhost:5173`. No hay login: el selector "Usar el sistema como"
-elige el usuario y la interfaz envía su id en el encabezado `X-Usuario-Id`.
+La interfaz queda en `http://localhost:5173` y empieza en la pantalla de ingreso. Los siete usuarios de la
+semilla entran con su email (`ana@example.org`, `carla@example.org`, `elena@example.org`, etc.) y la
+contraseña de desarrollo `demo1234`. Un vecino nuevo puede crear su cuenta desde la misma pantalla. La sesión
+queda en una cookie del servidor; ver [Sesión](docs/api-contract.md#sesión) en el contrato.
 
 | Rol | Qué puede hacer en la interfaz |
 | --- | --- |
@@ -277,3 +279,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 11 | `feature/11-geocodificacion` | Geocodificación con Georef: búsqueda de la dirección, elección de la sugerencia en el alta, enlace a Google Maps y caché |
 | 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor idempotente con reintentos y cola de errores, y Mailpit |
 | 13 | `feature/13-integracion-demo` | Compose con orden de arranque, chequeos de salud y memoria acotada; verificación de punta a punta en el CI; diagrama de componentes UML, secuencia completa, guion de demo y matriz de fallos |
+| 14 | `feature/14-login` | Login con sesión del servidor y CSRF (Spring Security), registro de ciudadanos, contraseñas con BCrypt y pantalla de ingreso; se elimina `X-Usuario-Id` |

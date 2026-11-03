@@ -1,9 +1,7 @@
-import { ROLES, describirUsuario } from '../dominio/etiquetas.js'
+import { describirUsuario } from '../dominio/etiquetas.js'
 
-const GRUPOS = ['CIUDADANO', 'AGENTE_MUNICIPAL', 'ADMINISTRADOR']
-
-/** Barra superior con el selector de usuario. Reemplaza al login: define el X-Usuario-Id. */
-export default function Encabezado({ usuarios, usuario, onCambiarUsuario }) {
+/** Barra superior: la marca y, con sesión iniciada, quién está usando el sistema y el botón para salir. */
+export default function Encabezado({ usuario, onSalir }) {
   return (
     <header className="encabezado">
       <div className="encabezado-contenido">
@@ -11,26 +9,14 @@ export default function Encabezado({ usuarios, usuario, onCambiarUsuario }) {
           <strong>Reclamos Urbanos</strong>
           <span>Municipio de Quilmes</span>
         </div>
-        <label className="selector-usuario">
-          <span>Usar el sistema como</span>
-          <select
-            value={usuario?.id ?? ''}
-            onChange={(evento) => onCambiarUsuario(Number(evento.target.value))}
-            disabled={usuarios.length === 0}
-          >
-            {GRUPOS.map((rol) => (
-              <optgroup key={rol} label={ROLES[rol]}>
-                {usuarios
-                  .filter((candidato) => candidato.rol === rol)
-                  .map((candidato) => (
-                    <option key={candidato.id} value={candidato.id}>
-                      {describirUsuario(candidato)}
-                    </option>
-                  ))}
-              </optgroup>
-            ))}
-          </select>
-        </label>
+        {usuario && (
+          <div className="sesion-usuario">
+            <span>{describirUsuario(usuario)}</span>
+            <button type="button" className="boton-encabezado" onClick={onSalir}>
+              Salir
+            </button>
+          </div>
+        )}
       </div>
     </header>
   )

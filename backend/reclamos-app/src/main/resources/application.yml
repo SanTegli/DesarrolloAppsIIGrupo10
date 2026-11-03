@@ -20,12 +20,23 @@ spring:
 
 server:
   port: 8080
+  servlet:
+    # Sesión del login: la cookie JSESSIONID es HttpOnly (JavaScript no la lee) y SameSite=Lax (otro sitio no
+    # la manda en un POST). Sin actividad, la sesión vence a los 30 minutos.
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
 
 # Contrato OpenAPI de REST 1: Swagger UI en /swagger-ui.html, contrato en /v3/api-docs.yaml.
 springdoc:
   paths-to-match: /api/**
   swagger-ui:
     path: /swagger-ui.html
+    # Swagger UI lee la cookie XSRF-TOKEN y la manda en X-XSRF-TOKEN: así "Try it out" funciona con el login.
+    csrf:
+      enabled: true
 
 # Estrategias activas (patrón Strategy).
 reclamos:

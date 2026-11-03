@@ -2,61 +2,146 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App.jsx'
-import { AREAS, BARRIOS, CATEGORIAS, USUARIOS, reclamo, simularApi } from './pruebas/apiFalsa.js'
+import { AREAS, BARRIOS, CATEGORIAS, SIN_SESION, TOKEN_CSRF, USUARIOS, reclamo, simularApi } from './pruebas/apiFalsa.js'
+
+const [ana, carla, elena] = USUARIOS
 
 const CATALOGOS = {
-  'GET /api/usuarios': USUARIOS,
   'GET /api/categorias': CATEGORIAS,
   'GET /api/barrios': BARRIOS,
   'GET /api/areas': AREAS,
 }
 
+/** Los catálogos y una sesión ya iniciada: /api/auth/yo devuelve al usuario. */
+const conSesion = (usuario) => ({ ...CATALOGOS, 'GET /api/auth/yo': usuario })
+
 const pestanas = () => within(screen.getByRole('navigation')).getAllByRole('button').map((boton) => boton.textContent)
 
 describe('App', () => {
-  it('arranca como el primer usuario y lista sus reclamos con su X-Usuario-Id', async () => {
-    const llamadas = simularApi({ ...CATALOGOS, 'GET /api/reclamos': [reclamo()] })
+  it('sin sesión muestra el login, entra con email y contraseña y lista los reclamos', async () => {
+    const llamadas = simularApi({
+      ...CATALOGOS,
+      'GET /api/auth/yo': SIN_SESION,
+      'POST /api/auth/login': ana,
+      'GET /api/reclamos': [reclamo()],
+    })
+    const usuario = userEvent.setup()
     render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    await usuario.type(screen.getByLabelText('Correo electrónico'), ' ana@example.org ')
+    await usuario.type(screen.getByLabelText('Contraseña'), 'demo1234')
+    await usuario.click(screen.getByRole('button', { name: 'Entrar' }))
 
     expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
     expect(pestanas()).toEqual(['Reclamos', 'Crear reclamo', 'Avisos'])
-    expect(llamadas.find((llamada) => llamada.ruta === '/api/reclamos').usuarioId).toBe('1')
+    expect(screen.getByText('Ana Pérez, Ciudadano')).toBeInTheDocument()
+    const login = llamadas.find((llamada) => llamada.ruta === '/api/auth/login')
+    expect(login).toMatchObject({
+      metodo: 'POST',
+      csrf: TOKEN_CSRF,
+      credenciales: 'same-origin',
+      cuerpo: { email: 'ana@example.org', contrasena: 'demo1234' },
+    })
+    expect(llamadas.every((llamada) => llamada.ruta !== '/api/usuarios')).toBe(true)
   })
 
-  it('cambia las secciones y el X-Usuario-Id al elegir otro usuario', async () => {
-    const llamadas = simularApi({ ...CATALOGOS, 'GET /api/reclamos': [] })
-    const usuario = userEvent.setup()
-    render(<App />)
-    const selector = await screen.findByLabelText('Usar el sistema como')
-    await screen.findByText('Todavía no creaste ningún reclamo.')
+  it('con la sesión ya iniciada entra directo, con las secciones del rol', async () => {
+    simularApi({ ...conSesion(carla), 'GET /api/reclamos': [] })
+    const { unmount } = render(<App />)
 
-    await usuario.selectOptions(selector, 'Carla Gómez, Agente municipal de Alumbrado')
     expect(await screen.findByRole('heading', { name: 'Reclamos de mi área' })).toBeInTheDocument()
     expect(pestanas()).toEqual(['Reclamos', 'Avisos'])
     expect(await screen.findByText('Tu área no tiene reclamos asignados.')).toBeInTheDocument()
+    unmount()
 
-    await usuario.selectOptions(selector, 'Elena Ruiz, Administrador')
+    simularApi({ ...conSesion(elena), 'GET /api/reclamos': [] })
+    render(<App />)
     expect(await screen.findByRole('heading', { name: 'Todos los reclamos' })).toBeInTheDocument()
     expect(pestanas()).toEqual(['Reclamos', 'Administración', 'Avisos'])
-
-    const usados = llamadas.filter((llamada) => llamada.ruta === '/api/reclamos').map((llamada) => llamada.usuarioId)
-    expect(usados).toEqual(['1', '3', '7'])
   })
 
-  it('recuerda el usuario elegido al volver a abrir la aplicación', async () => {
-    localStorage.setItem('reclamos.usuarioId', '7')
-    simularApi({ ...CATALOGOS, 'GET /api/reclamos': [] })
+  it('un login fallido muestra el error y deja la pantalla de ingreso', async () => {
+    simularApi({
+      ...CATALOGOS,
+      'GET /api/auth/yo': SIN_SESION,
+      'POST /api/auth/login': {
+        status: 401,
+        cuerpo: { status: 401, codigo: 'CREDENCIALES_INVALIDAS', mensaje: 'El correo o la contraseña no son correctos.', detalles: [] },
+      },
+    })
+    const usuario = userEvent.setup()
     render(<App />)
 
-    expect(await screen.findByRole('heading', { name: 'Todos los reclamos' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Usar el sistema como')).toHaveValue('7')
+    await usuario.type(await screen.findByLabelText('Correo electrónico'), 'ana@example.org')
+    await usuario.type(screen.getByLabelText('Contraseña'), 'otra-clave')
+    await usuario.click(screen.getByRole('button', { name: 'Entrar' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('El correo o la contraseña no son correctos.')
+    expect(screen.getByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Entrar' })).toBeEnabled()
+  })
+
+  it('un vecino nuevo se registra y entra con su cuenta', async () => {
+    const laura = { id: 8, nombreCompleto: 'Laura Martínez', rol: 'CIUDADANO', area: null }
+    const llamadas = simularApi({
+      ...CATALOGOS,
+      'GET /api/auth/yo': SIN_SESION,
+      'POST /api/auth/registro': { status: 201, cuerpo: laura },
+      'POST /api/auth/login': laura,
+      'GET /api/reclamos': [],
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Crear una cuenta' }))
+    await usuario.type(screen.getByLabelText('DNI'), '33444555')
+    await usuario.type(screen.getByLabelText('Nombre'), 'Laura')
+    await usuario.type(screen.getByLabelText('Apellido'), 'Martínez')
+    await usuario.type(screen.getByLabelText('Correo electrónico'), 'laura@example.org')
+    await usuario.type(screen.getByLabelText(/Contraseña/), 'una-clave-larga')
+    await usuario.click(screen.getByRole('button', { name: 'Crear cuenta y entrar' }))
+
+    expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/auth/registro').cuerpo).toEqual({
+      dni: '33444555',
+      nombre: 'Laura',
+      apellido: 'Martínez',
+      email: 'laura@example.org',
+      contrasena: 'una-clave-larga',
+    })
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/auth/login').cuerpo).toEqual({
+      email: 'laura@example.org',
+      contrasena: 'una-clave-larga',
+    })
+  })
+
+  it('Salir cierra la sesión en el backend y vuelve al login', async () => {
+    const llamadas = simularApi({ ...conSesion(ana), 'GET /api/reclamos': [], 'POST /api/auth/logout': { status: 204 } })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Salir' }))
+
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/auth/logout')).toMatchObject({ metodo: 'POST', csrf: TOKEN_CSRF })
+    expect(screen.queryByRole('button', { name: 'Salir' })).not.toBeInTheDocument()
+  })
+
+  it('si la sesión vence, vuelve al login y lo explica', async () => {
+    simularApi({ ...conSesion(ana), 'GET /api/reclamos': SIN_SESION })
+    render(<App />)
+
+    expect(await screen.findByRole('heading', { name: 'Iniciar sesión' })).toBeInTheDocument()
+    expect(screen.getByText(/Tu sesión venció o se cerró/)).toBeInTheDocument()
   })
 
   it('el ciudadano crea un reclamo y llega al detalle con el aviso de asignación', async () => {
     const creado = reclamo({ accionesDisponibles: ['CANCELADO'] })
     const llamadas = simularApi({
-      ...CATALOGOS,
+      ...conSesion(ana),
       'GET /api/reclamos': [],
       'POST /api/reclamos': { status: 201, cuerpo: creado },
       'GET /api/reclamos/REC-4F2A91BC': creado,
@@ -77,7 +162,7 @@ describe('App', () => {
     expect(await screen.findByRole('button', { name: 'Cancelar reclamo' })).toBeInTheDocument()
     const alta = llamadas.find((llamada) => llamada.metodo === 'POST')
     expect(alta).toMatchObject({
-      usuarioId: '1',
+      csrf: TOKEN_CSRF,
       cuerpo: { categoriaId: 1, barrioId: 2, direccion: 'Belgrano 450', descripcion: 'Farol apagado frente a la plaza' },
     })
   })
@@ -91,7 +176,7 @@ describe('App', () => {
     const quilmes = { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.758, longitud: -58.297 }
     const creado = reclamo({ ubicacion: { estado: 'CONFIRMADA', ...bernal, proveedor: 'georef' } })
     const llamadas = simularApi({
-      ...CATALOGOS,
+      ...conSesion(ana),
       'GET /api/reclamos': [],
       'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [bernal, quilmes] },
       'POST /api/reclamos': { status: 201, cuerpo: creado },
@@ -126,7 +211,7 @@ describe('App', () => {
 
   it('si el mapa no responde lo avisa, y cambiar la dirección borra la búsqueda', async () => {
     const llamadas = simularApi({
-      ...CATALOGOS,
+      ...conSesion(ana),
       'GET /api/reclamos': [],
       'GET /api/ubicaciones/sugerencias': { disponible: false, sugerencias: [] },
       'POST /api/reclamos': { status: 400, cuerpo: { status: 400, codigo: 'DATOS_INVALIDOS', mensaje: 'Prueba', detalles: [] } },
@@ -152,7 +237,7 @@ describe('App', () => {
 
   it('muestra los errores de validación del backend en el formulario', async () => {
     simularApi({
-      ...CATALOGOS,
+      ...conSesion(ana),
       'GET /api/reclamos': [],
       'POST /api/reclamos': {
         status: 400,
@@ -176,9 +261,8 @@ describe('App', () => {
   })
 
   it('el administrador ve en Administración los reclamos sin asignar y la cobertura de las áreas', async () => {
-    localStorage.setItem('reclamos.usuarioId', '7')
     const llamadas = simularApi({
-      ...CATALOGOS,
+      ...conSesion(elena),
       'GET /api/reclamos': (peticion) => (peticion.consulta.estado === 'INGRESADO' ? [reclamo({ estado: 'INGRESADO', area: null })] : []),
     })
     const usuario = userEvent.setup()
@@ -189,14 +273,13 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Reclamos sin asignar' })).toBeInTheDocument()
     expect(await screen.findByText('Sin asignar')).toBeInTheDocument()
     expect(screen.getByRole('cell', { name: 'Obras Públicas' })).toBeInTheDocument()
-    expect(llamadas.some((llamada) => llamada.consulta?.estado === 'INGRESADO' && llamada.usuarioId === '7')).toBe(true)
+    expect(llamadas.some((llamada) => llamada.consulta?.estado === 'INGRESADO')).toBe(true)
   })
 
   it('el agente ve en Avisos lo que le notificaron y abre el reclamo desde ahí', async () => {
-    localStorage.setItem('reclamos.usuarioId', '3')
     const asignado = reclamo({ accionesDisponibles: ['EN_PROCESO'] })
     const llamadas = simularApi({
-      ...CATALOGOS,
+      ...conSesion(carla),
       'GET /api/reclamos': [],
       'GET /api/notificaciones': [
         { numeroReclamo: 'REC-4F2A91BC', canal: 'INTERNO', mensaje: 'El reclamo REC-4F2A91BC fue asignado a tu area Alumbrado.', fechaEnvio: '2026-10-05T10:00:00' },
@@ -211,7 +294,7 @@ describe('App', () => {
 
     expect(await screen.findByText('El reclamo REC-4F2A91BC fue asignado a tu area Alumbrado.')).toBeInTheDocument()
     expect(screen.getByText('05/10/2026 10:00')).toBeInTheDocument()
-    expect(llamadas.find((llamada) => llamada.ruta === '/api/notificaciones').usuarioId).toBe('3')
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/notificaciones').metodo).toBe('GET')
 
     await usuario.click(screen.getByRole('button', { name: 'REC-4F2A91BC' }))
     expect(await screen.findByRole('button', { name: 'Tomar reclamo' })).toBeInTheDocument()
@@ -221,7 +304,7 @@ describe('App', () => {
   })
 
   it('la bandeja vacía lo dice y un error del backend se muestra', async () => {
-    simularApi({ ...CATALOGOS, 'GET /api/reclamos': [], 'GET /api/notificaciones': [] })
+    simularApi({ ...conSesion(ana), 'GET /api/reclamos': [], 'GET /api/notificaciones': [] })
     const usuario = userEvent.setup()
     const { unmount } = render(<App />)
     await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
@@ -229,19 +312,19 @@ describe('App', () => {
     unmount()
 
     simularApi({
-      ...CATALOGOS,
+      ...conSesion(ana),
       'GET /api/reclamos': [],
-      'GET /api/notificaciones': { status: 404, cuerpo: { status: 404, codigo: 'RECURSO_NO_ENCONTRADO', mensaje: 'No existe usuario con identificador 1', detalles: [] } },
+      'GET /api/notificaciones': { status: 500, cuerpo: { status: 500, codigo: 'ERROR_INTERNO', mensaje: 'Ocurrio un error interno. Intentalo nuevamente.', detalles: [] } },
     })
     render(<App />)
     await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('No existe usuario con identificador 1')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Ocurrio un error interno.')
   })
 
   it('avisa cuando el backend no responde y permite reintentar', async () => {
     simularApi({
-      'GET /api/usuarios': { status: 502, cuerpo: null },
-      'GET /api/categorias': [],
+      'GET /api/auth/yo': ana,
+      'GET /api/categorias': { status: 502, cuerpo: null },
       'GET /api/barrios': [],
       'GET /api/areas': [],
     })

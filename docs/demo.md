@@ -46,14 +46,14 @@ contenedor en el paso «Memoria de cada contenedor».
 | Paso | Qué se hace | Qué se muestra | Qué integración o patrón |
 | --- | --- | --- | --- |
 | 1 | Abrir el diagrama de componentes de [arquitectura.md](arquitectura.md#componentes-e-interfaces) | Cuatro aplicaciones propias y sus contratos | CBD: interfaces provistas y requeridas |
-| 2 | En la interfaz, entrar como **Ana Pérez**. **Crear reclamo**: Luminaria rota, barrio Bernal, dirección "Belgrano 450" | — | — |
+| 2 | En la interfaz, entrar como **Ana Pérez** (`ana@example.org`, contraseña `demo1234`). **Crear reclamo**: Luminaria rota, barrio Bernal, dirección "Belgrano 450" | La pantalla de ingreso; después, Ana arriba a la derecha con **Salir** | Login con sesión del servidor (Spring Security) |
 | 3 | Tocar **Buscar en el mapa** | Varias sugerencias, porque Belgrano 450 existe en más de una localidad; cada una con "Ver en el mapa" | **API externa** (Georef), Adapter y proxy de caché |
 | 4 | Elegir la sugerencia de Bernal. Descripción: "Hay un cable colgando del poste de luz y chispea cuando llueve, justo frente a la escuela" | — | — |
 | 5 | **Crear reclamo** | Detalle: prioridad alta o crítica "sugerida por IA" con su motivo, área Alumbrado, dirección normalizada y **Ver en Google Maps** | **IA** (REST 2 con Gemini) y **SOAP** (cobertura) |
 | 6 | Pestaña Mailpit | Los correos "lo recibimos" y "ya tiene un área a cargo" para Ana, y el aviso para Carla Gómez | **Mensajería**: outbox, RabbitMQ y consumidor |
 | 7 | Pestaña RabbitMQ: **Exchanges** → `reclamos.eventos`, **Queues** → `notificaciones.email` | El gráfico de mensajes publicados y entregados; `notificaciones.email.dlq` vacía | Publicar y suscribir, cola de errores |
 | 8 | Pestañas del WSDL y de los dos Swagger | `ConsultarCobertura`, `POST /api/prioridades/evaluar` y los endpoints de REST 1 | **Contratos**: WSDL y OpenAPI |
-| 9 | Entrar como **Carla Gómez** (agente de Alumbrado): tomar el reclamo y resolverlo | El historial suma dos pasos | — |
+| 9 | **Salir** y entrar como **Carla Gómez** (`carla@example.org`, agente de Alumbrado): tomar el reclamo y resolverlo | El historial suma dos pasos | Cada rol ve y hace lo suyo: lo decide el dominio con el usuario de la sesión |
 | 10 | Volver a Mailpit | "cambió de estado" y "está resuelto" para Ana | El mismo flujo de mensajería, otro evento |
 
 Para el paso 5: la IA puede subir la prioridad de la categoría pero nunca bajarla. Si sugiere una menor, el
@@ -110,8 +110,9 @@ correr desde la máquina: `node scripts/verificar-demo.mjs`.
 | Paso | Qué comprueba |
 | --- | --- |
 | Frontend, backend, cobertura, prioridad, RabbitMQ y Mailpit | Que cada contenedor responda: la interfaz y el proxy de `/api`, los contratos OpenAPI, el WSDL, el exchange con su cola y su consumidor, y el buzón |
+| Login | Que Ana Pérez entre con `demo1234`: toma la cookie `XSRF-TOKEN`, la devuelve en `X-XSRF-TOKEN` y guarda la cookie de sesión, como el navegador |
 | Georef | Que el backend devuelva sugerencias para Belgrano 450, en Bernal. Sin Internet es un **aviso**, no una falla |
-| Alta del reclamo | `POST /api/reclamos` como Ana Pérez, con la sugerencia elegida: responde 201 |
+| Alta del reclamo | `POST /api/reclamos` con la sesión de Ana Pérez y la sugerencia elegida: responde 201 |
 | Prioridad con IA | Que el origen sea `IA`, o `CATEGORIA` si la IA sugirió menos. `RESPALDO` es una falla: la IA no contestó |
 | Área por SOAP | Que quede asignado a un área y sin la asignación pendiente |
 | Ubicación | Que quede `CONFIRMADA` con las coordenadas elegidas |

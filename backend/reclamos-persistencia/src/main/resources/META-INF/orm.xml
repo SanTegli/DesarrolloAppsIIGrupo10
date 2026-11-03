@@ -21,6 +21,8 @@
       <basic name="email"><column name="email" nullable="false" length="254"/></basic>
       <basic name="telefono"><column name="telefono" nullable="true" length="30"/></basic>
       <basic name="activo"><column name="activo" nullable="false"/></basic>
+      <!-- BCrypt. Nulo para los usuarios que no pueden entrar con contraseña. -->
+      <basic name="hashContrasena"><column name="hash_contrasena" nullable="true" length="100"/></basic>
     </attributes>
   </entity>
   <entity class="Ciudadano" access="FIELD" metadata-complete="true">

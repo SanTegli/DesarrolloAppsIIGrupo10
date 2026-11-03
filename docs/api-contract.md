@@ -17,13 +17,14 @@ dependen tres personas a la vez.
 | URL base | `http://localhost:8080/api` |
 | Formato | JSON en UTF-8, `Content-Type: application/json` |
 | Fechas | ISO-8601 sin zona horaria: `2026-10-05T10:00:00`. Las del historial y los avisos pueden traer fracción de segundo (`2026-10-05T10:00:00.123456`) |
-| Identidad | Encabezado `X-Usuario-Id` con el id numérico del usuario. Todavía no hay login: lo agrega la Segunda Parte |
+| Identidad | Sesión del servidor: `POST /api/auth/login` deja la cookie `JSESSIONID` (`HttpOnly`) y el navegador la manda sola. Ver [Sesión](#sesión) |
+| CSRF | Cada `POST` y `PATCH` lleva el encabezado `X-XSRF-TOKEN` con el valor de la cookie `XSRF-TOKEN`, que el backend deja en cualquier respuesta |
 | Número de reclamo | `REC-` más ocho caracteres hexadecimales en mayúscula: `REC-4F2A91BC` |
 
-`X-Usuario-Id` es obligatorio en todos los endpoints de `/api/reclamos` y en `/api/notificaciones`.
-Los endpoints de consulta de usuarios, barrios, categorías y áreas no lo piden, porque el selector de
-usuario los necesita antes de saber quién es el usuario. La búsqueda de direcciones
-(`/api/ubicaciones/sugerencias`) tampoco.
+Todo `/api` exige sesión, salvo el login, el registro y los catálogos públicos (`/api/categorias`,
+`/api/barrios` y `/api/areas`), que la interfaz necesita antes de que alguien entre. Sin sesión, la respuesta
+es `401 NO_AUTENTICADO`. Qué puede hacer cada usuario lo decide su rol, guardado en la base: la sesión solo
+dice quién es.
 
 ### Enumerados
 
@@ -54,8 +55,11 @@ Todos los errores tienen la misma forma:
 
 | HTTP | `codigo` | Cuándo | Excepción del backend |
 | --- | --- | --- | --- |
-| 400 | `DATOS_INVALIDOS` | Falta un campo, formato incorrecto, falta `X-Usuario-Id` | `DatosInvalidosException` |
+| 400 | `DATOS_INVALIDOS` | Falta un campo o tiene formato incorrecto | `DatosInvalidosException` |
+| 401 | `NO_AUTENTICADO` | No hay sesión, o venció | `RespuestasDeSeguridad` (Spring Security) |
+| 401 | `CREDENCIALES_INVALIDAS` | El login falló. Mismo mensaje si el email no existe, la contraseña está mal o la cuenta está desactivada | `CredencialesInvalidasException` |
 | 403 | `ACCESO_DENEGADO` | El usuario existe pero su rol no puede hacer la operación, o el reclamo no es suyo ni de su área | `AccesoDenegadoException` |
+| 403 | `CSRF_INVALIDO` | Un `POST` o `PATCH` sin el encabezado `X-XSRF-TOKEN`, o con un valor distinto al de la cookie | `RespuestasDeSeguridad` (Spring Security) |
 | 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo mientras se procesaba esta; hay que volver a cargarlo | Bloqueo optimista de JPA |
@@ -299,11 +303,35 @@ correo ni SMS.
 | `ReclamoResuelto` | Ciudadano |
 | `ReclamoVencido` | Ciudadano y el agente a cargo; si nadie lo tomó, los agentes del área |
 
+## Sesión
+
+El login usa la sesión del servidor, no JWT. La contraseña se guarda con BCrypt y nunca vuelve en una
+respuesta. Los cuatro endpoints son `POST`, salvo `yo`, así que llevan `X-XSRF-TOKEN`.
+
+| Endpoint | Qué hace | Respuesta |
+| --- | --- | --- |
+| `POST /api/auth/login` | Recibe `{ "email", "contrasena" }`. El email no distingue mayúsculas | `200` con el usuario, como en `GET /api/usuarios/{id}`, y la cookie `JSESSIONID`. `401 CREDENCIALES_INVALIDAS` si falla |
+| `GET /api/auth/yo` | El usuario de la sesión | `200` con el usuario; `401 NO_AUTENTICADO` sin sesión |
+| `POST /api/auth/registro` | Crea un **ciudadano**: `{ "dni", "nombre", "apellido", "email", "contrasena" }`. Contraseña de 8 a 72 caracteres | `201` con el usuario y `Location`. `409 REGLA_NEGOCIO` si el email o el DNI ya existen. No inicia sesión |
+| `POST /api/auth/logout` | Invalida la sesión | `204` |
+
+El login le cambia el id a la sesión que traía el navegador, para que nadie que conociera el id anterior
+herede el login. La sesión vence a los 30 minutos sin actividad. Los agentes y administradores no se
+registran: los da de alta el municipio.
+
+```json
+POST /api/auth/login
+{ "email": "ana@example.org", "contrasena": "demo1234" }
+
+200
+{ "id": 1, "nombreCompleto": "Ana Pérez", "rol": "CIUDADANO", "area": null }
+```
+
 ## Avisos
 
 ### `GET /api/notificaciones` — bandeja de avisos del usuario
 
-Los avisos que recibió el usuario de `X-Usuario-Id`, de cualquier reclamo, del más nuevo al más
+Los avisos que recibió el usuario de la sesión, de cualquier reclamo, del más nuevo al más
 viejo. Cada usuario ve solo los suyos; no hay filtros.
 
 ```json
@@ -317,16 +345,16 @@ viejo. Cada usuario ve solo los suyos; no hay filtros.
 ]
 ```
 
-Sin avisos devuelve `[]`. Errores: `400` falta `X-Usuario-Id` o no es un número positivo; `404` el
-usuario no existe.
+Sin avisos devuelve `[]`. Sin sesión, `401`.
 
 ## Consultas de apoyo
 
-No piden `X-Usuario-Id`.
+Las categorías, los barrios y las áreas son públicos: la interfaz los pide antes del login.
 
 ### `GET /api/usuarios` y `GET /api/usuarios/{id}`
 
-Alimentan el selector de usuario.
+La lista completa solo la ve un administrador; cualquier otro rol recibe `403`. Un usuario puede consultarse
+a sí mismo por id; a otro, solo si es administrador.
 
 ```json
 [
@@ -375,8 +403,8 @@ Para el formulario de asignación manual.
 ### `GET /api/ubicaciones/sugerencias` — buscar la dirección en el mapa
 
 Antes del alta. El backend busca la dirección en [Georef](https://www.argentina.gob.ar/georef), la API
-oficial de normalización de direcciones, dentro del municipio y la provincia del barrio. No pide
-`X-Usuario-Id`.
+oficial de normalización de direcciones, dentro del municipio y la provincia del barrio. Exige sesión,
+porque cada búsqueda consulta una API externa.
 
 `GET /api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2`
 
@@ -435,15 +463,18 @@ Municipio: Quilmes, provincia de Buenos Aires.
 | 3 | Higiene Urbana | Residuos | Quilmes Centro, Bernal |
 | 4 | Mantenimiento Vial | Bache | Bernal |
 
-| Id | Usuario | Rol | Área |
-| --- | --- | --- | --- |
-| 1 | Ana Pérez | Ciudadano | |
-| 2 | Bruno Díaz | Ciudadano | |
-| 3 | Carla Gómez | Agente | Alumbrado |
-| 4 | Diego Sosa | Agente | Obras Públicas |
-| 5 | Fabián Luna | Agente | Higiene Urbana |
-| 6 | Gabriela Paz | Agente | Mantenimiento Vial |
-| 7 | Elena Ruiz | Administrador | |
+| Id | Usuario | Email para entrar | Rol | Área |
+| --- | --- | --- | --- | --- |
+| 1 | Ana Pérez | `ana@example.org` | Ciudadano | |
+| 2 | Bruno Díaz | `bruno@example.org` | Ciudadano | |
+| 3 | Carla Gómez | `carla@example.org` | Agente | Alumbrado |
+| 4 | Diego Sosa | `diego@example.org` | Agente | Obras Públicas |
+| 5 | Fabián Luna | `fabian@example.org` | Agente | Higiene Urbana |
+| 6 | Gabriela Paz | `gabriela@example.org` | Agente | Mantenimiento Vial |
+| 7 | Elena Ruiz | `elena@example.org` | Administrador | |
+
+Los siete entran con la contraseña de desarrollo **`demo1234`**. Es solo para la semilla local: la base
+guarda su hash BCrypt.
 
 Con esta semilla se pueden demostrar los casos que dependen del territorio:
 

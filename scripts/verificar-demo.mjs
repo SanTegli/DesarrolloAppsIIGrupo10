@@ -5,7 +5,8 @@
 // Con Node 20 o posterior, desde la raíz del repositorio:
 //   node scripts/verificar-demo.mjs
 //
-// Crea un reclamo real como Ana Pérez: el paso que lo crea deja un reclamo más en la base.
+// Inicia sesión como Ana Pérez (contraseña de la semilla de desarrollo) y crea un reclamo real: el paso que lo
+// crea deja un reclamo más en la base.
 // Sale con código 1 si algún paso falla, para que el CI lo marque en rojo.
 // Solo usa módulos de Node: no necesita npm install.
 
@@ -25,8 +26,8 @@ const VALORES_POR_DEFECTO = {
 
 // Datos de la semilla de desarrollo (README_INSTRUCTIVO, sección 9).
 export const RECLAMO_DE_PRUEBA = {
-  usuarioId: 1,
   correoCiudadano: 'ana@example.org',
+  contrasena: 'demo1234',
   categoriaId: 1, // Luminaria rota, prioridad base MEDIA
   barrioId: 2, // Bernal: lo cubre Alumbrado
   direccion: 'Belgrano 450',
@@ -86,9 +87,19 @@ export async function verificarDemo(config, informar = () => {}) {
     return [OK, `interfaz y proxy de /api: ${categorias.length} categorías`]
   })
   await paso(anotar, 'Backend (REST 1)', async () => {
-    const usuarios = await http.json(config.backendUrl + '/api/usuarios')
+    // Un pedido público: además deja la cookie XSRF-TOKEN que el login necesita.
+    const categorias = await http.json(config.backendUrl + '/api/categorias')
     await http.texto(config.backendUrl + '/v3/api-docs')
-    return [OK, `${usuarios.length} usuarios en la semilla; contrato OpenAPI publicado`]
+    return [OK, `${categorias.length} categorías en la semilla; contrato OpenAPI publicado`]
+  })
+  await paso(anotar, 'Login', async () => {
+    await http.json(config.backendUrl + '/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
+      body: JSON.stringify({ email: RECLAMO_DE_PRUEBA.correoCiudadano, contrasena: RECLAMO_DE_PRUEBA.contrasena }),
+    })
+    const yo = await http.json(config.backendUrl + '/api/auth/yo')
+    return [OK, `sesión iniciada como ${yo.nombreCompleto} (${yo.rol})`]
   })
   await paso(anotar, 'Servicio de cobertura (SOAP)', async () => {
     const wsdl = await http.texto(config.coberturaUrl + '/ws/cobertura.wsdl')
@@ -157,7 +168,7 @@ export async function verificarDemo(config, informar = () => {}) {
     }
     reclamo = await http.json(config.backendUrl + '/api/reclamos', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Usuario-Id': String(RECLAMO_DE_PRUEBA.usuarioId) },
+      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
       body: JSON.stringify(cuerpo),
       esperado: 201,
     })
@@ -269,14 +280,39 @@ function clienteHttp(config) {
     },
   }
 
+  // Cookies del backend, como las guarda un navegador: la de sesión (JSESSIONID) y la del token CSRF.
+  const cookies = new Map()
+  const esDelBackend = (url) => url.startsWith(config.backendUrl)
+
+  function guardarCookies(respuesta) {
+    for (const cookie of respuesta.headers.getSetCookie?.() ?? []) {
+      const [par, ...atributos] = cookie.split(';')
+      const separador = par.indexOf('=')
+      const nombre = par.slice(0, separador).trim()
+      const borrar = atributos.some((atributo) => /^\s*max-age=0\s*$/i.test(atributo))
+      if (borrar) {
+        cookies.delete(nombre)
+      } else {
+        cookies.set(nombre, par.slice(separador + 1).trim())
+      }
+    }
+  }
+
   async function pedir(url, opciones = {}) {
-    const { esperado = 200, ...resto } = opciones
+    const { esperado = 200, headers = {}, ...resto } = opciones
+    const encabezados = { ...headers }
+    if (esDelBackend(url) && cookies.size > 0) {
+      encabezados.Cookie = [...cookies].map(([nombre, valor]) => `${nombre}=${valor}`).join('; ')
+    }
     let respuesta
     try {
-      respuesta = await fetch(url, { ...resto, signal: AbortSignal.timeout(config.tiempoLimiteMs) })
+      respuesta = await fetch(url, { ...resto, headers: encabezados, signal: AbortSignal.timeout(config.tiempoLimiteMs) })
     } catch (error) {
       const causa = error.cause?.code ?? error.name
       throw new Error(`${url} no responde (${causa})`)
+    }
+    if (esDelBackend(url)) {
+      guardarCookies(respuesta)
     }
     if (respuesta.status !== esperado) {
       const cuerpo = (await respuesta.text()).slice(0, 200)
@@ -287,6 +323,7 @@ function clienteHttp(config) {
 
   return {
     rabbit,
+    tokenCsrf: () => cookies.get('XSRF-TOKEN'),
     texto: async (url, opciones) => (await pedir(url, opciones)).text(),
     json: async (url, opciones) => (await pedir(url, opciones)).json(),
   }

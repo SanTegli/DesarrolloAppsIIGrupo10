@@ -215,22 +215,28 @@ flowchart TB
   C2["UsuarioController"] --> F
   C3["CatalogoController"] --> F
   C4["NotificacionController"] --> F
+  C5["AutenticacionController"] --> F
   F --> S1["ReclamoService<br/>crear, asignar, cambiar estado"]
   S1 --> S4["ServicioAsignacion<br/>área automática o manual"]
   F --> S2["ConsultaReclamosService<br/>listar, buscar, acciones, avisos"]
   F --> S3["ConsultaCatalogosService<br/>usuarios, categorías, barrios, áreas"]
+  F --> S5["ServicioCuentas<br/>registro de ciudadanos"]
 ```
 
 ```java
 @PostMapping
-public ResponseEntity<ReclamoResponse> crear(@RequestHeader("X-Usuario-Id") @Positive Long usuarioId,
-                                             @Valid @RequestBody CrearReclamoRequest request) {
-    Reclamo reclamo = facade.crear(usuarioId, request.categoriaId(), request.barrioId(),
-            request.descripcion(), request.direccion());
+public ResponseEntity<ReclamoResponse> crear(
+        @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+        @Valid @RequestBody CrearReclamoRequest request) {
+    Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.barrioId(),
+            request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()));
     return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
-            .body(respuesta(usuarioId, reclamo));
+            .body(respuesta(usuario.id(), reclamo));
 }
 ```
+
+Cuando llegó el login (PR 14), la fachada no cambió: el controlador dejó de leer el id de un encabezado y lo
+toma de la sesión.
 
 La fachada no depende de HTTP: otro transporte de entrada (un consumidor de mensajes, por ejemplo)
 la usaría igual que los controladores.
@@ -262,6 +268,7 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Reintentos y cola de errores | 12 | `ConfiguracionReintentos`, `notificaciones.email.dlq` | Una falla pasajera del SMTP se reintenta; un mensaje que no se puede procesar no traba la cola |
 | Consumidor idempotente | 12 | `ProcesadorAvisos`, tabla `mensajes_procesados` | Un mensaje repetido no manda dos correos |
 | Adapter | 12 | `BrokerRabbit` | La outbox habla con `BrokerMensajes`; RabbitMQ queda detrás |
+| Chain of Responsibility (de Spring Security) | 14 | Cadena de filtros que arma `ConfiguracionSeguridad` | CSRF, sesión, autorización y logout se resuelven cada uno en su filtro, antes de llegar al controlador |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -432,3 +439,26 @@ SMTP, y está escrita en [el contrato](contratos/mensajes.md).
 - **Servicio:** `servicios/servicio-notificaciones`
 - **Tests:** `OutboxIntegrationTest`, `PublicadorMensajesTest`, `OutboxAvisosTest`, `PublicacionRabbitIntegrationTest`
   y, del lado del consumidor, `ProcesadorAvisosTest`, `ConfiguracionReintentosTest` y `FlujoCorreoIntegrationTest`
+
+## Chain of Responsibility en el login (Spring Security)
+
+**Problema.** Cada pedido tiene que pasar varios controles antes de llegar al controlador: que traiga el
+token CSRF si es un `POST` o `PATCH`, que tenga sesión si la ruta lo exige y, si es el cierre de sesión,
+invalidarla. Meter todo eso en cada controlador lo repetiría en todas partes.
+
+**Solución.** Spring Security arma una cadena de filtros. Cada filtro hace su parte y le pasa el pedido al
+siguiente, o lo corta con una respuesta: 403 si falta el token, 401 si no hay sesión, 204 si era el logout.
+`ConfiguracionSeguridad` no escribe los filtros: los configura.
+
+```text
+pedido → CsrfFilter → SecurityContextHolderFilter → LogoutFilter → … → AuthorizationFilter → controlador
+            │ 403 CSRF_INVALIDO       │ carga la sesión   │ 204          │ 401 NO_AUTENTICADO
+```
+
+El patrón lo aporta el framework, no es código propio: en la defensa conviene presentarlo así. Lo propio es
+la configuración y las respuestas de error (`RespuestasDeSeguridad`), que usan el mismo cuerpo que el resto
+de la API.
+
+- **Código:** `reclamos-app/…/aplicacion/seguridad/`
+- **Tests:** `AutenticacionIntegrationTest` y, en `RestIntegrationTest`, `todasLasRutasDeReclamosExigenSesion`
+  y `unPostOPatchConSesionPeroSinTokenCsrfEs403YNoCambiaNada`

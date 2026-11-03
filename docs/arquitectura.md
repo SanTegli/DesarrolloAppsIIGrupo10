@@ -9,11 +9,14 @@ estrategias, integraciones) y las capas de afuera las implementan.
 ```mermaid
 flowchart TB
   subgraph UI["Interfaz - frontend/ (React + Vite)"]
-    COMP["Componentes: listado, alta, detalle, administración"]
-    API["src/api: cliente HTTP y X-Usuario-Id"]
+    COMP["Componentes: ingreso, listado, alta, detalle, administración"]
+    API["src/api: cliente HTTP, sesión y token CSRF"]
+  end
+  subgraph SEG["Seguridad - reclamos-app/aplicacion/seguridad"]
+    FIL["Cadena de filtros de Spring Security:<br/>CSRF, sesión, autorización, logout"]
   end
   subgraph REST["Presentación REST - reclamos-app/aplicacion/rest"]
-    CTRL["ReclamoController, NotificacionController,<br/>UsuarioController, CatalogoController"]
+    CTRL["ReclamoController, NotificacionController, UsuarioController,<br/>CatalogoController, AutenticacionController"]
     DTO["DTOs, RestMapper, ManejadorGlobalErrores"]
   end
   subgraph APP["Servicios - reclamos-app/aplicacion"]
@@ -37,7 +40,8 @@ flowchart TB
   UTIL["reclamos-comun: Validador y excepciones"]
 
   COMP --> API
-  API -->|"HTTP + JSON"| CTRL
+  API -->|"HTTP + JSON, cookie de sesión"| FIL
+  FIL --> CTRL
   CTRL --> FAC
   CTRL --> DTO
   FAC --> SRV
@@ -59,12 +63,13 @@ flowchart TB
 El recorrido de una operación es siempre el mismo:
 
 ```text
-React → Controller → Facade → Servicios → Dominio → Repository → JPA → MySQL
+React → filtros de seguridad → Controller → Facade → Servicios → Dominio → Repository → JPA → MySQL
 ```
 
 | Capa | Dónde está | Responsabilidad | No hace |
 | --- | --- | --- | --- |
 | Interfaz | `frontend/` | Mostrar reclamos y enviar acciones del usuario | No decide permisos: muestra las `accionesDisponibles` que calcula el backend |
+| Seguridad | `reclamos-app/.../aplicacion/seguridad` | Login, sesión, CSRF y respuestas 401 y 403 con el error común | No decide qué puede hacer cada rol: eso sigue en el dominio y en `PermisosReclamo` |
 | Presentación REST | `reclamos-app/.../aplicacion/rest` | Traducir HTTP y JSON a llamadas de la fachada; uniformar errores | No tiene lógica de negocio |
 | Servicios | `reclamos-app/.../aplicacion` | Coordinar cada caso de uso dentro de una transacción | No conoce HTTP ni JPA |
 | Dominio | `reclamos-dominio` | Reglas del negocio, creación del reclamo, contratos | No depende de Spring ni de JPA |
@@ -224,7 +229,8 @@ intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
 | Mapeo JPA en `META-INF/orm.xml` en lugar de anotaciones | El dominio queda sin ninguna dependencia de JPA y se prueba con JUnit solo |
 | Interfaces Repository en el dominio, adaptadores en persistencia | Los servicios no dependen de `JpaRepository`; en los tests se reemplazan por dobles en memoria |
 | Transiciones en una tabla (`PoliticaTransiciones`) y no con el patrón State | Nueve transiciones se leen mejor en una tabla que repartidas en siete clases |
-| Identidad con el encabezado `X-Usuario-Id` | El Hito 1 no pide autenticación; el rol sale del usuario guardado en la base |
+| Login con sesión del servidor, no JWT (PR 14) | La interfaz y el backend están en el mismo origen. La cookie `HttpOnly` no la puede leer JavaScript y cerrar sesión la invalida enseguida, cosa que un JWT no permite sin una lista de revocados |
+| La sesión guarda solo el id del usuario | El rol sale del usuario guardado en la base en cada operación: un cambio de rol o una baja valen sin volver a entrar |
 | Los avisos se generan dentro de la transacción | Si el listener de avisos falla se revierte todo el caso de uso; no quedan reclamos sin aviso |
 | La auditoría corre después del commit | Solo registra hechos confirmados; una operación revertida no deja rastro falso |
 | El frontend llama a `/api` en su mismo origen y un proxy reenvía al backend | No hace falta configurar CORS en Spring; funciona igual con Vite y con nginx |
@@ -232,6 +238,51 @@ intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
 | `open-in-view: false` y DTOs en REST | No se serializan entidades JPA ni se abren consultas durante la respuesta HTTP |
 | Bloqueo optimista con `@Version` en `Reclamo` | Dos operaciones simultáneas sobre el mismo reclamo no se pisan: la segunda recibe `409 CONFLICTO_CONCURRENTE` |
 | OpenAPI generado del código con springdoc | El contrato de Swagger no se desactualiza: `OpenApiTest` lo regenera en `docs/openapi/reclamos.yaml` |
+
+## Login y sesión
+
+Desde el PR 14 el usuario entra con email y contraseña. Antes se identificaba con el encabezado `X-Usuario-Id`,
+y cualquiera podía hacerse pasar por cualquiera.
+
+```mermaid
+sequenceDiagram
+  actor U as Usuario
+  participant UI as React
+  participant SEC as Filtros de Spring Security
+  participant AUTH as AutenticacionController
+  participant AM as AuthenticationManager
+  participant DB as Usuarios en la base
+
+  UI->>SEC: GET /api/auth/yo
+  SEC-->>UI: 401 NO_AUTENTICADO y cookie XSRF-TOKEN
+  U->>UI: email y contraseña
+  UI->>SEC: POST /api/auth/login con X-XSRF-TOKEN
+  SEC->>SEC: el token del encabezado coincide con la cookie
+  SEC->>AUTH: pedido
+  AUTH->>AM: autenticar(email, contraseña)
+  AM->>DB: CargaDeUsuarios.loadUserByUsername(email)
+  DB-->>AM: id, hash BCrypt, activo
+  AM->>AM: BCrypt compara la contraseña
+  AM-->>AUTH: autenticado
+  AUTH->>AUTH: cambia el id de la sesión y guarda el usuario en ella
+  AUTH-->>UI: 200 con el usuario y cookie JSESSIONID (HttpOnly)
+  UI->>SEC: GET /api/reclamos con la cookie
+  SEC->>SEC: sesión válida
+  SEC-->>UI: los reclamos que ve ese usuario
+```
+
+| Pieza | Clase | Qué hace |
+| --- | --- | --- |
+| Configuración | `ConfiguracionSeguridad` | Rutas abiertas y protegidas, CSRF, logout, BCrypt y el `AuthenticationManager` |
+| Carga del usuario | `CargaDeUsuarios` | Busca por email, sin distinguir mayúsculas. Sin contraseña o desactivado, no entra |
+| Usuario de la sesión | `UsuarioAutenticado` | Solo el id y el email. Spring borra el hash después del login |
+| CSRF | `CsrfParaAplicacionDeUnaPagina` | Token en la cookie `XSRF-TOKEN`, devuelto en `X-XSRF-TOKEN`. La configuración que recomienda Spring para aplicaciones de una sola página |
+| Errores | `RespuestasDeSeguridad` | `401 NO_AUTENTICADO`, `403 CSRF_INVALIDO` y `403 ACCESO_DENEGADO`, con el mismo cuerpo que el resto |
+| Registro | `ServicioCuentas` | Solo ciudadanos. Email en minúsculas y único, DNI único, contraseña de 8 a 72 bytes |
+
+Los controladores reciben al usuario con `@AuthenticationPrincipal` y pasan su id a la fachada, que no cambió.
+Las reglas de qué puede hacer cada rol siguen en el dominio y en `PermisosReclamo`: la seguridad solo
+responde quién es.
 
 ## Integraciones de la Segunda Parte
 
@@ -437,8 +488,11 @@ repite. Está documentado en [el contrato](contratos/mensajes.md).
   los muestra en un buzón web y no los entrega a casillas reales. No hay SMS.
 - **Un solo publicador.** La outbox la publica una tarea del backend; con dos instancias del backend, las dos
   publicarían los mismos pendientes (el consumidor descarta los repetidos, pero sobra trabajo).
-- **Sin autenticación.** El usuario se identifica con `X-Usuario-Id`; cualquiera puede elegir
-  cualquier usuario.
+- **Sin límite de intentos de login.** Un atacante puede probar contraseñas sin freno. Los límites de uso
+  llegan con el PR 15.
+- **Sin confirmación del email.** El registro no verifica que el correo sea de quien se registra.
+- **Una cuenta desactivada conserva su sesión abierta** hasta que vence. Cada operación se valida con el
+  usuario de la base, así que igual no puede crear reclamos: el dominio la rechaza con `409`.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.
 - **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.

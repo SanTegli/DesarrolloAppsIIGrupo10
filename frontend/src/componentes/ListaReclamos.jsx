@@ -17,7 +17,7 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
   const areaConsulta = esAdministrador && !estadoFijo ? areaId : ''
 
   const { datos, error, cargando, recargar } = useCarga(
-    () => listarReclamos(usuario.id, { estado: estadoConsulta, areaId: areaConsulta }),
+    () => listarReclamos({ estado: estadoConsulta, areaId: areaConsulta }),
     [usuario.id, estadoConsulta, areaConsulta],
   )
   const reclamos = datos ?? []

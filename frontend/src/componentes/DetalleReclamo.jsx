@@ -25,7 +25,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
 
   const { datos, error, cargando, recargar } = useCarga(
     () =>
-      Promise.all([obtenerReclamo(usuario.id, numero), listarNotificaciones(usuario.id, numero)]).then(
+      Promise.all([obtenerReclamo(numero), listarNotificaciones(numero)]).then(
         ([reclamo, notificaciones]) => ({ reclamo, notificaciones }),
       ),
     [usuario.id, numero],
@@ -140,7 +140,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
                         disabled={enviando}
                         onClick={() =>
                           ejecutar(
-                            () => cambiarEstado(usuario.id, reclamo.numero, destino, observacion.trim()),
+                            () => cambiarEstado(reclamo.numero, destino, observacion.trim()),
                             `El reclamo pasó a ${ESTADOS[destino]}.`,
                           )
                         }
@@ -159,7 +159,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
                     evento.preventDefault()
                     const area = areas.find((candidata) => String(candidata.id) === areaId)
                     ejecutar(
-                      () => asignarArea(usuario.id, reclamo.numero, Number(areaId), observacion.trim()),
+                      () => asignarArea(reclamo.numero, Number(areaId), observacion.trim()),
                       `El reclamo quedó asignado a ${area?.nombre ?? 'el área elegida'}.`,
                     )
                   }}
