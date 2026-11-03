@@ -264,7 +264,9 @@ Desde la raíz del repositorio:
 docker compose up --build
 ```
 
-La primera vez tarda varios minutos, porque compila el backend dentro del contenedor. Cuando el log muestra `Started ReclamosApplication`, abrir `http://localhost:5173`. La API queda en `http://localhost:8080/api`.
+La primera vez tarda varios minutos, porque compila el backend y los servicios dentro de los contenedores; las siguientes, las dependencias de Maven salen de una caché. Los contenedores arrancan en orden: el backend espera a MySQL, RabbitMQ y los servicios de cobertura y prioridad, y el frontend espera al backend. Cuando aparece `reclamos-frontend` en el log, abrir `http://localhost:5173`. La API queda en `http://localhost:8080/api`.
+
+Docker Desktop necesita unos 4 GB de memoria asignada para los ocho contenedores (se ve y se cambia en **Settings → Resources**; con WSL 2, en el archivo `.wslconfig`). Cada servicio Java tiene un tope de memoria en `docker-compose.yml`.
 
 | Contenedor | Qué corre | Puerto |
 | --- | --- | --- |
@@ -287,6 +289,14 @@ docker compose logs -f backend
 En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap`, `RECLAMOS_PRIORIDAD_ESTRATEGIA=ia` y `RECLAMOS_MENSAJERIA_HABILITADA=true`: la asignación automática pasa por el servicio SOAP, la prioridad por el servicio de IA y cada aviso sale por correo a través de RabbitMQ. El WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` y Swagger del servicio de IA en `http://localhost:8082/swagger-ui.html`.
 
 Para que la IA funcione, `.env` tiene que tener `GEMINI_API_KEY` (ver «Probar el servicio de prioridad con IA», en la sección 10). Sin clave todo arranca igual, pero cada reclamo sale con la prioridad de la categoría y origen `RESPALDO`.
+
+**Comprobar que todo anda.** Con la demo levantada, en otra terminal desde la raíz:
+
+```powershell
+docker compose run --rm verificar-demo
+```
+
+Crea un reclamo de prueba como Ana Pérez y sigue su recorrido: sugerencias de Georef, prioridad con IA, área por SOAP, mensaje por RabbitMQ y correo en Mailpit. Muestra una línea por paso con `OK`, `AVISO` o `FALLA` y termina con `N pasos bien, N avisos, N fallas`. Un `AVISO` en Georef significa que no hay Internet: el resto sigue. Una `FALLA` en «Prioridad con IA» casi siempre es la clave de Gemini. El guion para presentar la demo, con las fallas que se pueden provocar a propósito, está en `docs/demo.md`.
 
 Después de cambiar código, volver a ejecutar `docker compose up --build` para reconstruir las imágenes. Los datos de MySQL se conservan en el volumen `reclamos-mysql-data`, que es el mismo del modo desarrollo.
 
@@ -608,6 +618,10 @@ Puede ser un problema de decodificación o presentación de la consola, sin impl
 
 Comprobar que Docker Desktop esté abierto, use contenedores Linux y que su motor esté listo. Según la instalación de Windows, revisar virtualización habilitada y los requisitos del backend WSL2 de Docker Desktop. No se verificó la configuración de cada PC; este es diagnóstico general. No reinicializar ni eliminar distribuciones o volúmenes para resolverlo sin revisar la causa.
 
+### H. La demo no termina de arrancar o `verificar-demo` marca fallas
+
+`docker compose ps` muestra qué contenedor no llegó a `healthy` y `docker compose logs <servicio>` explica por qué. Lo más común: poca memoria asignada a Docker Desktop (el backend se reinicia o tarda mucho), un puerto ocupado por un backend o frontend que quedó corriendo en la máquina, o la clave de Gemini. La tabla «Si algo sale mal» de `docs/demo.md` tiene cada síntoma con su causa.
+
 ## 14. Cómo apagar todo
 
 En la terminal del backend y en la del frontend: **Ctrl+C**. En modo demo, **Ctrl+C** en la terminal de `docker compose up` detiene todos los contenedores.
@@ -642,3 +656,4 @@ docker compose down
 - [ ] `.env` tiene `GEMINI_API_KEY` y la clave no aparece en `git status` ni en ningún commit.
 - [ ] Modo demo: `docker compose up --build` levanta los ocho contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.
 - [ ] Modo demo: al crear un reclamo, el correo llega a Mailpit en `http://localhost:8025`.
+- [ ] Modo demo: `docker compose run --rm verificar-demo` termina con `0 fallas`.

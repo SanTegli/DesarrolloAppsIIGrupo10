@@ -114,6 +114,78 @@ comparten con el backend son sus contratos: [`cobertura.xsd`](contratos/soap/cob
 [el OpenAPI de REST 2](contratos/README.md#rest-2-post-apiprioridadesevaluar) y
 [el contrato de mensajes](contratos/mensajes.md).
 
+## Componentes e interfaces
+
+El diagrama anterior muestra quién depende de quién. Este muestra **por qué interfaz** se comunican, en la
+notación de UML: cada círculo es una interfaz; la línea continua sale del componente que la **provee** y la
+flecha punteada, del que la **requiere**. Ningún componente conoce la implementación de otro: solo su interfaz.
+
+```mermaid
+flowchart LR
+  FE["«component»<br/>frontend"]
+  APP["«component»<br/>reclamos-app"]
+  DOM["«component»<br/>reclamos-dominio"]
+  PERS["«component»<br/>reclamos-persistencia"]
+  COM["«component»<br/>reclamos-comun"]
+  COB["«component»<br/>servicio-cobertura"]
+  PRI["«component»<br/>servicio-prioridad"]
+  NOT["«component»<br/>servicio-notificaciones"]
+  MQ["«broker»<br/>RabbitMQ"]
+  GEO["«externo»<br/>Georef"]
+  GEM["«externo»<br/>Gemini"]
+  MY["«externo»<br/>MySQL"]
+  MAIL["«externo»<br/>Mailpit"]
+
+  I1(("API de<br/>reclamos"))
+  I2(("Modelo e<br/>interfaces"))
+  I3(("Repository"))
+  I4(("Validación"))
+  I5(("Consultar<br/>Cobertura"))
+  I6(("Evaluar<br/>prioridad"))
+  I7(("direcciones"))
+  I8(("reclamos.<br/>eventos"))
+  I9(("generate<br/>Content"))
+  I10(("JDBC"))
+  I11(("notificaciones.<br/>email"))
+  I12(("SMTP"))
+
+  FE -.-> I1 --- APP
+  APP -.-> I2 --- DOM
+  APP -.-> I3 --- PERS
+  PERS -.-> I2
+  DOM -.-> I4 --- COM
+  PERS -.-> I10 --- MY
+  APP -.->|"SOAP"| I5 --- COB
+  APP -.->|"REST 2"| I6 --- PRI
+  PRI -.->|"HTTPS"| I9 --- GEM
+  APP -.->|"HTTPS"| I7 --- GEO
+  APP -.->|"AMQP, publica"| I8 --- MQ
+  NOT -.->|"AMQP, consume"| I11 --- MQ
+  NOT -.-> I12 --- MAIL
+```
+
+| Componente | Provee | Requiere | Contrato |
+| --- | --- | --- | --- |
+| `frontend` | Interfaz web | API de reclamos | [`api-contract.md`](api-contract.md) y `openapi/reclamos.yaml` |
+| `reclamos-app` | API de reclamos (REST 1) | Repository, `ConsultarCobertura`, evaluar prioridad, Georef, exchange `reclamos.eventos` | OpenAPI de REST 1 |
+| `reclamos-dominio` | Modelo e interfaces: Repository, `EstrategiaPrioridad`, `EstrategiaAsignacion`, `CatalogoCobertura`, `Geocodificador`, `PublicadorEventos` | Validación de `reclamos-comun` | Las interfaces Java del paquete `dominio` |
+| `reclamos-persistencia` | Implementación de los Repository | JDBC (MySQL) | `orm.xml` |
+| `reclamos-comun` | Validación y excepciones | — | — |
+| `servicio-cobertura` | `ConsultarCobertura` (SOAP) | Su catálogo, en un archivo propio | [`cobertura.xsd`](contratos/soap/cobertura.xsd) y el WSDL |
+| `servicio-prioridad` | `POST /api/prioridades/evaluar` (REST 2) | API de Gemini (u OpenAI) | `openapi/prioridad.yaml` |
+| `servicio-notificaciones` | Nada: solo consume | Cola `notificaciones.email`, SMTP | [`mensajes.md`](contratos/mensajes.md) |
+
+Dentro del backend pasa lo mismo, con interfaces Java. Es la **transparencia de ubicación** de la Clase 1: el
+servicio que usa la interfaz no sabe si la respuesta sale de la base, de otro proceso o de una API externa.
+
+| Interfaz | La usa | Implementaciones | Se elige con |
+| --- | --- | --- | --- |
+| `CatalogoCobertura` | `ServicioAsignacion` | `CoberturaLocal` (base) o `CoberturaSoap` (servicio SOAP) | `reclamos.cobertura.origen` |
+| `EstrategiaPrioridad` | `ReclamoService` | `PrioridadPorCategoria`, `PrioridadPorPalabrasClave` o `PrioridadConRespaldo` sobre `PrioridadPorIA` (REST 2) | `reclamos.prioridad.estrategia` |
+| `Geocodificador` | `ServicioUbicaciones` | `GeocodificadorConCache` sobre `GeorefGeocodificador` | — |
+| `SalidaDeAvisos` | `ServicioNotificaciones` | Ninguna salida, u `OutboxAvisos` (RabbitMQ) | `reclamos.mensajeria.habilitada` |
+| `BrokerMensajes` | `PublicadorMensajes` | `BrokerRabbit` | — |
+
 ## Servicios orientados a componentes
 
 Cada servicio tiene una responsabilidad y se puede probar por separado.

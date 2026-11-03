@@ -10,14 +10,17 @@ cd backend
 ./mvnw test          # dominio, persistencia con H2, servicios y REST
 
 cd ../servicios
-./mvnw verify        # servicio SOAP de cobertura
+./mvnw verify        # servicios de cobertura (SOAP), prioridad (IA) y notificaciones
 
 cd ../frontend
 npm install
 npm test             # 38 tests: capa de API, etiquetas y componentes
+
+cd ..
+node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
 ```
 
-Guardar en esta carpeta la salida de los tres comandos (`BUILD SUCCESS` y el resumen de Vitest).
+Guardar en esta carpeta la salida de los comandos (`BUILD SUCCESS` y el resumen de Vitest).
 Los mismos tests corren en GitHub Actions en cada pull request; una captura de la verificación en
 verde también sirve de evidencia.
 
@@ -107,6 +110,18 @@ RabbitMQ y Mailpit como servicios; en una máquina sin las variables `RABBITMQ_H
 | CP35 | Con RabbitMQ caído el alta sigue; el mensaje espera y sale cuando vuelve | `OutboxIntegrationTest.conElBrokerCaidoLosMensajesEsperanYSalenCuandoVuelve`, `PublicadorMensajesTest.siElBrokerFallaElMensajeQuedaPendienteConElErrorYSeCortaLaPasada` | `docker compose stop rabbitmq`, crear un reclamo (201) y ver el mensaje `PENDIENTE`; `docker compose start rabbitmq` y pasa a `PUBLICADO` |
 | CP36 | Con el correo caído se reintenta tres veces y el mensaje va a la cola de errores; uno inválido va directo | `ConfiguracionReintentosTest`, `ProcesadorAvisosTest.siElCorreoFallaNoSeRegistraYElReintentoLoManda`, `FlujoCorreoIntegrationTest.unMensajeInvalidoTerminaEnLaColaDeErroresSinReintentos` | `docker compose stop mailpit`, crear un reclamo y ver el mensaje en `notificaciones.email.dlq` |
 
+### Segunda Parte: demo completa
+
+Un solo reclamo atraviesa las cinco integraciones. El guion para presentarlo y la matriz de fallos están en
+[demo.md](../demo.md).
+
+| Caso | Qué demuestra | Cómo se comprueba | Cómo reproducirlo |
+| --- | --- | --- | --- |
+| CP37 | `docker compose up --build` levanta los ocho contenedores en orden y quedan sanos | Trabajo «Demo completa» del CI, paso «Construir y levantar los ocho contenedores» | `docker compose up --build` y `docker compose ps` |
+| CP38 | Un reclamo pasa por Georef, la IA, el SOAP, RabbitMQ y llega como correo | `scripts/verificar-demo.mjs`, en el mismo trabajo del CI (con el proveedor simulado de IA) | `docker compose run --rm verificar-demo`: termina con `0 fallas` |
+| CP39 | Cada pieza que falla tiene su respaldo y el alta no se traba | Los tests de la [matriz de fallos](../demo.md#matriz-de-fallos) | Las fallas a propósito del guion, con `docker compose stop` y `start` |
+| CP40 | Los ocho contenedores entran en la memoria de una notebook | Paso «Memoria de cada contenedor» del CI | `docker stats --no-stream` con la demo levantada |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -141,6 +156,9 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Captura de las sugerencias de Georef en el alta y del detalle con el enlace a Google Maps (CP27 y CP28).
 - [ ] Captura de Mailpit con los correos de un reclamo y de la consola de RabbitMQ con el exchange y las colas (CP33).
 - [ ] Captura de `mensajes_salientes` con un mensaje `PENDIENTE` y después `PUBLICADO` (CP35) y de la cola de errores con un mensaje (CP36).
+- [ ] Salida de `docker compose run --rm verificar-demo` con la clave de Gemini real, sin fallas (CP38).
+- [ ] Salida de `docker stats --no-stream` con la demo levantada, o la del paso «Memoria de cada contenedor» del CI (CP40).
+- [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).
