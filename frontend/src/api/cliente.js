@@ -2,6 +2,49 @@
 
 const URL_BASE = (import.meta.env.VITE_API_URL || '/api').replace(/\/$/, '')
 
+// CSRF: el backend deja el token en la cookie XSRF-TOKEN y lo espera en este encabezado en cada POST y PATCH.
+const COOKIE_CSRF = 'XSRF-TOKEN'
+const ENCABEZADO_CSRF = 'X-XSRF-TOKEN'
+const METODOS_SEGUROS = ['GET', 'HEAD']
+
+let alPerderSesion = null
+
+/**
+ * Registra qué hacer cuando el backend responde 401 a un pedido que necesitaba sesión (la sesión venció o se
+ * cerró en otra pestaña). Devuelve la función para darlo de baja.
+ */
+export function alVencerSesion(manejador) {
+  alPerderSesion = manejador
+  return () => {
+    if (alPerderSesion === manejador) {
+      alPerderSesion = null
+    }
+  }
+}
+
+function leerCookie(nombre) {
+  const prefijo = `${nombre}=`
+  const cookie = document.cookie.split('; ').find((candidata) => candidata.startsWith(prefijo))
+  return cookie ? decodeURIComponent(cookie.slice(prefijo.length)) : null
+}
+
+/**
+ * El token CSRF de la cookie. Si todavía no hay (por ejemplo, justo después de cerrar sesión), un GET a una
+ * ruta pública hace que el backend la mande.
+ */
+async function tokenCsrf() {
+  const token = leerCookie(COOKIE_CSRF)
+  if (token) {
+    return token
+  }
+  try {
+    await fetch(`${URL_BASE}/categorias`, { headers: { Accept: 'application/json' }, credentials: 'same-origin' })
+  } catch {
+    // Si no hay conexión, el pedido real va a fallar y explicarlo.
+  }
+  return leerCookie(COOKIE_CSRF)
+}
+
 /** Error con la forma del contrato REST: status, codigo, mensaje y detalles. */
 export class ErrorApi extends Error {
   constructor({ status, codigo, mensaje, detalles = [] }) {
@@ -49,18 +92,22 @@ async function leerError(respuesta) {
 }
 
 /**
- * Ejecuta una llamada a la API.
+ * Ejecuta una llamada a la API. La identidad viaja en la cookie de sesión, que el navegador manda solo.
  *
  * @param {string} ruta ruta relativa a la URL base, por ejemplo "/reclamos"
- * @param {object} opciones usuarioId (encabezado X-Usuario-Id), metodo, cuerpo y parametros de consulta
+ * @param {object} opciones metodo, cuerpo, parametros de consulta y avisarSiNoHaySesion (false en las rutas de
+ *   login, donde un 401 es una respuesta esperada y no una sesión vencida)
  */
-export async function pedir(ruta, { usuarioId, metodo = 'GET', cuerpo, parametros } = {}) {
+export async function pedir(ruta, { metodo = 'GET', cuerpo, parametros, avisarSiNoHaySesion = true } = {}) {
   const encabezados = { Accept: 'application/json' }
-  if (usuarioId !== undefined && usuarioId !== null) {
-    encabezados['X-Usuario-Id'] = String(usuarioId)
-  }
   if (cuerpo !== undefined) {
     encabezados['Content-Type'] = 'application/json'
+  }
+  if (!METODOS_SEGUROS.includes(metodo)) {
+    const token = await tokenCsrf()
+    if (token) {
+      encabezados[ENCABEZADO_CSRF] = token
+    }
   }
 
   let respuesta
@@ -69,6 +116,7 @@ export async function pedir(ruta, { usuarioId, metodo = 'GET', cuerpo, parametro
       method: metodo,
       headers: encabezados,
       body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+      credentials: 'same-origin',
     })
   } catch {
     throw new ErrorApi({
@@ -79,7 +127,11 @@ export async function pedir(ruta, { usuarioId, metodo = 'GET', cuerpo, parametro
   }
 
   if (!respuesta.ok) {
-    throw await leerError(respuesta)
+    const error = await leerError(respuesta)
+    if (error.status === 401 && avisarSiNoHaySesion && alPerderSesion) {
+      alPerderSesion(error)
+    }
+    throw error
   }
   return respuesta.status === 204 ? null : respuesta.json()
 }

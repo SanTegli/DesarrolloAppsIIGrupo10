@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.aplicacion.rest.error;
 
 import ar.edu.uade.reclamos.aplicacion.rest.dto.ErrorResponse;
+import ar.edu.uade.reclamos.aplicacion.seguridad.CredencialesInvalidasException;
 import ar.edu.uade.reclamos.comun.excepcion.*;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -41,6 +42,12 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(AccesoDenegadoException.class)
     public ResponseEntity<ErrorResponse> accesoDenegado(AccesoDenegadoException error, HttpServletRequest request) {
         return respuesta(403, "ACCESO_DENEGADO", error.getMessage(), List.of(), request);
+    }
+
+    @ExceptionHandler(CredencialesInvalidasException.class)
+    public ResponseEntity<ErrorResponse> credencialesInvalidas(CredencialesInvalidasException error,
+                                                               HttpServletRequest request) {
+        return respuesta(401, "CREDENCIALES_INVALIDAS", error.getMessage(), List.of(), request);
     }
 
     @ExceptionHandler(RecursoNoEncontradoException.class)

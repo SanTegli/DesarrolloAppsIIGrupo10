@@ -50,6 +50,20 @@ class CatalogosYUsuariosRepositoryJpaTest extends PersistenciaTestBase {
         assertThat(usuarios.buscarAgentesPorArea(-1L)).isEmpty();
     }
 
+    @Test void buscaPorEmailSinDistinguirMayusculasYGuardaElHashDeLaContrasena() {
+        prepararDatos();
+        Usuario ana = usuarios.buscarPorId(ciudadano.getId()).orElseThrow();
+        ana.definirContrasena("$2a$10$hashDePrueba");
+        usuarios.guardar(ana);
+        flushYLimpiar();
+
+        Usuario encontrada = usuarios.buscarPorEmail("  ANA@Example.org ").orElseThrow();
+        assertThat(encontrada.getId()).isEqualTo(ciudadano.getId());
+        assertThat(encontrada.getHashContrasena()).isEqualTo("$2a$10$hashDePrueba");
+        assertThat(usuarios.buscarPorEmail("nadie@example.org")).isEmpty();
+        assertThat(usuarios.buscarPorEmail(null)).isEmpty();
+    }
+
     @Test void dniEsUnicoEntreTodosLosRoles() {
         prepararDatos();
         em.flush();

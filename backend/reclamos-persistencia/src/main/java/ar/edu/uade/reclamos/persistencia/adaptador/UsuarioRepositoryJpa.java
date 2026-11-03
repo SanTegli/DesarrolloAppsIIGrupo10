@@ -35,6 +35,12 @@ public class UsuarioRepositoryJpa implements UsuarioRepository {
     }
 
     @Override
+    public Optional<Usuario> buscarPorEmail(String email) {
+        return email == null ? Optional.empty()
+                : jpa.findFirstByEmailIgnoreCaseOrderByIdAsc(email.strip()).map(CargadorRelaciones::cargar);
+    }
+
+    @Override
     public List<Usuario> buscarTodos() {
         return jpa.findAllByOrderByIdAsc().stream().map(CargadorRelaciones::cargar).toList();
     }

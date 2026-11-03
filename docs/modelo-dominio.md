@@ -24,8 +24,11 @@ classDiagram
     -String apellido
     -String email
     -boolean activo
+    -String hashContrasena
     +getRol() Rol
     +getNombreCompleto() String
+    +definirContrasena(String)
+    +tieneContrasena() boolean
   }
   class Ciudadano
   class Administrador
@@ -169,6 +172,7 @@ habilitada, además salen por correo a través de la outbox.
 | Una ubicación confirmada tiene coordenadas válidas, dirección y proveedor; nunca se inventan | `Ubicacion.confirmada` |
 | Una ubicación solo se confirma si el ciudadano eligió una sugerencia del geocodificador dentro de su municipio | `ServicioUbicaciones.confirmar` |
 | Todo reclamo nace `INGRESADO`, con número, fecha límite e historial | `ReclamoFactory.crear` |
+| Un usuario guarda el hash de su contraseña, nunca la contraseña; un hash vacío no se acepta | `Usuario.definirContrasena` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
 
@@ -204,6 +208,7 @@ erDiagram
     string email
     string telefono
     boolean activo
+    string hash_contrasena "BCrypt; nulo si no puede entrar"
     bigint area_id FK "solo agentes"
   }
   municipios {

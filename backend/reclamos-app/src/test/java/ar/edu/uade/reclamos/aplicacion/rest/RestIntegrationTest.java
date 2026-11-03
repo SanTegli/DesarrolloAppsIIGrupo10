@@ -1,5 +1,8 @@
 package ar.edu.uade.reclamos.aplicacion.rest;
 
+import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
+import static ar.edu.uade.reclamos.aplicacion.Sesiones.sinCsrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.assertj.core.api.Assertions.*;
 import static org.hamcrest.Matchers.*;
 import static org.mockito.Mockito.doThrow;
@@ -119,7 +122,7 @@ class RestIntegrationTest {
 
     @Test
     void postValidoDevuelve201LocationDtoCompletoYNotificaciones() throws Exception {
-        MvcResult resultado = mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        MvcResult resultado = mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                         .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria())))
                 .andExpect(status().isCreated()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.estado").value("ASIGNADO"))
@@ -150,7 +153,7 @@ class RestIntegrationTest {
 
     @Test
     void postSinAreaCompatibleDevuelveIngresadoYAreaNula() throws Exception {
-        mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                         .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.sinArea())))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.estado").value("INGRESADO"))
                 .andExpect(jsonPath("$.area").value(nullValue())).andExpect(jsonPath("$.historial", hasSize(1)));
@@ -159,7 +162,7 @@ class RestIntegrationTest {
     @ParameterizedTest
     @MethodSource("cuerposInvalidos")
     void postConBodyInvalidoEs400(String body) throws Exception {
-        error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                 .contentType(MediaType.APPLICATION_JSON).content(body)), 400, "DATOS_INVALIDOS", "/api/reclamos");
     }
 
@@ -173,14 +176,27 @@ class RestIntegrationTest {
 
     @Test
     void beanValidationDevuelveUnDetallePorCampoInvalido() throws Exception {
-        MvcResult resultado = error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        MvcResult resultado = error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                 .contentType(MediaType.APPLICATION_JSON).content("{}")), 400, "DATOS_INVALIDOS", "/api/reclamos");
         assertThat(leer(resultado).get("detalles")).hasSize(4);
     }
 
     @Test
+    void postConCategoriaOBarrioInexistenteEs404YNoCreaNada() throws Exception {
+        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
+                .contentType(MediaType.APPLICATION_JSON).content(creacion(Long.MAX_VALUE))),
+                404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
+        ObjectNode sinBarrio = (ObjectNode) json.readTree(creacion(datos.categoria()));
+        sinBarrio.put("barrioId", Long.MAX_VALUE);
+        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
+                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(sinBarrio))),
+                404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
+        assertThat(reclamos.buscarTodos()).hasSize(4);
+    }
+
+    @Test
     void postUsuarioInexistenteEs404() throws Exception {
-        error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", Long.MAX_VALUE)
+        error(mvc.perform(post("/api/reclamos").with(como(Long.MAX_VALUE))
                 .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
     }
@@ -192,7 +208,7 @@ class RestIntegrationTest {
             ciudadano.desactivar();
             usuarios.guardar(ciudadano);
         });
-        error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                 .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
                 409, "REGLA_NEGOCIO", "/api/reclamos");
         assertThat(reclamos.buscarTodos()).hasSize(4);
@@ -201,28 +217,46 @@ class RestIntegrationTest {
 
     @Test
     void postAgenteNoPuedeCrearEs403() throws Exception {
-        error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.agente())
+        error(mvc.perform(post("/api/reclamos").with(como(datos.agente()))
                 .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
                 403, "ACCESO_DENEGADO", "/api/reclamos");
     }
 
     @Test
-    void todasLasRutasDeReclamosExigenHeader() throws Exception {
+    void todasLasRutasDeReclamosExigenSesion() throws Exception {
         String base = "/api/reclamos/" + datos.asignado();
         for (MockHttpServletRequestBuilder request : List.of(get("/api/reclamos"), get(base), get(base + "/notificaciones"),
+                get("/api/notificaciones"), get("/api/usuarios"), get("/api/auth/yo"),
+                get("/api/ubicaciones/sugerencias").param("direccion", "Belgrano 450").param("barrioId", "1"),
                 post("/api/reclamos").contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria())),
                 patch(base + "/estado").contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"EN_PROCESO\"}"),
                 patch(base + "/asignacion").contentType(MediaType.APPLICATION_JSON).content("{\"areaId\":" + datos.otraArea() + "}"))) {
-            mvc.perform(request).andExpect(status().isBadRequest()).andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
+            mvc.perform(request.with(csrf())).andExpect(status().isUnauthorized())
+                    .andExpect(jsonPath("$.codigo").value("NO_AUTENTICADO"));
         }
+        assertThat(reclamos.buscarTodos()).hasSize(4);
     }
 
-    @ParameterizedTest
-    @ValueSource(strings = {"", "texto", "0", "-1", "9223372036854775808", "1.5"})
-    void postHeaderInvalidoEs400(String header) throws Exception {
-        error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", header)
+    @Test
+    void unPostOPatchConSesionPeroSinTokenCsrfEs403YNoCambiaNada() throws Exception {
+        error(mvc.perform(post("/api/reclamos").with(sinCsrf(datos.ciudadano()))
                 .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
-                400, "DATOS_INVALIDOS", "/api/reclamos");
+                403, "CSRF_INVALIDO", "/api/reclamos");
+        String ruta = "/api/reclamos/" + datos.asignado() + "/estado";
+        error(mvc.perform(patch(ruta).with(sinCsrf(datos.agente())).contentType(MediaType.APPLICATION_JSON)
+                .content("{\"estado\":\"EN_PROCESO\"}")), 403, "CSRF_INVALIDO", ruta);
+        assertThat(reclamos.buscarTodos()).hasSize(4);
+        assertThat(reclamos.buscarPorNumero(datos.asignado()).orElseThrow().getEstado()).isEqualTo(EstadoReclamo.ASIGNADO);
+    }
+
+    @Test
+    void elViejoEncabezadoXUsuarioIdNoCambiaQuienOpera() throws Exception {
+        // Antes del login, mandar el id del administrador alcanzaba para ver todo. Ahora manda la sesión.
+        mvc.perform(get("/api/reclamos").with(como(datos.ciudadano())).header("X-Usuario-Id", datos.administrador()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[*].numero").value(contains(datos.ingresado(), datos.asignado())));
+        error(mvc.perform(get("/api/reclamos/" + datos.ajeno()).with(como(datos.ciudadano()))
+                .header("X-Usuario-Id", datos.administrador())), 403, "ACCESO_DENEGADO", "/api/reclamos/" + datos.ajeno());
     }
 
     @Test
@@ -230,7 +264,7 @@ class RestIntegrationTest {
         listado(datos.ciudadano(), datos.ingresado(), datos.asignado());
         listado(datos.agente(), datos.resuelto(), datos.asignado());
         listado(datos.administrador(), datos.resuelto(), datos.ingresado(), datos.ajeno(), datos.asignado());
-        JsonNode resumen = leer(mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.ciudadano()))
+        JsonNode resumen = leer(mvc.perform(get("/api/reclamos").with(como(datos.ciudadano())))
                 .andExpect(status().isOk()).andReturn()).get(0);
         campos(resumen, "numero", "direccion", "estado", "prioridad", "vencido", "asignacionPendiente",
                 "fechaCreacion", "fechaLimite", "categoria", "barrio", "ciudadano", "area");
@@ -238,14 +272,14 @@ class RestIntegrationTest {
 
     @Test
     void filtrosCombinadosEIdsInexistentesRespetanContrato() throws Exception {
-        mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.administrador())
+        mvc.perform(get("/api/reclamos").with(como(datos.administrador()))
                         .param("areaId", datos.area().toString()).param("ciudadanoId", datos.ciudadano().toString())
                         .param("estado", "ASIGNADO"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[*].numero").value(contains(datos.asignado())));
-        mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.ciudadano()).param("estado", "INGRESADO"))
+        mvc.perform(get("/api/reclamos").with(como(datos.ciudadano())).param("estado", "INGRESADO"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$[*].numero").value(contains(datos.ingresado())));
         for (String filtro : List.of("areaId", "ciudadanoId")) {
-            mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.administrador())
+            mvc.perform(get("/api/reclamos").with(como(datos.administrador()))
                             .param(filtro, Long.toString(Long.MAX_VALUE)))
                     .andExpect(status().isOk()).andExpect(content().json("[]"));
         }
@@ -255,7 +289,7 @@ class RestIntegrationTest {
     void filtrosAdministrativosSon403ParaCiudadanoYAgente() throws Exception {
         for (Long usuario : List.of(datos.ciudadano(), datos.agente())) {
             for (String filtro : List.of("areaId", "ciudadanoId")) {
-                error(mvc.perform(get("/api/reclamos").header("X-Usuario-Id", usuario).param(filtro, "1")),
+                error(mvc.perform(get("/api/reclamos").with(como(usuario)).param(filtro, "1")),
                         403, "ACCESO_DENEGADO", "/api/reclamos");
             }
         }
@@ -264,35 +298,35 @@ class RestIntegrationTest {
     @ParameterizedTest
     @CsvSource({"estado,NO_EXISTE", "estado,1", "areaId,texto", "areaId,0", "ciudadanoId,-1", "ciudadanoId,1.5"})
     void queryMalFormadaEs400(String campo, String valor) throws Exception {
-        error(mvc.perform(get("/api/reclamos").header("X-Usuario-Id", datos.administrador()).param(campo, valor)),
+        error(mvc.perform(get("/api/reclamos").with(como(datos.administrador())).param(campo, valor)),
                 400, "DATOS_INVALIDOS", "/api/reclamos");
     }
 
     @Test
     void consultaIndividualDevuelveAccionesDelUsuarioYNoSerializaRelacionesInversas() throws Exception {
         String ruta = "/api/reclamos/" + datos.asignado();
-        mvc.perform(get(ruta).header("X-Usuario-Id", datos.ciudadano())).andExpect(status().isOk())
+        mvc.perform(get(ruta).with(como(datos.ciudadano()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.accionesDisponibles").value(contains("CANCELADO")))
                 .andExpect(jsonPath("$.historial[0].reclamo").doesNotExist())
                 .andExpect(jsonPath("$.ciudadano.dni").doesNotExist());
-        mvc.perform(get(ruta).header("X-Usuario-Id", datos.agente())).andExpect(status().isOk())
+        mvc.perform(get(ruta).with(como(datos.agente()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.accionesDisponibles").value(contains("EN_PROCESO")));
-        mvc.perform(get(ruta).header("X-Usuario-Id", datos.administrador())).andExpect(status().isOk())
+        mvc.perform(get(ruta).with(como(datos.administrador()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.accionesDisponibles").value(contains("ASIGNADO")));
     }
 
     @Test
     void consultaIndividualInexistenteEs404YSinPermisoEs403() throws Exception {
-        error(mvc.perform(get("/api/reclamos/REC-INEXISTENTE").header("X-Usuario-Id", datos.ciudadano())),
+        error(mvc.perform(get("/api/reclamos/REC-INEXISTENTE").with(como(datos.ciudadano()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos/REC-INEXISTENTE");
         String ruta = "/api/reclamos/" + datos.ajeno();
-        error(mvc.perform(get(ruta).header("X-Usuario-Id", datos.ciudadano())), 403, "ACCESO_DENEGADO", ruta);
+        error(mvc.perform(get(ruta).with(como(datos.ciudadano()))), 403, "ACCESO_DENEGADO", ruta);
     }
 
     @Test
     void patchEstadoValidoPersisteYMapeaAgenteHistorialYAcciones() throws Exception {
         String ruta = "/api/reclamos/" + datos.asignado() + "/estado";
-        mvc.perform(patch(ruta).header("X-Usuario-Id", datos.agente()).contentType(MediaType.APPLICATION_JSON)
+        mvc.perform(patch(ruta).with(como(datos.agente())).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"estado\":\"EN_PROCESO\",\"observacion\":\"Cuadrilla\"}"))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.estado").value("EN_PROCESO"))
                 .andExpect(jsonPath("$.agente.id").value(datos.agente()))
@@ -304,14 +338,14 @@ class RestIntegrationTest {
     @Test
     void patchTransicionInvalidaPrevaleceSobrePermisosYEs409() throws Exception {
         String ruta = "/api/reclamos/" + datos.ingresado() + "/estado";
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.otroCiudadano()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.otroCiudadano())).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"estado\":\"RESUELTO\"}")), 409, "REGLA_NEGOCIO", ruta);
     }
 
     @Test
     void patchEstadoSinPermisoEs403() throws Exception {
         String ruta = "/api/reclamos/" + datos.asignado() + "/estado";
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.otroAgente()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.otroAgente())).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"estado\":\"EN_PROCESO\"}")), 403, "ACCESO_DENEGADO", ruta);
     }
 
@@ -319,24 +353,24 @@ class RestIntegrationTest {
     @ValueSource(strings = {"\"NO_EXISTE\"", "1", "null", "true", "\"ASIGNADO\""})
     void patchEstadoInvalidoEs400(String estado) throws Exception {
         String ruta = "/api/reclamos/" + datos.asignado() + "/estado";
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.administrador()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.administrador())).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"estado\":" + estado + "}")), 400, "DATOS_INVALIDOS", ruta);
     }
 
     @Test
     void observacionExcesivaEs400EnAmbosPatch() throws Exception {
         String base = "/api/reclamos/" + datos.asignado();
-        error(mvc.perform(patch(base + "/estado").header("X-Usuario-Id", datos.agente()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(base + "/estado").with(como(datos.agente())).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("estado", "EN_PROCESO", "observacion", "x".repeat(1001))))),
                 400, "DATOS_INVALIDOS", base + "/estado");
-        error(mvc.perform(patch(base + "/asignacion").header("X-Usuario-Id", datos.administrador()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(base + "/asignacion").with(como(datos.administrador())).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("areaId", datos.otraArea(), "observacion", "x".repeat(1001))))),
                 400, "DATOS_INVALIDOS", base + "/asignacion");
     }
 
     @Test
     void patchAsignacionValidaEs200() throws Exception {
-        mvc.perform(patch("/api/reclamos/" + datos.ingresado() + "/asignacion").header("X-Usuario-Id", datos.administrador())
+        mvc.perform(patch("/api/reclamos/" + datos.ingresado() + "/asignacion").with(como(datos.administrador()))
                         .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(Map.of("areaId", datos.area()))))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.area.id").value(datos.area()))
                 .andExpect(jsonPath("$.estado").value("ASIGNADO"))
@@ -347,9 +381,9 @@ class RestIntegrationTest {
     @Test
     void patchAreaInexistenteEs404YUsuarioSinPermisoEs403() throws Exception {
         String ruta = "/api/reclamos/" + datos.ingresado() + "/asignacion";
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.administrador()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.administrador())).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("areaId", Long.MAX_VALUE)))), 404, "RECURSO_NO_ENCONTRADO", ruta);
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.ciudadano()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.ciudadano())).contentType(MediaType.APPLICATION_JSON)
                 .content(json.writeValueAsString(Map.of("areaId", datos.area())))), 403, "ACCESO_DENEGADO", ruta);
     }
 
@@ -357,7 +391,7 @@ class RestIntegrationTest {
     @ValueSource(strings = {"null", "0", "-1", "1.5", "\"texto\""})
     void patchAreaInvalidaEs400(String area) throws Exception {
         String ruta = "/api/reclamos/" + datos.ingresado() + "/asignacion";
-        error(mvc.perform(patch(ruta).header("X-Usuario-Id", datos.administrador()).contentType(MediaType.APPLICATION_JSON)
+        error(mvc.perform(patch(ruta).with(como(datos.administrador())).contentType(MediaType.APPLICATION_JSON)
                 .content("{\"areaId\":" + area + "}")), 400, "DATOS_INVALIDOS", ruta);
     }
 
@@ -365,40 +399,45 @@ class RestIntegrationTest {
     void notificacionesTienenDtoCorrectoYSinPermisoEs403() throws Exception {
         facade.tomar(datos.agente(), datos.asignado(), "Cuadrilla");
         String ruta = "/api/reclamos/" + datos.asignado() + "/notificaciones";
-        MvcResult resultado = mvc.perform(get(ruta).header("X-Usuario-Id", datos.ciudadano()))
+        MvcResult resultado = mvc.perform(get(ruta).with(como(datos.ciudadano())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].canal").value("INTERNO"))
                 .andExpect(jsonPath("$[0].destinatario.id").value(datos.ciudadano())).andReturn();
         campos(leer(resultado).get(0), "canal", "destinatario", "mensaje", "fechaEnvio");
-        error(mvc.perform(get(ruta).header("X-Usuario-Id", datos.otroCiudadano())), 403, "ACCESO_DENEGADO", ruta);
+        error(mvc.perform(get(ruta).with(como(datos.otroCiudadano()))), 403, "ACCESO_DENEGADO", ruta);
     }
 
     @Test
     void bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad() throws Exception {
         facade.tomar(datos.agente(), datos.asignado(), "Cuadrilla");
         String ruta = "/api/notificaciones";
-        MvcResult resultado = mvc.perform(get(ruta).header("X-Usuario-Id", datos.ciudadano()))
+        MvcResult resultado = mvc.perform(get(ruta).with(como(datos.ciudadano())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].numeroReclamo").value(datos.asignado()))
                 .andExpect(jsonPath("$[0].canal").value("INTERNO")).andReturn();
         campos(leer(resultado).get(0), "numeroReclamo", "canal", "mensaje", "fechaEnvio");
-        mvc.perform(get(ruta).header("X-Usuario-Id", datos.otroCiudadano()))
+        mvc.perform(get(ruta).with(como(datos.otroCiudadano())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
-        error(mvc.perform(get(ruta)), 400, "DATOS_INVALIDOS", ruta);
-        error(mvc.perform(get(ruta).header("X-Usuario-Id", 999999)), 404, "RECURSO_NO_ENCONTRADO", ruta);
+        error(mvc.perform(get(ruta)), 401, "NO_AUTENTICADO", ruta);
+        error(mvc.perform(get(ruta).with(como(999999))), 404, "RECURSO_NO_ENCONTRADO", ruta);
     }
 
     @Test
-    void usuariosYCatalogosNoExigenIdentidadYSoloExponenCamposDelContrato() throws Exception {
-        JsonNode usuariosDto = leer(mvc.perform(get("/api/usuarios")).andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(5))).andReturn());
+    void losUsuariosSonSoloParaElAdministradorYLosCatalogosSonPublicos() throws Exception {
+        JsonNode usuariosDto = leer(mvc.perform(get("/api/usuarios").with(como(datos.administrador())))
+                .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(5))).andReturn());
         campos(usuariosDto.get(0), "id", "nombreCompleto", "rol", "area");
-        JsonNode agente = leer(mvc.perform(get("/api/usuarios/" + datos.agente())).andExpect(status().isOk())
+        error(mvc.perform(get("/api/usuarios").with(como(datos.ciudadano()))), 403, "ACCESO_DENEGADO", "/api/usuarios");
+        error(mvc.perform(get("/api/usuarios").with(como(datos.agente()))), 403, "ACCESO_DENEGADO", "/api/usuarios");
+        JsonNode agente = leer(mvc.perform(get("/api/usuarios/" + datos.agente()).with(como(datos.administrador())))
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.rol").value("AGENTE_MUNICIPAL"))
                 .andExpect(jsonPath("$.area.id").value(datos.area())).andReturn());
         campos(agente.get("area"), "id", "nombre");
-        mvc.perform(get("/api/usuarios/" + datos.ciudadano())).andExpect(status().isOk())
+        mvc.perform(get("/api/usuarios/" + datos.ciudadano()).with(como(datos.ciudadano()))).andExpect(status().isOk())
                 .andExpect(jsonPath("$.area").value(nullValue()));
+        error(mvc.perform(get("/api/usuarios/" + datos.otroCiudadano()).with(como(datos.ciudadano()))), 403,
+                "ACCESO_DENEGADO", "/api/usuarios/" + datos.otroCiudadano());
         JsonNode categoria = leer(mvc.perform(get("/api/categorias")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2))).andReturn()).get(0);
         campos(categoria, "id", "nombre", "descripcion", "slaHoras", "prioridadBase");
@@ -415,27 +454,28 @@ class RestIntegrationTest {
     @Test
     void usuarioInexistenteEs404() throws Exception {
         String ruta = "/api/usuarios/" + Long.MAX_VALUE;
-        error(mvc.perform(get(ruta)), 404, "RECURSO_NO_ENCONTRADO", ruta);
+        error(mvc.perform(get(ruta).with(como(datos.administrador()))), 404, "RECURSO_NO_ENCONTRADO", ruta);
     }
 
     @ParameterizedTest
     @ValueSource(strings = {"texto", "0", "-1", "9223372036854775808"})
     void usuarioIdMalFormadoEs400(String id) throws Exception {
         String ruta = "/api/usuarios/" + id;
-        error(mvc.perform(get(ruta)), 400, "DATOS_INVALIDOS", ruta);
+        error(mvc.perform(get(ruta).with(como(datos.administrador()))), 400, "DATOS_INVALIDOS", ruta);
     }
 
     @Test
     void errorInesperadoEsGenericoYNoExponeDatosInternos() throws Exception {
-        doThrow(new IllegalStateException("SECRETO_INTERNO_NO_EXPONER")).when(facade).usuario(Long.MAX_VALUE);
+        doThrow(new IllegalStateException("SECRETO_INTERNO_NO_EXPONER")).when(facade)
+                .usuario(datos.administrador(), Long.MAX_VALUE);
         String ruta = "/api/usuarios/" + Long.MAX_VALUE;
-        MvcResult resultado = error(mvc.perform(get(ruta)), 500, "ERROR_INTERNO", ruta);
+        MvcResult resultado = error(mvc.perform(get(ruta).with(como(datos.administrador()))), 500, "ERROR_INTERNO", ruta);
         assertThat(resultado.getResponse().getContentAsString()).doesNotContain("SECRETO_INTERNO", "stackTrace", "IllegalStateException");
     }
 
     @Test
     void deleteReclamosDevuelve405ConErrorResponse() throws Exception {
-        MvcResult resultado = error(mvc.perform(delete("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())),
+        MvcResult resultado = error(mvc.perform(delete("/api/reclamos").with(como(datos.ciudadano()))),
                 405, "METODO_NO_PERMITIDO", "/api/reclamos");
         assertThat(leer(resultado).get("mensaje").asText())
                 .isEqualTo("El método HTTP utilizado no está permitido para este recurso.");
@@ -446,7 +486,7 @@ class RestIntegrationTest {
 
     @Test
     void postReclamosConTextoPlanoDevuelve415ConErrorResponse() throws Exception {
-        MvcResult resultado = error(mvc.perform(post("/api/reclamos").header("X-Usuario-Id", datos.ciudadano())
+        MvcResult resultado = error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
                 .contentType(MediaType.TEXT_PLAIN).content(creacion(datos.categoria()))),
                 415, "TIPO_CONTENIDO_NO_SOPORTADO", "/api/reclamos");
         assertThat(leer(resultado).get("mensaje").asText())
@@ -463,7 +503,7 @@ class RestIntegrationTest {
     }
 
     private void listado(Long usuario, String... numeros) throws Exception {
-        mvc.perform(get("/api/reclamos").header("X-Usuario-Id", usuario)).andExpect(status().isOk())
+        mvc.perform(get("/api/reclamos").with(como(usuario))).andExpect(status().isOk())
                 .andExpect(jsonPath("$[*].numero").value(contains(numeros)));
     }
 

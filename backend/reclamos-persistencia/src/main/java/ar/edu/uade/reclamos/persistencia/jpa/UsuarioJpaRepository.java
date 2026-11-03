@@ -11,6 +11,7 @@ import org.springframework.data.repository.query.Param;
 /** Contrato técnico interno; los servicios usan el Repository del dominio. */
 public interface UsuarioJpaRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByDni(String dni);
+    Optional<Usuario> findFirstByEmailIgnoreCaseOrderByIdAsc(String email);
     List<Usuario> findAllByOrderByIdAsc();
 
     @Query("select a from AgenteMunicipal a where a.activo = true and a.area.id = :areaId order by a.id")

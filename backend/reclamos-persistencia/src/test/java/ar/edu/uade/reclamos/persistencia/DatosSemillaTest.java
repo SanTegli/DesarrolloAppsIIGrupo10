@@ -70,5 +70,7 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(jdbc.queryForObject("select count(*) from area_barrio", Integer.class)).isEqualTo(8);
         assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(4);
         assertThat(reclamos.buscarTodos()).isEmpty();
+        assertThat(usuarios.buscarTodos()).allMatch(Usuario::tieneContrasena);
+        assertThat(usuarios.buscarPorEmail("ana@example.org")).isPresent();
     }
 }

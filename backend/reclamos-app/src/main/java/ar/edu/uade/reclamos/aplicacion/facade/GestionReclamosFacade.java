@@ -13,13 +13,22 @@ public class GestionReclamosFacade {
     private final ConsultaReclamosService consultas;
     private final ConsultaCatalogosService catalogos;
     private final ServicioUbicaciones ubicaciones;
+    private final ServicioCuentas cuentas;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
-                                  ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones) {
+                                  ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones,
+                                  ServicioCuentas cuentas) {
         this.escritura = escritura;
         this.consultas = consultas;
         this.catalogos = catalogos;
         this.ubicaciones = ubicaciones;
+        this.cuentas = cuentas;
+    }
+
+    /** Registro de un ciudadano con email y contraseña. */
+    public Ciudadano registrarCiudadano(String dni, String nombre, String apellido, String email,
+                                        String contrasena) {
+        return cuentas.registrarCiudadano(dni, nombre, apellido, email, contrasena);
     }
 
     public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion) {
@@ -94,8 +103,8 @@ public class GestionReclamosFacade {
         return consultas.accionesDisponibles(usuarioId, numero);
     }
 
-    public List<Usuario> usuarios() {
-        return catalogos.usuarios();
+    public List<Usuario> usuarios(Long actorId) {
+        return catalogos.usuarios(actorId);
     }
 
     public List<Categoria> categorias() {
@@ -112,5 +121,9 @@ public class GestionReclamosFacade {
 
     public Usuario usuario(Long id) {
         return catalogos.usuario(id);
+    }
+
+    public Usuario usuario(Long actorId, Long id) {
+        return catalogos.usuario(actorId, id);
     }
 }

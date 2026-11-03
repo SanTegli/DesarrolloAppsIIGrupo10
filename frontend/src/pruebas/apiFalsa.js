@@ -15,7 +15,8 @@ export function simularApi(rutas) {
         metodo,
         ruta: pathname,
         consulta: Object.fromEntries(searchParams),
-        usuarioId: opciones.headers?.['X-Usuario-Id'],
+        csrf: opciones.headers?.['X-XSRF-TOKEN'],
+        credenciales: opciones.credentials,
         cuerpo: opciones.body ? JSON.parse(opciones.body) : undefined,
       }
       llamadas.push(peticion)
@@ -30,6 +31,15 @@ export function simularApi(rutas) {
     }),
   )
   return llamadas
+}
+
+/** Valor de la cookie XSRF-TOKEN que deja el setup de los tests. */
+export const TOKEN_CSRF = 'token-de-prueba'
+
+/** Respuesta 401 del backend cuando no hay sesión. */
+export const SIN_SESION = {
+  status: 401,
+  cuerpo: { status: 401, codigo: 'NO_AUTENTICADO', mensaje: 'Hay que iniciar sesión para usar esta función.', detalles: [] },
 }
 
 export const USUARIOS = [

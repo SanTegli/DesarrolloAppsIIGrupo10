@@ -2,6 +2,8 @@
 //   npm run mock        (escucha en http://localhost:8080)
 //
 // Sigue docs/api-contract.md y guarda todo en memoria: al reiniciar se pierde.
+// Como el backend, usa login con sesión (cookie JSESSIONID) y CSRF (cookie XSRF-TOKEN y encabezado
+// X-XSRF-TOKEN). Los siete usuarios de la semilla entran con la contraseña demo1234.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -31,15 +33,19 @@ const areas = [
   { id: 3, nombre: 'Higiene Urbana', activa: true, categorias: [3], barrios: [1, 2] },
   { id: 4, nombre: 'Mantenimiento Vial', activa: true, categorias: [2], barrios: [2] },
 ]
+// Solo es una ayuda de desarrollo: las contraseñas quedan en memoria y en texto. El backend guarda BCrypt.
+const CONTRASENA_SEMILLA = 'demo1234'
 const usuarios = [
-  { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO', areaId: null },
-  { id: 2, nombreCompleto: 'Bruno Díaz', rol: 'CIUDADANO', areaId: null },
-  { id: 3, nombreCompleto: 'Carla Gómez', rol: 'AGENTE_MUNICIPAL', areaId: 1 },
-  { id: 4, nombreCompleto: 'Diego Sosa', rol: 'AGENTE_MUNICIPAL', areaId: 2 },
-  { id: 5, nombreCompleto: 'Fabián Luna', rol: 'AGENTE_MUNICIPAL', areaId: 3 },
-  { id: 6, nombreCompleto: 'Gabriela Paz', rol: 'AGENTE_MUNICIPAL', areaId: 4 },
-  { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', areaId: null },
-]
+  { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO', areaId: null, email: 'ana@example.org', dni: '30111222' },
+  { id: 2, nombreCompleto: 'Bruno Díaz', rol: 'CIUDADANO', areaId: null, email: 'bruno@example.org', dni: '31222333' },
+  { id: 3, nombreCompleto: 'Carla Gómez', rol: 'AGENTE_MUNICIPAL', areaId: 1, email: 'carla@example.org', dni: '25333444' },
+  { id: 4, nombreCompleto: 'Diego Sosa', rol: 'AGENTE_MUNICIPAL', areaId: 2, email: 'diego@example.org', dni: '26444555' },
+  { id: 5, nombreCompleto: 'Fabián Luna', rol: 'AGENTE_MUNICIPAL', areaId: 3, email: 'fabian@example.org', dni: '27555666' },
+  { id: 6, nombreCompleto: 'Gabriela Paz', rol: 'AGENTE_MUNICIPAL', areaId: 4, email: 'gabriela@example.org', dni: '28666777' },
+  { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', areaId: null, email: 'elena@example.org', dni: '20555666' },
+].map((usuario) => ({ ...usuario, contrasena: CONTRASENA_SEMILLA }))
+// id de sesión -> id de usuario, como la sesión HTTP del backend.
+const sesiones = new Map()
 const reclamos = []
 const notificaciones = []
 
@@ -125,12 +131,66 @@ const buscar = (lista, id, recurso) => {
   return encontrado
 }
 
-function usuarioDe(peticion) {
-  const valor = peticion.headers['x-usuario-id']
-  if (!valor || !/^[1-9]\d*$/.test(valor)) {
-    throw invalido('Faltan datos obligatorios o su formato es invalido.')
+function usuarioDe(contexto) {
+  const usuarioId = sesiones.get(contexto.cookies.JSESSIONID)
+  if (!usuarioId) {
+    throw new ErrorHttp(401, 'NO_AUTENTICADO', 'Hay que iniciar sesión para usar esta función.')
   }
-  return buscar(usuarios, Number(valor), 'usuario')
+  return buscar(usuarios, usuarioId, 'usuario')
+}
+
+const usuarioPublico = (usuario) => ({
+  id: usuario.id,
+  nombreCompleto: usuario.nombreCompleto,
+  rol: usuario.rol,
+  area: referencia(areas.find((a) => a.id === usuario.areaId)),
+})
+
+function leerCookies(peticion) {
+  const cookies = {}
+  for (const parte of (peticion.headers.cookie ?? '').split(';')) {
+    const [nombre, ...valor] = parte.trim().split('=')
+    if (nombre) cookies[nombre] = decodeURIComponent(valor.join('='))
+  }
+  return cookies
+}
+
+function login(contexto, cuerpo) {
+  const email = String(cuerpo.email ?? '').trim().toLowerCase()
+  const usuario = usuarios.find((candidato) => candidato.email === email)
+  if (!usuario || usuario.contrasena !== cuerpo.contrasena) {
+    throw new ErrorHttp(401, 'CREDENCIALES_INVALIDAS', 'El correo o la contraseña no son correctos.')
+  }
+  sesiones.delete(contexto.cookies.JSESSIONID)
+  const sesion = randomUUID()
+  sesiones.set(sesion, usuario.id)
+  contexto.setCookies.push(`JSESSIONID=${sesion}; Path=/; HttpOnly; SameSite=Lax`)
+  return usuarioPublico(usuario)
+}
+
+function registrarCuenta(cuerpo) {
+  const detalles = []
+  const texto = (campo) => String(cuerpo[campo] ?? '').trim()
+  if (!/^\d{7,8}$/.test(texto('dni'))) detalles.push('dni: debe tener 7 u 8 dígitos')
+  if (!texto('nombre')) detalles.push('nombre: no debe estar vacío')
+  if (!texto('apellido')) detalles.push('apellido: no debe estar vacío')
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(texto('email'))) detalles.push('email: debe ser una dirección de correo')
+  if (String(cuerpo.contrasena ?? '').length < 8) detalles.push('contrasena: debe tener al menos 8 caracteres')
+  if (detalles.length) throw invalido('Los datos recibidos no son validos.', detalles)
+  const email = texto('email').toLowerCase()
+  if (usuarios.some((u) => u.email === email)) throw regla('Ya hay una cuenta con ese correo electrónico.')
+  if (usuarios.some((u) => u.dni === texto('dni'))) throw regla('Ya hay una cuenta con ese DNI.')
+  const usuario = {
+    id: Math.max(...usuarios.map((u) => u.id)) + 1,
+    nombreCompleto: `${texto('nombre')} ${texto('apellido')}`,
+    rol: 'CIUDADANO',
+    areaId: null,
+    email,
+    dni: texto('dni'),
+    contrasena: cuerpo.contrasena,
+  }
+  usuarios.push(usuario)
+  return usuarioPublico(usuario)
 }
 
 function puedeConsultar(usuario, reclamo) {
@@ -377,7 +437,7 @@ async function leerCuerpo(peticion) {
   throw invalido('Faltan datos obligatorios o su formato es invalido.')
 }
 
-async function atender(peticion) {
+async function atender(peticion, contexto) {
   const url = new URL(peticion.url, 'http://localhost')
   const partes = url.pathname.split('/').filter(Boolean) // ["api", "reclamos", numero, accion]
   const metodo = peticion.method
@@ -397,23 +457,33 @@ async function atender(peticion) {
       return [200, lista]
     }
     if (partes[1] === 'usuarios') {
-      const lista = usuarios.map((u) => ({
-        id: u.id,
-        nombreCompleto: u.nombreCompleto,
-        rol: u.rol,
-        area: referencia(areas.find((a) => a.id === u.areaId)),
-      }))
-      return [200, lista]
+      if (usuarioDe(contexto).rol !== 'ADMINISTRADOR') throw denegado('Solo un administrador puede ver la lista de usuarios.')
+      return [200, usuarios.map(usuarioPublico)]
+    }
+  }
+
+  if (partes[1] === 'auth' && partes.length === 3) {
+    if (metodo === 'POST' && partes[2] === 'login') return [200, login(contexto, await leerCuerpo(peticion))]
+    if (metodo === 'POST' && partes[2] === 'registro') {
+      const usuario = registrarCuenta(await leerCuerpo(peticion))
+      return [201, usuario, { Location: `/api/usuarios/${usuario.id}` }]
+    }
+    if (metodo === 'GET' && partes[2] === 'yo') return [200, usuarioPublico(usuarioDe(contexto))]
+    if (metodo === 'POST' && partes[2] === 'logout') {
+      sesiones.delete(contexto.cookies.JSESSIONID)
+      contexto.setCookies.push('JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax')
+      return [204, null]
     }
   }
 
   if (metodo === 'GET' && partes[1] === 'ubicaciones' && partes[2] === 'sugerencias' && partes.length === 3) {
+    usuarioDe(contexto)
     return [200, sugerirUbicaciones(url.searchParams)]
   }
 
   // Bandeja del usuario: sus avisos, del más nuevo al más viejo.
   if (partes[1] === 'notificaciones' && partes.length === 2 && metodo === 'GET') {
-    const usuario = usuarioDe(peticion)
+    const usuario = usuarioDe(contexto)
     const lista = notificaciones
       .filter((n) => n.destinatarioId === usuario.id)
       .map((n) => ({ numeroReclamo: n.numero, canal: n.canal, mensaje: n.mensaje, fechaEnvio: n.fechaEnvio }))
@@ -422,7 +492,7 @@ async function atender(peticion) {
   }
 
   if (partes[1] === 'reclamos') {
-    const usuario = usuarioDe(peticion)
+    const usuario = usuarioDe(contexto)
     if (partes.length === 2 && metodo === 'GET') return [200, listar(usuario, url.searchParams)]
     if (partes.length === 2 && metodo === 'POST') {
       const reclamo = crear(usuario, await leerCuerpo(peticion))
@@ -460,8 +530,17 @@ createServer(async (peticion, respuesta) => {
   let status
   let cuerpo
   let encabezados = {}
+  const contexto = { cookies: leerCookies(peticion), setCookies: [] }
+  // CSRF como en el backend: la cookie sale en cualquier respuesta y los POST y PATCH la devuelven en el encabezado.
+  const tokenCsrf = contexto.cookies['XSRF-TOKEN']
+  if (!tokenCsrf) {
+    contexto.setCookies.push(`XSRF-TOKEN=${randomUUID()}; Path=/; SameSite=Lax`)
+  }
   try {
-    ;[status, cuerpo, encabezados = {}] = await atender(peticion)
+    if (!['GET', 'HEAD'].includes(peticion.method) && (!tokenCsrf || peticion.headers['x-xsrf-token'] !== tokenCsrf)) {
+      throw new ErrorHttp(403, 'CSRF_INVALIDO', 'Falta el token de seguridad o venció. Recargá la página e intentá de nuevo.')
+    }
+    ;[status, cuerpo, encabezados = {}] = await atender(peticion, contexto)
   } catch (error) {
     status = error.status ?? 500
     cuerpo = {
@@ -474,11 +553,20 @@ createServer(async (peticion, respuesta) => {
     }
     if (!error.status) console.error(error)
   }
-  respuesta.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...encabezados })
-  respuesta.end(JSON.stringify(cuerpo))
+  if (contexto.setCookies.length) {
+    encabezados = { ...encabezados, 'Set-Cookie': contexto.setCookies }
+  }
+  if (status === 204) {
+    respuesta.writeHead(status, encabezados)
+    respuesta.end()
+  } else {
+    respuesta.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...encabezados })
+    respuesta.end(JSON.stringify(cuerpo))
+  }
   console.log(`${peticion.method} ${peticion.url} -> ${status}`)
 }).listen(PUERTO, () => {
   console.log(`API simulada en http://localhost:${PUERTO}/api`)
+  console.log(`Usuarios de la semilla, contraseña ${CONTRASENA_SEMILLA}: ${usuarios.map((u) => u.email).join(', ')}`)
   console.log(`Prioridad: ${ESTRATEGIA_PRIORIDAD}. Asignación: ${ESTRATEGIA_ASIGNACION}.`)
   console.log(`Vencimientos: control cada ${INTERVALO_VENCIMIENTOS_MS} ms.`)
 })

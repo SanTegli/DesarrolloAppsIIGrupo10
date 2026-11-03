@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.dominio.modelo;
 
+import ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException;
 import ar.edu.uade.reclamos.comun.validacion.Validador;
 
 /** Persona que usa el sistema. El rol lo define la subclase. */
@@ -11,6 +12,8 @@ public abstract class Usuario extends Entidad {
     private String email;
     private String telefono;
     private boolean activo = true;
+    /** Hash de la contraseña (BCrypt). El dominio no sabe cómo se calcula: lo recibe hecho. Nulo si no puede entrar. */
+    private String hashContrasena;
 
     /** Requerido por JPA. */
     protected Usuario() {
@@ -28,6 +31,22 @@ public abstract class Usuario extends Entidad {
 
     public String getNombreCompleto() {
         return nombre + " " + apellido;
+    }
+
+    /** Define la contraseña con su hash ya calculado. Nunca se guarda la contraseña en texto. */
+    public void definirContrasena(String hash) {
+        if (hash == null || hash.isBlank()) {
+            throw new DatosInvalidosException("La contraseña no puede quedar vacía.");
+        }
+        this.hashContrasena = hash;
+    }
+
+    public boolean tieneContrasena() {
+        return hashContrasena != null;
+    }
+
+    public String getHashContrasena() {
+        return hashContrasena;
     }
 
     public void activar() {

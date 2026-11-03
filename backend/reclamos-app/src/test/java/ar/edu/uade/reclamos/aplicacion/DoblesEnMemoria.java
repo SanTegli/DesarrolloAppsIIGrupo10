@@ -147,6 +147,11 @@ public final class DoblesEnMemoria {
         }
 
         @Override
+        public Optional<Usuario> buscarPorEmail(String email) {
+            return guardados.stream().filter(usuario -> usuario.getEmail().equalsIgnoreCase(email)).findFirst();
+        }
+
+        @Override
         public List<Usuario> buscarTodos() {
             return List.copyOf(guardados);
         }

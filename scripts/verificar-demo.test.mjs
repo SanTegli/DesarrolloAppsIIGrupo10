@@ -7,7 +7,6 @@ import {
   AVISO,
   FALLA,
   OK,
-  RECLAMO_DE_PRUEBA,
   resumen,
   revisarArea,
   revisarPrioridad,
@@ -31,6 +30,7 @@ function escenarioNormal() {
     ],
     consumidores: 1,
     mensajesEnErrores: 0,
+    contrasena: 'demo1234',
     altas: [],
   }
 }
@@ -39,10 +39,19 @@ let escenario
 let servidor
 let base
 
-function responder(res, estado, cuerpo, tipo = 'application/json') {
-  res.writeHead(estado, { 'Content-Type': tipo })
+const TOKEN = 'token-csrf-de-prueba'
+const SESION = 'sesion-de-prueba'
+
+function responder(res, estado, cuerpo, tipo = 'application/json', cookies = []) {
+  res.writeHead(estado, { 'Content-Type': tipo, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) })
   res.end(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo))
 }
+
+function cookiesDe(req) {
+  return Object.fromEntries((req.headers.cookie ?? '').split('; ').filter(Boolean).map((par) => par.split('=')))
+}
+
+const NO_AUTENTICADO = { status: 401, codigo: 'NO_AUTENTICADO' }
 
 async function leer(req) {
   let texto = ''
@@ -56,12 +65,35 @@ before(async () => {
     const ruta = url.pathname
     if (ruta === '/frontend/') return responder(res, 200, '<div id="raiz"></div>', 'text/html')
     if (ruta === '/frontend/api/categorias') return responder(res, 200, [{ id: 1 }, { id: 2 }, { id: 3 }])
-    if (ruta === '/backend/api/usuarios') return responder(res, 200, Array.from({ length: 7 }, (_, i) => ({ id: i })))
+    // Como el backend: el GET público deja la cookie CSRF; el login la exige y deja la de sesión.
+    const cookies = cookiesDe(req)
+    const conSesion = cookies.JSESSIONID === SESION
+    if (ruta === '/backend/api/categorias') {
+      return responder(res, 200, [{ id: 1 }, { id: 2 }, { id: 3 }], 'application/json', [`XSRF-TOKEN=${TOKEN}; Path=/`])
+    }
     if (ruta === '/backend/v3/api-docs') return responder(res, 200, { openapi: '3.1.0' })
-    if (ruta === '/backend/api/ubicaciones/sugerencias') return responder(res, 200, escenario.georef)
-    if (ruta === '/backend/api/reclamos' && req.method === 'POST') {
+    if (ruta === '/backend/api/auth/login' && req.method === 'POST') {
       const cuerpo = JSON.parse(await leer(req))
-      escenario.altas.push({ cuerpo, usuario: req.headers['x-usuario-id'] })
+      if (req.headers['x-xsrf-token'] !== TOKEN || cookies['XSRF-TOKEN'] !== TOKEN) {
+        return responder(res, 403, { status: 403, codigo: 'CSRF_INVALIDO' })
+      }
+      if (cuerpo.email !== 'ana@example.org' || cuerpo.contrasena !== escenario.contrasena) {
+        return responder(res, 401, { status: 401, codigo: 'CREDENCIALES_INVALIDAS' })
+      }
+      return responder(res, 200, { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO' }, 'application/json',
+        [`JSESSIONID=${SESION}; Path=/; HttpOnly`])
+    }
+    if (ruta === '/backend/api/auth/yo') {
+      return conSesion ? responder(res, 200, { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO' }) : responder(res, 401, NO_AUTENTICADO)
+    }
+    if (ruta === '/backend/api/ubicaciones/sugerencias') {
+      return conSesion ? responder(res, 200, escenario.georef) : responder(res, 401, NO_AUTENTICADO)
+    }
+    if (ruta === '/backend/api/reclamos' && req.method === 'POST') {
+      if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
+      if (req.headers['x-xsrf-token'] !== TOKEN) return responder(res, 403, { status: 403, codigo: 'CSRF_INVALIDO' })
+      const cuerpo = JSON.parse(await leer(req))
+      escenario.altas.push({ cuerpo, usuarioId: req.headers['x-usuario-id'] })
       return responder(res, 201, {
         numero: NUMERO,
         estado: 'ASIGNADO',
@@ -127,7 +159,8 @@ describe('verificarDemo', () => {
     assert.deepEqual(resumen(resultados), { ok: resultados.length, avisos: 0, fallas: 0 })
     assert.equal(escenario.altas.length, 1)
     const [alta] = escenario.altas
-    assert.equal(alta.usuario, String(RECLAMO_DE_PRUEBA.usuarioId))
+    assert.equal(alta.usuarioId, undefined, 'la identidad va en la sesión, no en un encabezado')
+    assert.match(resultados.find((r) => r.paso === 'Login').detalle, /Ana Pérez/)
     assert.equal(alta.cuerpo.ubicacion.direccionNormalizada, 'BELGRANO 450, Bernal, Quilmes')
     assert.match(resultados.find((r) => r.paso === 'Correo por RabbitMQ').detalle, /lo recibimos/)
   })
@@ -173,6 +206,16 @@ describe('verificarDemo', () => {
     const rabbit = resultados.find((r) => r.paso === 'RabbitMQ')
     assert.equal(rabbit.estado, FALLA)
     assert.match(rabbit.detalle, /401/)
+  })
+
+  test('con una contraseña que no es la de la semilla, falla el login y el alta no se intenta con sesión', async () => {
+    escenario = { ...escenarioNormal(), contrasena: 'otra-clave' }
+    const resultados = await verificarDemo(configuracion())
+
+    assert.equal(estadoDe(resultados, 'Login'), FALLA)
+    assert.match(resultados.find((r) => r.paso === 'Login').detalle, /401/)
+    assert.equal(estadoDe(resultados, 'Alta del reclamo'), FALLA)
+    assert.equal(escenario.altas.length, 0)
   })
 
   test('con el backend apagado no se corta: marca las fallas y no intenta revisar el reclamo', async () => {

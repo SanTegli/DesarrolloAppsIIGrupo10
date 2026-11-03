@@ -105,3 +105,9 @@ INSERT INTO inicializaciones (identificador)
 SELECT 'datos-dev-v1' WHERE NOT EXISTS (
     SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v1'
 );
+
+-- Login (PR 14): contraseña de desarrollo "demo1234" para los siete usuarios de la semilla, en BCrypt.
+-- Va aparte del marcador datos-dev-v1 para completar también las bases creadas antes del login. Solo toca
+-- los usuarios sin contraseña: no pisa una que se haya cambiado.
+UPDATE usuarios SET hash_contrasena = '$2a$10$Fj7CGx6hDi2DyQSJv4Bat.Crnxp12nWpSIXthWYde6v/q.bYhjFjW'
+WHERE hash_contrasena IS NULL AND id BETWEEN 1 AND 7;

@@ -14,6 +14,9 @@ public interface UsuarioRepository {
 
     Optional<Usuario> buscarPorDni(String dni);
 
+    /** Busca por email sin distinguir mayúsculas: es el nombre de usuario para entrar al sistema. */
+    Optional<Usuario> buscarPorEmail(String email);
+
     List<Usuario> buscarTodos();
 
     /** Agentes activos del área. Se usan para avisarles cuando entra un reclamo. */

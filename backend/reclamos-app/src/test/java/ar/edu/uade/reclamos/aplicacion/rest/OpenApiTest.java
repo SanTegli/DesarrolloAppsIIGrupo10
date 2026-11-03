@@ -42,7 +42,8 @@ class OpenApiTest {
                 "/api/reclamos/{numero}/estado", "/api/reclamos/{numero}/asignacion",
                 "/api/reclamos/{numero}/notificaciones", "/api/notificaciones", "/api/usuarios",
                 "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
-                "/api/ubicaciones/sugerencias");
+                "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
+                "/api/auth/logout");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();
@@ -51,12 +52,15 @@ class OpenApiTest {
                 .isTrue();
 
         JsonNode cambiarEstado = contrato.at("/paths/~1api~1reclamos~1{numero}~1estado/patch");
-        for (String codigo : List.of("200", "400", "403", "404", "409", "500")) {
+        for (String codigo : List.of("200", "400", "401", "403", "404", "409", "500")) {
             assertThat(cambiarEstado.get("responses").has(codigo)).as("respuesta %s", codigo).isTrue();
         }
         assertThat(cambiarEstado.at("/responses/409/content/application~1json/schema/$ref").asText())
                 .isEqualTo("#/components/schemas/ErrorResponse");
-        assertThat(cambiarEstado.get("parameters").findValuesAsText("name")).contains("X-Usuario-Id");
+        // La identidad sale de la sesión: ninguna operación pide un encabezado o parámetro con el usuario.
+        assertThat(contrato.findValuesAsText("name")).doesNotContain("X-Usuario-Id");
+        assertThat(contrato.at("/components/securitySchemes/sesion/in").asText()).isEqualTo("cookie");
+        assertThat(contrato.at("/components/securitySchemes/sesion/name").asText()).isEqualTo("JSESSIONID");
     }
 
     @Test

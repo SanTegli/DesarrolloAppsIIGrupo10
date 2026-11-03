@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
@@ -147,7 +148,7 @@ class UbicacionesIntegrationTest {
     void validaLosParametrosDeLaBusqueda() throws Exception {
         sugerencias("ab").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
-        mvc.perform(get("/api/ubicaciones/sugerencias").param("direccion", "Belgrano 450").param("barrioId", "999"))
+        mvc.perform(get("/api/ubicaciones/sugerencias").with(como(ciudadano)).param("direccion", "Belgrano 450").param("barrioId", "999"))
                 .andExpect(status().isNotFound());
         assertThat(CONSULTAS).isEmpty();
     }
@@ -186,12 +187,12 @@ class UbicacionesIntegrationTest {
     }
 
     private ResultActions sugerencias(String direccion) throws Exception {
-        return mvc.perform(get("/api/ubicaciones/sugerencias").param("direccion", direccion)
+        return mvc.perform(get("/api/ubicaciones/sugerencias").with(como(ciudadano)).param("direccion", direccion)
                 .param("barrioId", barrio.toString()));
     }
 
     private ResultActions crear(String ubicacion) throws Exception {
-        return mvc.perform(post("/api/reclamos").header("X-Usuario-Id", ciudadano)
+        return mvc.perform(post("/api/reclamos").with(como(ciudadano))
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Pozo en la calle",

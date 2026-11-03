@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import ar.edu.uade.reclamos.dominio.repositorio.*;
@@ -23,8 +24,20 @@ public class ConsultaCatalogosService {
         this.areas = areas;
     }
 
-    public List<Usuario> usuarios() {
+    /** El listado completo de usuarios solo lo ve un administrador. */
+    public List<Usuario> usuarios(Long actorId) {
+        if (!(usuario(actorId) instanceof Administrador)) {
+            throw new AccesoDenegadoException("Solo un administrador puede ver la lista de usuarios.");
+        }
         return usuarios.buscarTodos();
+    }
+
+    /** Un usuario se puede consultar a sí mismo; a los demás, solo un administrador. */
+    public Usuario usuario(Long actorId, Long id) {
+        if (!actorId.equals(id) && !(usuario(actorId) instanceof Administrador)) {
+            throw new AccesoDenegadoException("Solo un administrador puede ver los datos de otro usuario.");
+        }
+        return usuario(id);
     }
 
     public Usuario usuario(Long id) {
