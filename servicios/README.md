@@ -7,7 +7,7 @@ con su propio proceso y contenedor; no comparten código con `backend/`: se inte
 | --- | --- | --- | --- | --- | --- |
 | Cobertura | `servicio-cobertura/` | SOAP 1.1, WSDL en `/ws/cobertura.wsdl` | 8081 | 9 | Hecho |
 | Prioridad con IA | `servicio-prioridad/` | REST 2, OpenAPI en `/swagger-ui.html` | 8082 | 10 | Hecho |
-| Notificaciones | `servicio-notificaciones/` | Consume de RabbitMQ, envía SMTP a Mailpit | — | 12 | Pendiente |
+| Notificaciones | `servicio-notificaciones/` | Consume de RabbitMQ, envía SMTP a Mailpit | — | 12 | Hecho |
 
 Los contratos están en [`docs/contratos/`](../docs/contratos/README.md).
 
@@ -145,3 +145,61 @@ Maven: Java 21 ejecuta el archivo directamente.
 | `PrioridadControllerTest`, `ErroresDelProveedorTest` | El endpoint completo: 200, 400, 502, 503 y 504 |
 | `ConfiguracionProveedorTest` | La Factory elige el adaptador por configuración y no muestra las claves |
 | `OpenApiPrioridadTest` | El contrato documenta la operación y sus errores; regenera `docs/openapi/prioridad.yaml` |
+
+## Servicio de notificaciones (RabbitMQ y correo)
+
+Consume los avisos que publica el backend en RabbitMQ y los manda por correo. No tiene API HTTP: solo escucha
+la cola `notificaciones.email`. El contrato de los mensajes está en
+[`docs/contratos/mensajes.md`](../docs/contratos/mensajes.md).
+
+```text
+servicio-notificaciones/
+  src/main/java/.../configuracion/TopologiaRabbit.java       Exchanges, cola y cola de errores
+  src/main/java/.../configuracion/ConfiguracionReintentos.java  Qué se reintenta y qué va directo a errores
+  src/main/java/.../aviso/ListenerAvisos.java                 @RabbitListener de la cola
+  src/main/java/.../aviso/ProcesadorAvisos.java               Lee, descarta repetidos, manda y registra
+  src/main/java/.../aviso/CorreoSmtp.java                     El correo, por SMTP
+  src/main/resources/schema.sql                               Tabla de eventId ya procesados
+```
+
+| Qué pasa | Cómo |
+| --- | --- |
+| Llega un aviso | Se valida contra el contrato, se manda el correo y se registra el `eventId` |
+| Llega un repetido | El `eventId` ya está registrado: se confirma sin mandar otro correo |
+| El SMTP no responde | Tres intentos en total, esperando 1 y 2 segundos; después, a `notificaciones.email.dlq` |
+| Llega algo que no cumple el contrato | Directo a `notificaciones.email.dlq`, sin reintentos |
+| RabbitMQ se cae | El servicio se reconecta solo; los mensajes esperan en la cola durable |
+
+**Base propia.** Los `eventId` procesados se guardan en un archivo H2 del servicio (`./datos/` al correrlo
+desde acá; un volumen en Compose). No comparte base con el backend.
+
+### Cómo levantarlo
+
+Necesita RabbitMQ y Mailpit. Lo más simple es levantar los dos con Compose, desde la raíz:
+
+```powershell
+docker compose up -d rabbitmq mailpit
+cd servicios
+$env:RABBITMQ_USER="reclamos"; $env:RABBITMQ_PASSWORD="reclamos_dev"
+.\mvnw.cmd -pl servicio-notificaciones spring-boot:run
+```
+
+Para que el backend publique, se arranca con `RECLAMOS_MENSAJERIA_HABILITADA=true` y las mismas variables de
+RabbitMQ. Los correos se ven en `http://localhost:8025` y las colas en la consola de RabbitMQ,
+`http://localhost:15672`, con el usuario y la contraseña de `.env`.
+
+| Variable | Valor por defecto | Para qué |
+| --- | --- | --- |
+| `RABBITMQ_HOST`, `RABBITMQ_PORT` | `localhost`, `5672` | Dónde está RabbitMQ |
+| `RABBITMQ_USER`, `RABBITMQ_PASSWORD` | `guest` | Usuario de RabbitMQ; en Compose, el de `.env` |
+| `SMTP_HOST`, `SMTP_PORT` | `localhost`, `1025` | SMTP de Mailpit |
+| `NOTIFICACIONES_DB_URL` | `jdbc:h2:file:./datos/notificaciones` | Base de los `eventId` procesados |
+
+| Test | Qué comprueba |
+| --- | --- |
+| `LectorMensajesTest` | El contrato: campos obligatorios, versión, UUID, email; los campos nuevos se ignoran y la fecha conserva su zona |
+| `ProcesadorAvisosTest` | Correo y registro, repetido descartado, SMTP caído sin registrar y mensaje inválido sin enviar |
+| `CorreoSmtpTest` | Destinatario, asunto y cuerpo del correo |
+| `ConfiguracionReintentosTest` | Tres intentos ante una falla pasajera; ninguno ante un mensaje inválido, aunque llegue envuelto |
+| `TopologiaRabbitTest` | Exchanges, colas, cola de errores y claves iguales al contrato |
+| `FlujoCorreoIntegrationTest` | Con RabbitMQ y Mailpit de verdad (corre en la integración continua): el aviso llega como correo, el repetido no se manda y el inválido termina en la cola de errores |

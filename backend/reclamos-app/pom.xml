@@ -35,6 +35,11 @@
             <groupId>org.glassfish.jaxb</groupId>
             <artifactId>jaxb-runtime</artifactId>
         </dependency>
+        <!-- Productor de RabbitMQ: la outbox publica los avisos en el exchange reclamos.eventos. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-amqp</artifactId>
+        </dependency>
         <!-- Cliente de REST 2 (prioridad con IA): deja de llamar un rato si el servicio falla seguido. -->
         <dependency>
             <groupId>io.github.resilience4j</groupId>

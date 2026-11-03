@@ -7,7 +7,7 @@ necesita cambiar un contrato, lo avisa al grupo antes, igual que con [el contrat
 | --- | --- | --- |
 | SOAP de cobertura | [`soap/cobertura.xsd`](soap/cobertura.xsd) y [`soap/cobertura.wsdl`](soap/cobertura.wsdl) | Hecho en el PR 9: `servicios/servicio-cobertura` y `CoberturaSoap` en el backend |
 | REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend |
-| Mensajes por RabbitMQ | [`mensajes.md`](mensajes.md) | PR 12, backend y `servicios/servicio-notificaciones` |
+| Mensajes por RabbitMQ | [`mensajes.md`](mensajes.md) | Hecho en el PR 12: outbox en el backend y `servicios/servicio-notificaciones` |
 | REST 1 (API de reclamos) | [`../openapi/reclamos.yaml`](../openapi/README.md), generado del código | Backend |
 
 ## SOAP: `ConsultarCobertura`

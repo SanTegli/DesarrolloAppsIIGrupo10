@@ -89,6 +89,9 @@ flowchart LR
   PRI["servicio-prioridad<br/>REST 2, proceso aparte"]
   LLM["Gemini u OpenAI<br/>API externa"]
   GEO["Georef<br/>API externa"]
+  MQ[("RabbitMQ<br/>reclamos.eventos")]
+  NOT["servicio-notificaciones<br/>consumidor, proceso aparte"]
+  MAIL["Mailpit<br/>SMTP de prueba"]
 
   FE -->|"REST /api"| APP
   APP --> PERS
@@ -100,12 +103,16 @@ flowchart LR
   APP -.->|"REST POST /api/prioridades/evaluar<br/>si la estrategia es ia"| PRI
   PRI -->|"HTTPS"| LLM
   APP -->|"HTTPS GET /direcciones"| GEO
+  APP -.->|"AMQP, outbox<br/>si la mensajería está habilitada"| MQ
+  MQ -->|"cola notificaciones.email"| NOT
+  NOT -->|"SMTP"| MAIL
 ```
 
-`servicio-cobertura` y `servicio-prioridad` no son módulos del backend: son otras aplicaciones, en
-`servicios/`, que se compilan, se prueban y se despliegan por separado. Lo único que comparten con el
-backend son sus contratos: [`cobertura.xsd`](contratos/soap/cobertura.xsd) y
-[el OpenAPI de REST 2](contratos/README.md#rest-2-post-apiprioridadesevaluar).
+`servicio-cobertura`, `servicio-prioridad` y `servicio-notificaciones` no son módulos del backend: son otras
+aplicaciones, en `servicios/`, que se compilan, se prueban y se despliegan por separado. Lo único que
+comparten con el backend son sus contratos: [`cobertura.xsd`](contratos/soap/cobertura.xsd),
+[el OpenAPI de REST 2](contratos/README.md#rest-2-post-apiprioridadesevaluar) y
+[el contrato de mensajes](contratos/mensajes.md).
 
 ## Servicios orientados a componentes
 
@@ -164,7 +171,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | Prioridad con IA (REST 2) | `EstrategiaPrioridad`, que devuelve `PrioridadCalculada` | **Hecho (PR 10)**: `PrioridadPorIA`, `PrioridadConRespaldo` y `servicio-prioridad`; ver abajo | — |
 | Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | **Hecho (PR 9)**: `CoberturaSoap` y `servicio-cobertura`; ver abajo | — |
 | Geocodificación (API externa) | `Geocodificador` | **Hecho (PR 11)**: `GeorefGeocodificador`, `GeocodificadorConCache` y `ServicioUbicaciones`; ver abajo | — |
-| Mensajería | `ServicioNotificaciones` | Avisos internos | Outbox, RabbitMQ y `servicio-notificaciones` |
+| Mensajería | `ServicioNotificaciones` | **Hecho (PR 12)**: outbox, `PublicadorMensajes`, RabbitMQ y `servicio-notificaciones`; ver abajo | — |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
@@ -304,10 +311,60 @@ El recuadro de cada municipio está en `reclamos.geocodificacion.recuadros`. Es 
 coordenadas de otra provincia o inventadas en el navegador, pero no prueba que el punto esté dentro del
 límite exacto del partido.
 
+### Mensajería: outbox, RabbitMQ y servicio de notificaciones
+
+Cada aviso que genera `ServicioNotificaciones` sigue guardándose como aviso interno y, con
+`reclamos.mensajeria.habilitada: true`, también sale por correo. La publicación es asincrónica: el alta no
+espera a RabbitMQ ni al SMTP.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant SN as ServicioNotificaciones
+  participant OB as OutboxAvisos
+  participant DB as MySQL<br/>mensajes_salientes
+  participant PU as PublicadorMensajes<br/>(cada 2 s)
+  participant MQ as RabbitMQ<br/>reclamos.eventos
+  participant LI as servicio-notificaciones
+  participant MP as Mailpit
+
+  Note over SN,DB: dentro de la transacción del alta
+  SN->>DB: guarda el aviso interno
+  SN->>OB: enviar(aviso, RECLAMO_CREADO)
+  OB->>DB: fila PENDIENTE con eventId y JSON
+  Note over SN,DB: commit: aviso y mensaje, o ninguno
+  PU->>DB: hasta 50 pendientes, los más viejos primero
+  PU->>MQ: publica con clave aviso.reclamo-creado
+  MQ-->>PU: confirmación (publisher confirm)
+  PU->>DB: PUBLICADO
+  MQ->>LI: cola notificaciones.email
+  alt eventId nuevo
+    LI->>MP: correo por SMTP
+    LI->>LI: registra el eventId
+  else eventId repetido
+    LI->>LI: lo descarta
+  end
+  LI-->>MQ: ACK
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `OutboxAvisos` | Guarda el mensaje en `mensajes_salientes`, en la transacción del caso de uso. Si el alta se revierte, el mensaje tampoco existe |
+| `PublicadorMensajes` | Publica los pendientes con confirmación del broker y los marca publicados. Si RabbitMQ no responde, quedan pendientes con el error y salen en la próxima pasada |
+| `BrokerRabbit` | Adapter sobre `RabbitTemplate`: mensaje persistente, JSON, con el `eventId` como `message-id` |
+| `servicio-notificaciones` | Consumidor idempotente: descarta los `eventId` ya procesados, manda el correo y registra. Reintenta 3 veces; después, a la cola de errores |
+
+Fallas: con RabbitMQ caído, el reclamo se crea igual y los mensajes esperan en la outbox; con el SMTP caído,
+el mensaje espera en la cola y, si se agotan los reintentos, queda en `notificaciones.email.dlq` para
+revisarlo. No hay entrega exactamente una vez: si el consumidor cae entre el envío y el registro, el correo se
+repite. Está documentado en [el contrato](contratos/mensajes.md).
+
 ## Límites conocidos
 
-- **Avisos simulados.** Las notificaciones se guardan en la base con canal `INTERNO`; no se envían
-  correos ni SMS.
+- **Correo de laboratorio.** Con la mensajería habilitada, los avisos salen por correo, pero a Mailpit, que
+  los muestra en un buzón web y no los entrega a casillas reales. No hay SMS.
+- **Un solo publicador.** La outbox la publica una tarea del backend; con dos instancias del backend, las dos
+  publicarían los mismos pendientes (el consumidor descarta los repetidos, pero sobra trabajo).
 - **Sin autenticación.** El usuario se identifica con `X-Usuario-Id`; cualquiera puede elegir
   cualquier usuario.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.

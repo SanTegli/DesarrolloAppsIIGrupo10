@@ -93,6 +93,20 @@ grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Geor
 | CP30 | Georef caído: el alta no se traba y la ubicación queda pendiente | `UbicacionesIntegrationTest.georefCaidoDevuelveNoDisponibleSinError`, `GeorefGeocodificadorTest.georefQueNoContestaSeCortaEnElTiempoLimite` | Desconectar Internet y buscar: "El mapa no responde en este momento". El reclamo se crea con la ubicación pendiente |
 | CP31 | Una ubicación fuera del municipio se rechaza | `UbicacionesIntegrationTest.elAltaConUnaUbicacionFueraDelMunicipioOIncompletaSeRechaza` | Solo por API: `POST /api/reclamos` con coordenadas de Córdoba. Responde 400 |
 
+### Segunda Parte: avisos por correo con RabbitMQ
+
+Se reproducen en el modo demo, que levanta RabbitMQ y Mailpit. Los tests con broker y SMTP de verdad
+(`PublicacionRabbitIntegrationTest` y `FlujoCorreoIntegrationTest`) corren en GitHub Actions, que levanta
+RabbitMQ y Mailpit como servicios; en una máquina sin las variables `RABBITMQ_HOST` y `MAILPIT_URL` se saltean.
+
+| Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
+| --- | --- | --- | --- |
+| CP32 | Cada aviso deja un mensaje en la outbox, en la misma transacción que el alta | `OutboxIntegrationTest.elAltaDejaUnMensajePendientePorCadaAvisoConElContrato`, `OutboxIntegrationTest.siElAltaFallaNoQuedaNingunMensaje` | Crear un reclamo y consultar `mensajes_salientes` (ver README_INSTRUCTIVO) |
+| CP33 | El aviso llega como correo | `FlujoCorreoIntegrationTest.unAvisoPublicadoLlegaComoCorreoYElRepetidoNoSeManda`, `PublicacionRabbitIntegrationTest`, `CorreoSmtpTest` | Crear un reclamo y abrir Mailpit en `http://localhost:8025` |
+| CP34 | Un mensaje repetido no manda dos correos | `ProcesadorAvisosTest.unMensajeRepetidoNoSeVuelveAMandar`, `FlujoCorreoIntegrationTest` | En la consola de RabbitMQ, publicar dos veces el mismo mensaje en `reclamos.eventos`: llega un solo correo |
+| CP35 | Con RabbitMQ caído el alta sigue; el mensaje espera y sale cuando vuelve | `OutboxIntegrationTest.conElBrokerCaidoLosMensajesEsperanYSalenCuandoVuelve`, `PublicadorMensajesTest.siElBrokerFallaElMensajeQuedaPendienteConElErrorYSeCortaLaPasada` | `docker compose stop rabbitmq`, crear un reclamo (201) y ver el mensaje `PENDIENTE`; `docker compose start rabbitmq` y pasa a `PUBLICADO` |
+| CP36 | Con el correo caído se reintenta tres veces y el mensaje va a la cola de errores; uno inválido va directo | `ConfiguracionReintentosTest`, `ProcesadorAvisosTest.siElCorreoFallaNoSeRegistraYElReintentoLoManda`, `FlujoCorreoIntegrationTest.unMensajeInvalidoTerminaEnLaColaDeErroresSinReintentos` | `docker compose stop mailpit`, crear un reclamo y ver el mensaje en `notificaciones.email.dlq` |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -125,6 +139,8 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Captura del WSDL en el navegador y de una consulta SOAP con su respuesta (CP16, CP17 y CP19).
 - [ ] Captura del detalle de un reclamo con la asignación pendiente, con el servicio detenido (CP20).
 - [ ] Captura de las sugerencias de Georef en el alta y del detalle con el enlace a Google Maps (CP27 y CP28).
+- [ ] Captura de Mailpit con los correos de un reclamo y de la consola de RabbitMQ con el exchange y las colas (CP33).
+- [ ] Captura de `mensajes_salientes` con un mensaje `PENDIENTE` y después `PUBLICADO` (CP35) y de la cola de errores con un mensaje (CP36).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).

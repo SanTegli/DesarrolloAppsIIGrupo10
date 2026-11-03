@@ -25,6 +25,7 @@
     <modules>
         <module>servicio-cobertura</module>
         <module>servicio-prioridad</module>
+        <module>servicio-notificaciones</module>
     </modules>
 
     <properties>

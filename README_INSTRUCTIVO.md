@@ -77,6 +77,7 @@ DesarrolloAppsIIGrupo10/
     mvnw.cmd
     servicio-cobertura/
     servicio-prioridad/
+    servicio-notificaciones/
   docker-compose.yml
   .env.example
 ```
@@ -89,6 +90,7 @@ DesarrolloAppsIIGrupo10/
 | `reclamos-app` | Inicio de Spring Boot, perfiles, servicios, Facade, Strategies, Observer y REST. |
 | `servicios/servicio-cobertura` | Servicio SOAP de cobertura, aparte del backend: otro proyecto Maven, otro proceso, puerto 8081. |
 | `servicios/servicio-prioridad` | Servicio REST 2 de prioridad con IA (Gemini), también aparte, puerto 8082. |
+| `servicios/servicio-notificaciones` | Consumidor de RabbitMQ: manda por correo los avisos que publica el backend. No tiene puerto propio. |
 
 `docs/api-contract.md` contiene el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
 
@@ -112,6 +114,8 @@ Editar `.env` en un editor de texto y definir las credenciales locales antes de 
 | `PRIORIDAD_IA_PROVEEDOR` | Proveedor del servicio de prioridad: `gemini` (plantilla), `openai` o `simulado`. |
 | `GEMINI_API_KEY` | Clave gratuita de Google AI Studio, vacía en la plantilla. Ver «Probar el servicio de prioridad con IA», en la sección 10. |
 | `OPENAI_API_KEY` | Solo si se usa `openai`; vacía en la plantilla. |
+| `RABBITMQ_USER` | Usuario de RabbitMQ en el modo demo; plantilla: `reclamos`. |
+| `RABBITMQ_PASSWORD` | Contraseña local de RabbitMQ; plantilla: `reclamos_dev`. Si falta en un `.env` viejo, Compose usa ese mismo valor. |
 
 **`.env` no debe subirse a Git** y está excluido por `.gitignore`. Docker Compose carga automáticamente el `.env` de la raíz. Spring Boot ejecutado directamente desde PowerShell **no necesariamente lee `.env`**; este proyecto obtiene las variables desde el entorno del proceso.
 
@@ -250,9 +254,9 @@ Abrir `http://localhost:5173`. El selector "Usar el sistema como" elige el usuar
 
 ### Alternativa: todo en contenedores (modo demo)
 
-En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los cinco contenedores: MySQL, backend, frontend, el servicio SOAP de cobertura y el servicio de prioridad con IA. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
+En lugar de levantar Spring Boot y el frontend a mano, Docker Compose puede levantar los ocho contenedores: MySQL, backend, frontend, el servicio SOAP de cobertura, el servicio de prioridad con IA, RabbitMQ, el servicio de notificaciones y Mailpit. Solo necesita Docker Desktop y el archivo `.env` de la sección 4; no hace falta Java ni Node.js en la máquina.
 
-Antes de empezar, detener el backend, el frontend y el servicio de cobertura locales si están corriendo: el modo demo usa los mismos puertos, 8080, 5173, 8081 y 8082.
+Antes de empezar, detener el backend, el frontend y el servicio de cobertura locales si están corriendo: el modo demo usa los mismos puertos, 8080, 5173, 8081 y 8082, y además 5672, 15672, 1025 y 8025.
 
 Desde la raíz del repositorio:
 
@@ -269,6 +273,9 @@ La primera vez tarda varios minutos, porque compila el backend dentro del conten
 | `reclamos-frontend` | nginx con la interfaz compilada; reenvía `/api` al backend | 5173 |
 | `servicio-cobertura` | Servicio SOAP de cobertura; el backend le consulta las áreas de cada reclamo nuevo | 8081 |
 | `servicio-prioridad` | Servicio de prioridad con IA; el backend le pide la prioridad de cada reclamo nuevo | 8082 |
+| `reclamos-rabbitmq` | RabbitMQ; el backend publica cada aviso en el exchange `reclamos.eventos` | 5672, y la consola en 15672 |
+| `servicio-notificaciones` | Consume los avisos y los manda por correo | No publica puertos |
+| `reclamos-mailpit` | Servidor de correo de prueba: recibe los correos y los muestra en el navegador, sin mandar nada afuera | 1025 (SMTP) y 8025 (web) |
 
 Para ver el estado y los logs, en otra terminal:
 
@@ -277,7 +284,7 @@ docker compose ps
 docker compose logs -f backend
 ```
 
-En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap` y `RECLAMOS_PRIORIDAD_ESTRATEGIA=ia`: la asignación automática pasa por el servicio SOAP y la prioridad por el servicio de IA. El WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` y Swagger del servicio de IA en `http://localhost:8082/swagger-ui.html`.
+En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap`, `RECLAMOS_PRIORIDAD_ESTRATEGIA=ia` y `RECLAMOS_MENSAJERIA_HABILITADA=true`: la asignación automática pasa por el servicio SOAP, la prioridad por el servicio de IA y cada aviso sale por correo a través de RabbitMQ. El WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` y Swagger del servicio de IA en `http://localhost:8082/swagger-ui.html`.
 
 Para que la IA funcione, `.env` tiene que tener `GEMINI_API_KEY` (ver «Probar el servicio de prioridad con IA», en la sección 10). Sin clave todo arranca igual, pero cada reclamo sale con la prioridad de la categoría y origen `RESPALDO`.
 
@@ -506,6 +513,26 @@ Responde `disponible: true` y las sugerencias con coordenadas dentro de Quilmes;
 
 En la interfaz, como Ana Pérez: **Crear reclamo**, elegir el barrio, escribir la dirección y tocar **Buscar en el mapa**. Elegir una opción y crear el reclamo: el detalle muestra la dirección normalizada y el enlace **Ver en Google Maps**. Si no se elige ninguna, el reclamo se crea igual y el detalle dice "Sin marcar en el mapa".
 
+### Probar los avisos por correo
+
+Se prueba en el modo demo (sección 8), que levanta RabbitMQ, el servicio de notificaciones y Mailpit. Con el backend levantado a mano la mensajería está apagada: los avisos se guardan como siempre y no sale ningún correo.
+
+1. Abrir Mailpit en `http://localhost:8025`. Ningún correo sale de la máquina: todos quedan ahí.
+2. En la interfaz, como Ana Pérez, crear un reclamo. A los pocos segundos llegan a Mailpit los correos "lo recibimos" y, si se asignó, "lo asignamos".
+3. Abrir la consola de RabbitMQ en `http://localhost:15672`, con `RABBITMQ_USER` y `RABBITMQ_PASSWORD` de `.env`. En **Exchanges** está `reclamos.eventos`; en **Queues**, `notificaciones.email` y su cola de errores, `notificaciones.email.dlq`.
+
+**Broker caído.** Con `docker compose stop rabbitmq`, crear un reclamo: el alta responde 201 igual. El mensaje queda pendiente en la base:
+
+```powershell
+docker compose exec mysql mysql -u reclamos -p reclamos -e "SELECT event_id, tipo_evento, estado, intentos FROM mensajes_salientes ORDER BY id DESC LIMIT 5"
+```
+
+Con `docker compose start rabbitmq`, en menos de un minuto el estado pasa a `PUBLICADO` y el correo llega a Mailpit.
+
+**Correo caído.** Con `docker compose stop mailpit`, crear un reclamo: el servicio de notificaciones lo intenta tres veces (`docker compose logs servicio-notificaciones`) y el mensaje termina en `notificaciones.email.dlq`, que se ve en la consola de RabbitMQ. Volver a levantarlo con `docker compose start mailpit`.
+
+Los mensajes no llevan DNI, teléfono ni la descripción del reclamo: solo el número, el estado, el nombre y el correo del destinatario y el texto del aviso. El contrato está en `docs/contratos/mensajes.md`.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -597,7 +624,7 @@ Para quitar contenedores y red conservando la base:
 docker compose down
 ```
 
-`stop` permite volver a iniciar los contenedores; `down` permite recrearlos con `up -d mysql`. Ambos conservan el volumen nombrado. **`down -v` elimina los datos y requiere una decisión explícita de descartarlos.**
+`stop` permite volver a iniciar los contenedores; `down` permite recrearlos con `up -d mysql`. Ambos conservan los volúmenes nombrados: la base, la de RabbitMQ y la del servicio de notificaciones. **`down -v` elimina los datos y requiere una decisión explícita de descartarlos.**
 
 ## 15. Checklist final
 
@@ -613,4 +640,5 @@ docker compose down
 - [ ] El frontend abre en `http://localhost:5173` y lista los usuarios en el selector.
 - [ ] `servicios`: `.\mvnw.cmd verify` termina con `BUILD SUCCESS`.
 - [ ] `.env` tiene `GEMINI_API_KEY` y la clave no aparece en `git status` ni en ningún commit.
-- [ ] Modo demo: `docker compose up --build` levanta los cinco contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.
+- [ ] Modo demo: `docker compose up --build` levanta los ocho contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.
+- [ ] Modo demo: al crear un reclamo, el correo llega a Mailpit en `http://localhost:8025`.

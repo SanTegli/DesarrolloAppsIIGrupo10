@@ -133,6 +133,23 @@
       <many-to-one name="destinatario" target-entity="Usuario" fetch="LAZY" optional="false"><join-column name="destinatario_id" nullable="false"/></many-to-one>
     </attributes>
   </entity>
+  <!-- Outbox: avisos que tienen que salir por RabbitMQ. -->
+  <entity class="MensajeSaliente" access="FIELD" metadata-complete="true">
+    <table name="mensajes_salientes">
+      <index name="idx_mensajes_salientes_estado" column-list="estado, id"/>
+    </table>
+    <attributes>
+      <basic name="eventId"><column name="event_id" nullable="false" length="36" unique="true"/></basic>
+      <basic name="claveRuteo"><column name="clave_ruteo" nullable="false" length="60"/></basic>
+      <basic name="tipoEvento"><column name="tipo_evento" nullable="false" length="40"/></basic>
+      <basic name="contenido"><column name="contenido" nullable="false" length="4000"/></basic>
+      <basic name="estado"><column name="estado" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <basic name="intentos"><column name="intentos" nullable="false"/></basic>
+      <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
+      <basic name="fechaPublicacion"><column name="fecha_publicacion" nullable="true"/></basic>
+      <basic name="ultimoError"><column name="ultimo_error" nullable="true" length="300"/></basic>
+    </attributes>
+  </entity>
   <!-- Ubicación del reclamo, en columnas de la tabla reclamos. -->
   <embeddable class="Ubicacion" access="FIELD" metadata-complete="true">
     <attributes>

@@ -1,7 +1,13 @@
 # Contrato de mensajes: RabbitMQ
 
-Borrador del PR 8; lo implementa el PR 12. El backend publica un mensaje por cada aviso que genera, y
+Implementado en el PR 12. El backend publica un mensaje por cada aviso que genera, y
 `servicio-notificaciones` lo consume y envía el correo a Mailpit.
+
+| Lado | Dónde |
+| --- | --- |
+| Productor | Backend: `OutboxAvisos` guarda el mensaje en `mensajes_salientes` y `PublicadorMensajes` lo publica (`reclamos-app/…/aplicacion/mensajeria`) |
+| Consumidor | `servicios/servicio-notificaciones`: `ListenerAvisos` y `ProcesadorAvisos` |
+| Topología | La declara el consumidor (`TopologiaRabbit`); el backend declara solo el exchange, igual |
 
 ## Topología
 
@@ -53,8 +59,12 @@ JSON en UTF-8, con `content-type: application/json` y entrega persistente.
 - **Productor:** el aviso y la fila de outbox se guardan en la misma transacción. Una tarea publica las
   filas pendientes con confirmación del broker y recién entonces las marca publicadas. Si RabbitMQ está
   caído, las filas esperan.
-- **Consumidor:** registra cada `eventId` con restricción única antes de confirmar el mensaje; un repetido
-  se confirma sin reenviar el correo. Tres intentos con espera creciente (1, 2 y 4 segundos); después, a la
-  cola de errores. Un mensaje inválido va directo a la cola de errores, sin reintentos.
+- **Consumidor:** después de enviar el correo registra el `eventId` en su propia base (tabla
+  `mensajes_procesados`, con el `eventId` como clave primaria) y recién entonces confirma el mensaje; un
+  repetido se confirma sin reenviar el correo. Si el envío falla, tres intentos en total, esperando 1 y 2
+  segundos entre ellos; después el mensaje se rechaza y RabbitMQ lo manda a la cola de errores. Un mensaje
+  inválido (no es JSON, versión desconocida, faltan campos) va directo a la cola de errores, sin reintentos.
+- **Campos nuevos:** el consumidor ignora los campos que no conoce, así el productor puede sumar campos sin
+  romperlo. Un cambio incompatible sube `version`.
 - **No hay entrega exactamente una vez:** si el consumidor cae después de enviar el correo y antes de
   registrar el `eventId`, el correo se repite al reintentar.
