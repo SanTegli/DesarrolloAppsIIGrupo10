@@ -1,7 +1,10 @@
 package ar.edu.uade.reclamos.dominio.modelo;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException;
 import java.time.LocalDateTime;
@@ -14,10 +17,10 @@ class MensajeSalienteTest {
     void naceComoPendienteSinIntentos() {
         MensajeSaliente mensaje = nuevo();
 
-        assertThat(mensaje.isPendiente()).isTrue();
-        assertThat(mensaje.getEstado()).isEqualTo(EstadoMensaje.PENDIENTE);
-        assertThat(mensaje.getIntentos()).isZero();
-        assertThat(mensaje.getFechaPublicacion()).isNull();
+        assertTrue(mensaje.isPendiente());
+        assertEquals(EstadoMensaje.PENDIENTE, mensaje.getEstado());
+        assertEquals(0, mensaje.getIntentos());
+        assertNull(mensaje.getFechaPublicacion());
     }
 
     @Test
@@ -26,9 +29,9 @@ class MensajeSalienteTest {
         mensaje.registrarFalla("Connection refused");
         mensaje.registrarFalla("x".repeat(500));
 
-        assertThat(mensaje.getIntentos()).isEqualTo(2);
-        assertThat(mensaje.getUltimoError()).hasSize(MensajeSaliente.LONGITUD_MAXIMA_ERROR);
-        assertThat(mensaje.isPendiente()).isTrue();
+        assertEquals(2, mensaje.getIntentos());
+        assertEquals(MensajeSaliente.LONGITUD_MAXIMA_ERROR, mensaje.getUltimoError().length());
+        assertTrue(mensaje.isPendiente());
     }
 
     @Test
@@ -37,18 +40,18 @@ class MensajeSalienteTest {
         mensaje.registrarFalla(null);
         mensaje.marcarPublicado(AHORA.plusSeconds(2));
 
-        assertThat(mensaje.isPendiente()).isFalse();
-        assertThat(mensaje.getFechaPublicacion()).isEqualTo(AHORA.plusSeconds(2));
-        assertThat(mensaje.getUltimoError()).isNull();
-        assertThat(mensaje.getIntentos()).isEqualTo(1);
+        assertFalse(mensaje.isPendiente());
+        assertEquals(AHORA.plusSeconds(2), mensaje.getFechaPublicacion());
+        assertNull(mensaje.getUltimoError());
+        assertEquals(1, mensaje.getIntentos());
     }
 
     @Test
     void validaLosDatosObligatorios() {
-        assertThatThrownBy(() -> new MensajeSaliente(" ", "aviso.x", "Tipo", "{}", AHORA))
-                .isInstanceOf(DatosInvalidosException.class);
-        assertThatThrownBy(() -> new MensajeSaliente("e", "aviso.x", "Tipo", "x".repeat(4001), AHORA))
-                .isInstanceOf(DatosInvalidosException.class);
+        assertThrows(DatosInvalidosException.class,
+                () -> new MensajeSaliente(" ", "aviso.x", "Tipo", "{}", AHORA));
+        assertThrows(DatosInvalidosException.class,
+                () -> new MensajeSaliente("e", "aviso.x", "Tipo", "x".repeat(4001), AHORA));
     }
 
     private static MensajeSaliente nuevo() {
