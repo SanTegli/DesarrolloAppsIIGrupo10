@@ -95,12 +95,14 @@ async function leerError(respuesta) {
  * Ejecuta una llamada a la API. La identidad viaja en la cookie de sesión, que el navegador manda solo.
  *
  * @param {string} ruta ruta relativa a la URL base, por ejemplo "/reclamos"
- * @param {object} opciones metodo, cuerpo, parametros de consulta y avisarSiNoHaySesion (false en las rutas de
- *   login, donde un 401 es una respuesta esperada y no una sesión vencida)
+ * @param {object} opciones metodo, cuerpo (JSON), formulario (FormData, para subir archivos), parametros de
+ *   consulta y avisarSiNoHaySesion (false en las rutas de login, donde un 401 es una respuesta esperada y no una
+ *   sesión vencida)
  */
-export async function pedir(ruta, { metodo = 'GET', cuerpo, parametros, avisarSiNoHaySesion = true } = {}) {
+export async function pedir(ruta, { metodo = 'GET', cuerpo, formulario, parametros, avisarSiNoHaySesion = true } = {}) {
   const encabezados = { Accept: 'application/json' }
-  if (cuerpo !== undefined) {
+  // Con FormData, el navegador arma el Content-Type multipart con su separador: no hay que ponerlo a mano.
+  if (cuerpo !== undefined && !formulario) {
     encabezados['Content-Type'] = 'application/json'
   }
   if (!METODOS_SEGUROS.includes(metodo)) {
@@ -115,7 +117,7 @@ export async function pedir(ruta, { metodo = 'GET', cuerpo, parametros, avisarSi
     respuesta = await fetch(armarUrl(ruta, parametros), {
       method: metodo,
       headers: encabezados,
-      body: cuerpo === undefined ? undefined : JSON.stringify(cuerpo),
+      body: formulario ?? (cuerpo === undefined ? undefined : JSON.stringify(cuerpo)),
       credentials: 'same-origin',
     })
   } catch {

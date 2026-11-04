@@ -14,7 +14,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 50 tests: capa de API, etiquetas y componentes
+npm test             # 59 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
@@ -147,6 +147,16 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | CP51 | El administrador bloquea una cuenta: entra y consulta, pero no crea ni reabre | `VerificacionYReaperturasIntegrationTest.elAdministradorBloqueaUnaCuentaQueSigueConsultandoPeroNoCrea`, `unaCuentaBloqueadaNoReabre`, `ServicioCuentasTest` | Elena → **Administración** → **Cuentas de ciudadanos** → **Bloquear**. Con esa cuenta, **Crear reclamo** muestra el aviso |
 | CP52 | Reabrir exige motivo, se permite una vez y dentro de 7 días; después no se ofrece | `VerificacionYReaperturasIntegrationTest.seReabreUnaSolaVezConMotivoYDespuesNoSeOfrece`, `ReaperturaTest`, `DetalleReclamo.test.jsx` | Reclamo resuelto: **Reabrir** queda deshabilitado hasta escribir el motivo. Después de la segunda resolución, el botón ya no está |
 
+### Segunda Parte: foto del reclamo
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP53 | El alta con foto guarda un JPEG re-codificado, sin EXIF, y lo sirve | `FotosIntegrationTest.elAltaGuardaLaFotoSinMetadatosYLaSirveComoJpeg`, `ProcesadorFotosTest.reCodificarBorraElExifConLaUbicacion` | Crear un reclamo con una foto del celular. Descargar la foto del detalle y abrir sus propiedades: no tiene ubicación ni modelo de cámara |
+| CP54 | Sin foto, con un archivo que no es imagen o con un GIF, `400`; con más de 5 MB, `413`. No se crea nada | `FotosIntegrationTest.sinFotoOConUnArchivoQueNoEsFotoNoSeCreaNada`, `unaFotoDeMasDeCincoMegasEs413`, `FormularioReclamo.test.jsx` | En el alta, elegir un `.txt`: "La foto tiene que ser JPEG o PNG". Enviar sin foto: "Elegí una foto del problema" |
+| CP55 | La foto la ven solo quienes ven el detalle | `FotosIntegrationTest.laFotoLaVeQuienPuedeVerElDetalle` | Solo por API: `GET /api/reclamos/{numero}/foto` con la sesión de Bruno responde `403`; sin sesión, `401` |
+| CP56 | Si el alta falla, no queda la foto en el disco | `FotosIntegrationTest.siElAltaFallaDespuesDeGuardarLaFotoElArchivoSeBorra`, `GestionReclamosFacadeTest`, `AlmacenFotosLocalTest` | Crear como Carla (agente): `403`. El volumen `reclamos-fotos` no suma archivos (`docker compose exec backend ls /data/fotos`) |
+| CP57 | Los reclamos anteriores a la foto siguen funcionando | `FotosIntegrationTest.unReclamoAnteriorALaFotoNoTieneFoto`, `DetalleReclamo.test.jsx` | Un reclamo creado antes del PR 16 muestra "Este reclamo no tiene foto." |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -186,6 +196,7 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
 - [ ] Rehacer las capturas de `interfaz/`: todavía muestran el selector de usuario que el login del PR 14 reemplazó.
 - [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
+- [ ] Capturas del alta con foto, del formato rechazado y del detalle con la foto contra el backend real (CP53 y CP54), y del contenido de `/data/fotos` (CP56).
 - [ ] Captura de la verificación con el bot real de Telegram: el chat con el bot y la pantalla que pasa al formulario (CP49).
 - [ ] Capturas de la verificación simulada, el número repetido, el panel de cuentas y la reapertura contra el backend real (CP47, CP48, CP51 y CP52).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).

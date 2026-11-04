@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.mensajeria;
 
+import static ar.edu.uade.reclamos.aplicacion.Fotos.alta;
 import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -157,10 +158,8 @@ class OutboxIntegrationTest {
     }
 
     private ResultActions crearReclamo(Long usuario) throws Exception {
-        return mvc.perform(post("/api/reclamos").with(como(usuario))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+        return mvc.perform(alta("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol apagado frente a la plaza",
-                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)));
+                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)).with(como(usuario)));
     }
 }

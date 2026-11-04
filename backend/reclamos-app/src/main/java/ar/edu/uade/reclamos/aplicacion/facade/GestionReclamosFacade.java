@@ -1,6 +1,9 @@
 package ar.edu.uade.reclamos.aplicacion.facade;
 
+import ar.edu.uade.reclamos.aplicacion.foto.FotoSubida;
+import ar.edu.uade.reclamos.aplicacion.foto.ServicioFotos;
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
+import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
 import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.dominio.modelo.*;
@@ -17,10 +20,13 @@ public class GestionReclamosFacade {
     private final ServicioUbicaciones ubicaciones;
     private final ServicioCuentas cuentas;
     private final ServicioVerificacionTelefono verificacion;
+    private final ServicioFotos fotos;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
                                   ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones,
-                                  ServicioCuentas cuentas, ServicioVerificacionTelefono verificacion) {
+                                  ServicioCuentas cuentas, ServicioVerificacionTelefono verificacion,
+                                  ServicioFotos fotos) {
+        this.fotos = fotos;
         this.escritura = escritura;
         this.consultas = consultas;
         this.catalogos = catalogos;
@@ -58,6 +64,33 @@ public class GestionReclamosFacade {
                          UbicacionElegida ubicacion) {
         return escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion,
                 ubicaciones.confirmar(barrioId, ubicacion));
+    }
+
+    /**
+     * Alta desde la API: la foto es obligatoria. Se valida y se guarda como pendiente antes de la transacción
+     * del alta; se confirma cuando el reclamo ya está en la base y se descarta si el alta falla. Así nunca queda
+     * un archivo huérfano ni un reclamo que apunte a un archivo a medio escribir.
+     */
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+                         UbicacionElegida ubicacion, FotoSubida foto) {
+        String referencia = fotos.preparar(foto);
+        Reclamo reclamo;
+        try {
+            reclamo = escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion,
+                    ubicaciones.confirmar(barrioId, ubicacion), referencia);
+        } catch (RuntimeException error) {
+            fotos.descartar(referencia);
+            throw error;
+        }
+        fotos.confirmar(referencia);
+        return reclamo;
+    }
+
+    /** La foto del reclamo, con los mismos permisos que el detalle. JPEG sin metadatos. */
+    public byte[] foto(Long usuarioId, String numero) {
+        Reclamo reclamo = consultas.buscarPorNumero(usuarioId, numero);
+        return reclamo.getFoto().flatMap(fotos::leer)
+                .orElseThrow(() -> new RecursoNoEncontradoException("El reclamo " + numero + " no tiene foto."));
     }
 
     /** Sugerencias del geocodificador para la dirección, antes del alta. */

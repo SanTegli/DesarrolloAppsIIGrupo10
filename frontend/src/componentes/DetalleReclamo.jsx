@@ -88,6 +88,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
       <div className="detalle-cuerpo">
         <div>
           <p className="descripcion">{reclamo.descripcion}</p>
+          <FotoReclamo foto={reclamo.foto} />
           <dl className="datos">
             <dt>Categoría</dt>
             <dd>{reclamo.categoria.nombre}</dd>
@@ -228,6 +229,18 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
         </div>
       </div>
     </section>
+  )
+}
+
+/** La foto del problema. Los reclamos de antes de la foto obligatoria no tienen. */
+function FotoReclamo({ foto }) {
+  if (!foto) {
+    return <p className="secundario">Este reclamo no tiene foto.</p>
+  }
+  return (
+    <a className="foto-reclamo" href={foto} target="_blank" rel="noopener noreferrer">
+      <img src={foto} alt="Foto del problema" loading="lazy" />
+    </a>
   )
 }
 

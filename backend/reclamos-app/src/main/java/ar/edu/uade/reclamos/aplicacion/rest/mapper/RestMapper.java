@@ -11,7 +11,9 @@ import org.springframework.stereotype.Component;
 public class RestMapper {
     public ReclamoResponse reclamo(Reclamo reclamo, Set<EstadoReclamo> acciones) {
         return new ReclamoResponse(reclamo.getNumero(), reclamo.getDescripcion(), reclamo.getDireccion(),
-                ubicacion(reclamo.getUbicacion()), reclamo.getEstado(), reclamo.getPrioridad(),
+                ubicacion(reclamo.getUbicacion()),
+                reclamo.getFoto().map(referencia -> "/api/reclamos/" + reclamo.getNumero() + "/foto").orElse(null),
+                reclamo.getEstado(), reclamo.getPrioridad(),
                 reclamo.getOrigenPrioridad(), reclamo.getMotivoPrioridad(), reclamo.isVencido(),
                 reclamo.isAsignacionPendiente(), reclamo.getFechaCreacion(), reclamo.getFechaLimite(),
                 categoriaReferencia(reclamo.getCategoria()), barrioReferencia(reclamo.getBarrio()),

@@ -90,6 +90,7 @@ classDiagram
     -String motivoPrioridad
     -boolean vencido
     -boolean asignacionPendiente
+    -String foto
     -LocalDateTime fechaCreacion
     -LocalDateTime fechaLimite
     -long version
@@ -100,6 +101,7 @@ classDiagram
     +marcarVencido(LocalDateTime) boolean
     +definirPrioridad(Prioridad, OrigenPrioridad, String)
     +registrarUbicacion(Ubicacion)
+    +registrarFoto(String)
     +marcarAsignacionPendiente()
     +perteneceA(Usuario) boolean
   }
@@ -206,6 +208,7 @@ habilitada, además salen por correo a través de la outbox.
 | Reabrir exige motivo, se permite hasta `maximo` veces y dentro de `plazo` desde la última resolución; ambos datos salen del historial | `Reclamo.cambiarEstado` con `PoliticaReapertura` |
 | Un teléfono se guarda en E.164, de 8 a 15 dígitos, y se muestra enmascarado | `Telefono.normalizar` y `enmascarar` |
 | Un código de verificación se usa una sola vez y antes de vencer | `CodigoVerificacion.usar` |
+| Un reclamo guarda la referencia a su foto una sola vez; no se reemplaza | `Reclamo.registrarFoto` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
 
@@ -283,6 +286,7 @@ erDiagram
     string motivo_prioridad
     boolean vencido
     boolean asignacion_pendiente
+    string foto "referencia en el almacén; nula antes del PR 16"
     datetime fecha_creacion
     datetime fecha_limite
     bigint version "bloqueo optimista"

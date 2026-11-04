@@ -3,12 +3,16 @@ package ar.edu.uade.reclamos.aplicacion.facade;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
+import ar.edu.uade.reclamos.aplicacion.foto.FotoSubida;
+import ar.edu.uade.reclamos.aplicacion.foto.ServicioFotos;
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
 import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
 import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
+import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
 
@@ -22,8 +26,10 @@ class GestionReclamosFacadeTest {
     private final ServicioUbicaciones ubicaciones = mock(ServicioUbicaciones.class);
     private final ServicioCuentas cuentas = mock(ServicioCuentas.class);
     private final ServicioVerificacionTelefono verificacion = mock(ServicioVerificacionTelefono.class);
+    private final ServicioFotos fotos = mock(ServicioFotos.class);
     private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
-            ubicaciones, cuentas, verificacion);
+            ubicaciones, cuentas, verificacion, fotos);
+    private final FotoSubida foto = new FotoSubida(new byte[] {1, 2, 3});
 
     @Test
     void crearDelegaParametrosYResultadoSinOtrasInteracciones() {
@@ -46,6 +52,63 @@ class GestionReclamosFacadeTest {
         orden.verify(ubicaciones).confirmar(3L, elegida);
         orden.verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle", confirmada);
         verifyNoMoreInteractions(escritura, consultas, catalogos, ubicaciones);
+    }
+
+    @Test
+    void crearConFotoLaPreparaAntesYLaConfirmaCuandoElReclamoYaEstaGuardado() {
+        var pendiente = Ubicacion.pendiente();
+        when(fotos.preparar(foto)).thenReturn("ref.jpg");
+        when(ubicaciones.confirmar(3L, null)).thenReturn(pendiente);
+        when(escritura.crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg")).thenReturn(reclamo);
+
+        assertThat(facade.crear(1L, 2L, 3L, "Pozo", "Calle", null, foto)).isSameAs(reclamo);
+        var orden = inOrder(fotos, escritura);
+        orden.verify(fotos).preparar(foto);
+        orden.verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg");
+        orden.verify(fotos).confirmar("ref.jpg");
+        verify(fotos, never()).descartar(any());
+    }
+
+    @Test
+    void siElAltaFallaLaFotoPendienteSeDescartaYElErrorSigue() {
+        var error = new RecursoNoEncontradoException("categoría", 2L);
+        when(fotos.preparar(foto)).thenReturn("ref.jpg");
+        when(ubicaciones.confirmar(3L, null)).thenReturn(Ubicacion.pendiente());
+        when(escritura.crear(anyLong(), anyLong(), anyLong(), any(), any(), any(Ubicacion.class), eq("ref.jpg")))
+                .thenThrow(error);
+
+        assertThatThrownBy(() -> facade.crear(1L, 2L, 3L, "Pozo", "Calle", null, foto)).isSameAs(error);
+        verify(fotos).descartar("ref.jpg");
+        verify(fotos, never()).confirmar(any());
+    }
+
+    @Test
+    void unaFotoInvalidaFrenaElAltaSinTocarLaBase() {
+        var error = new ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException("no es imagen");
+        when(fotos.preparar(foto)).thenThrow(error);
+
+        assertThatThrownBy(() -> facade.crear(1L, 2L, 3L, "Pozo", "Calle", null, foto)).isSameAs(error);
+        verifyNoInteractions(escritura, ubicaciones);
+    }
+
+    @Test
+    void laFotoSeLeeConLosPermisosDelDetalle() {
+        reclamo.registrarFoto("0123456789abcdef0123456789abcdef.jpg");
+        byte[] jpeg = {(byte) 0xFF, (byte) 0xD8};
+        when(consultas.buscarPorNumero(1L, reclamo.getNumero())).thenReturn(reclamo);
+        when(fotos.leer("0123456789abcdef0123456789abcdef.jpg")).thenReturn(Optional.of(jpeg));
+
+        assertThat(facade.foto(1L, reclamo.getNumero())).isSameAs(jpeg);
+        verify(consultas).buscarPorNumero(1L, reclamo.getNumero());
+    }
+
+    @Test
+    void unReclamoSinFotoDa404() {
+        when(consultas.buscarPorNumero(1L, reclamo.getNumero())).thenReturn(reclamo);
+
+        assertThatThrownBy(() -> facade.foto(1L, reclamo.getNumero()))
+                .isInstanceOf(RecursoNoEncontradoException.class).hasMessageContaining("no tiene foto");
+        verifyNoInteractions(fotos);
     }
 
     @Test

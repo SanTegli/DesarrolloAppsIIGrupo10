@@ -296,6 +296,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | Geocodificación (API externa) | `Geocodificador` | **Hecho (PR 11)**: `GeorefGeocodificador`, `GeocodificadorConCache` y `ServicioUbicaciones`; ver abajo | — |
 | Mensajería | `ServicioNotificaciones` | **Hecho (PR 12)**: outbox, `PublicadorMensajes`, RabbitMQ y `servicio-notificaciones`; ver abajo | — |
 | Teléfono verificado (segunda API externa) | `CanalVerificacion` | **Hecho (PR 15)**: `CanalTelegram`, `BotTelegram` y `ServicioVerificacionTelefono`; ver abajo | — |
+| Foto del reclamo | `AlmacenFotos` | **Hecho (PR 16)**: `ServicioFotos`, `ProcesadorFotos` y `AlmacenFotosLocal` (volumen); ver abajo | — |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
@@ -544,6 +545,62 @@ que no hay columnas nuevas en `reclamos` y se cuentan también las reaperturas v
 reclamo evita que un doble clic lo reabra dos veces. El administrador bloquea y desbloquea cuentas de
 ciudadanos desde la interfaz; una cuenta bloqueada sigue pudiendo entrar y consultar.
 
+### Foto del reclamo
+
+Cada reclamo nuevo lleva una foto del problema: es la prueba que ve el agente antes de salir y la que
+permite comparar duplicados (PR 17). El alta pasa a `multipart/form-data`, con la parte `reclamo` (el JSON
+de siempre) y la parte `foto`.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor C as Ciudadano
+  participant UI as React
+  participant RC as ReclamoController
+  participant F as GestionReclamosFacade
+  participant SF as ServicioFotos
+  participant AL as AlmacenFotosLocal<br/>(Adapter)
+  participant RS as ReclamoService
+  participant DB as MySQL
+
+  C->>UI: completa el alta y elige la foto
+  UI->>RC: POST /api/reclamos (multipart: reclamo + foto)
+  RC->>F: crear(…, FotoSubida)
+  F->>SF: preparar(foto)
+  Note over SF: ImageIO: ¿JPEG o PNG? ¿hasta 4000 × 4000?<br/>re-codifica a JPEG sin EXIF
+  SF->>AL: guardarPendiente(jpeg)
+  AL-->>F: referencia aleatoria (.pendientes/…)
+  F->>RS: crear(…, referencia) en una transacción
+  RS->>DB: INSERT reclamos (foto = referencia)
+  alt el alta se confirmó
+    F->>SF: confirmar(referencia)
+    SF->>AL: mueve el archivo de .pendientes/
+  else el alta falló (404, 403, 409…)
+    F->>SF: descartar(referencia)
+    SF->>AL: borra el archivo pendiente
+  end
+  RC-->>UI: 201 con foto: /api/reclamos/{numero}/foto
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `ProcesadorFotos` | Reconoce el formato por el contenido (solo JPEG o PNG), lee las dimensiones del encabezado antes de decodificar (hasta 4000 × 4000) y re-codifica a JPEG con calidad 0,85. Re-codificar descarta los metadatos: el EXIF con el GPS no se guarda |
+| `AlmacenFotos` | Interfaz del almacén (Adapter): guardar pendiente, confirmar, descartar y leer. `AlmacenFotosLocal` usa un directorio; Firebase Storage o S3 serían otra implementación |
+| `AlmacenFotosLocal` | Nombres aleatorios (`<32 hex>.jpg`), pendientes en `.pendientes/` y movimiento atómico al confirmar. Rechaza cualquier referencia con otra forma, así no se puede leer fuera del directorio |
+| `ServicioFotos` | Coordina los dos pasos. Si confirmar falla después del alta, lo registra y el reclamo queda sin foto visible, en lugar de responder un error por un reclamo que sí se creó |
+| `GestionReclamosFacade` | Prepara la foto antes de la transacción del alta y la confirma o descarta según cómo terminó |
+
+**El archivo y la base no comparten transacción.** Por eso la foto se guarda primero como pendiente y se
+confirma cuando el reclamo ya está en la base; si el alta falla, se borra. Así no queda un archivo huérfano
+por cada alta rechazada, ni un reclamo que apunte a un archivo a medio escribir.
+
+**Acceso.** `GET /api/reclamos/{numero}/foto` usa los mismos permisos que el detalle. La foto no se sirve
+como archivo estático ni con una URL pública: sin sesión, `401`.
+
+**Límites de tamaño, en tres lugares:** nginx (6 MB, `client_max_body_size`), Spring
+(`spring.servlet.multipart.max-file-size: 5MB`) y `ProcesadorFotos` (5 MB y 4000 px). Los dos primeros cortan
+antes de leer el archivo entero; el tercero vale aunque cambie el transporte.
+
 ## Límites conocidos
 
 - **Correo de laboratorio.** Con la mensajería habilitada, los avisos salen por correo, pero a Mailpit, que
@@ -559,6 +616,11 @@ ciudadanos desde la interfaz; una cuenta bloqueada sigue pudiendo entrar y consu
 - **Sin confirmación del email.** El registro no verifica que el correo sea de quien se registra.
 - **Una cuenta desactivada conserva su sesión abierta** hasta que vence. Cada operación se valida con el
   usuario de la base, así que igual no puede crear reclamos: el dominio la rechaza con `409`.
+- **Fotos sin girar ni anonimizar.** La foto no se gira según la orientación que guardó el teléfono en el
+  EXIF, así que una foto vertical puede verse acostada. Tampoco se ocultan caras ni patentes: se le pide al
+  ciudadano que las evite. Difuminarlas automáticamente necesitaría un modelo de detección, fuera del alcance.
+- **Fotos en un solo disco.** El almacén local no se replica: con dos instancias del backend haría falta un
+  almacén compartido (otra implementación de `AlmacenFotos`). Un reclamo borrado de la base deja su foto.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.
 - **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.

@@ -43,3 +43,6 @@ dist/
 
 ### Base H2 local de servicio-notificaciones ###
 servicios/servicio-notificaciones/datos/
+
+### Fotos de los reclamos en desarrollo (PR 16) ###
+**/datos/fotos/

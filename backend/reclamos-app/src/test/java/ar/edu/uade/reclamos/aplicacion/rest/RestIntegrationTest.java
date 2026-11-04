@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.rest;
 
+import static ar.edu.uade.reclamos.aplicacion.Fotos.alta;
 import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.sinCsrf;
@@ -123,8 +124,7 @@ class RestIntegrationTest {
 
     @Test
     void postValidoDevuelve201LocationDtoCompletoYNotificaciones() throws Exception {
-        MvcResult resultado = mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                        .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria())))
+        MvcResult resultado = mvc.perform(alta(creacion(datos.categoria())).with(como(datos.ciudadano())))
                 .andExpect(status().isCreated()).andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.estado").value("ASIGNADO"))
                 .andExpect(jsonPath("$.accionesDisponibles").value(contains("CANCELADO")))
@@ -135,10 +135,11 @@ class RestIntegrationTest {
         JsonNode dto = leer(resultado);
         assertThat(resultado.getResponse().getHeader("Location")).isEqualTo("/api/reclamos/" + dto.get("numero").asText());
         assertThat(dto.get("numero").asText()).matches("REC-[0-9A-F]{8}");
-        campos(dto, "numero", "descripcion", "direccion", "ubicacion", "estado", "prioridad", "origenPrioridad",
+        campos(dto, "numero", "descripcion", "direccion", "ubicacion", "foto", "estado", "prioridad", "origenPrioridad",
                 "motivoPrioridad", "vencido", "asignacionPendiente", "fechaCreacion", "fechaLimite", "categoria",
                 "barrio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
         campos(dto.get("ubicacion"), "estado", "latitud", "longitud", "direccionNormalizada", "proveedor");
+        assertThat(dto.get("foto").asText()).isEqualTo("/api/reclamos/" + dto.get("numero").asText() + "/foto");
         assertThat(dto.get("ubicacion").get("estado").asText()).isEqualTo("PENDIENTE");
         assertThat(dto.get("ubicacion").get("latitud").isNull()).isTrue();
         assertThat(dto.get("origenPrioridad").asText()).isEqualTo("CATEGORIA");
@@ -154,8 +155,7 @@ class RestIntegrationTest {
 
     @Test
     void postSinAreaCompatibleDevuelveIngresadoYAreaNula() throws Exception {
-        mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                        .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.sinArea())))
+        mvc.perform(alta(creacion(datos.sinArea())).with(como(datos.ciudadano())))
                 .andExpect(status().isCreated()).andExpect(jsonPath("$.estado").value("INGRESADO"))
                 .andExpect(jsonPath("$.area").value(nullValue())).andExpect(jsonPath("$.historial", hasSize(1)));
     }
@@ -163,8 +163,7 @@ class RestIntegrationTest {
     @ParameterizedTest
     @MethodSource("cuerposInvalidos")
     void postConBodyInvalidoEs400(String body) throws Exception {
-        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content(body)), 400, "DATOS_INVALIDOS", "/api/reclamos");
+        error(mvc.perform(alta(body).with(como(datos.ciudadano()))), 400, "DATOS_INVALIDOS", "/api/reclamos");
     }
 
     static Stream<String> cuerposInvalidos() {
@@ -177,28 +176,24 @@ class RestIntegrationTest {
 
     @Test
     void beanValidationDevuelveUnDetallePorCampoInvalido() throws Exception {
-        MvcResult resultado = error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content("{}")), 400, "DATOS_INVALIDOS", "/api/reclamos");
+        MvcResult resultado = error(mvc.perform(alta("{}").with(como(datos.ciudadano()))), 400, "DATOS_INVALIDOS", "/api/reclamos");
         assertThat(leer(resultado).get("detalles")).hasSize(4);
     }
 
     @Test
     void postConCategoriaOBarrioInexistenteEs404YNoCreaNada() throws Exception {
-        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content(creacion(Long.MAX_VALUE))),
+        error(mvc.perform(alta(creacion(Long.MAX_VALUE)).with(como(datos.ciudadano()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
         ObjectNode sinBarrio = (ObjectNode) json.readTree(creacion(datos.categoria()));
         sinBarrio.put("barrioId", Long.MAX_VALUE);
-        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(sinBarrio))),
+        error(mvc.perform(alta(json.writeValueAsString(sinBarrio)).with(como(datos.ciudadano()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
         assertThat(reclamos.buscarTodos()).hasSize(4);
     }
 
     @Test
     void postUsuarioInexistenteEs404() throws Exception {
-        error(mvc.perform(post("/api/reclamos").with(como(Long.MAX_VALUE))
-                .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
+        error(mvc.perform(alta(creacion(datos.categoria())).with(como(Long.MAX_VALUE))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
     }
 
@@ -209,8 +204,7 @@ class RestIntegrationTest {
             ciudadano.desactivar();
             usuarios.guardar(ciudadano);
         });
-        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
+        error(mvc.perform(alta(creacion(datos.categoria())).with(como(datos.ciudadano()))),
                 409, "REGLA_NEGOCIO", "/api/reclamos");
         assertThat(reclamos.buscarTodos()).hasSize(4);
         assertThat(notificaciones.buscarPorDestinatario(datos.ciudadano())).isEmpty();
@@ -218,8 +212,7 @@ class RestIntegrationTest {
 
     @Test
     void postAgenteNoPuedeCrearEs403() throws Exception {
-        error(mvc.perform(post("/api/reclamos").with(como(datos.agente()))
-                .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
+        error(mvc.perform(alta(creacion(datos.categoria())).with(como(datos.agente()))),
                 403, "ACCESO_DENEGADO", "/api/reclamos");
     }
 
@@ -229,7 +222,8 @@ class RestIntegrationTest {
         for (MockHttpServletRequestBuilder request : List.of(get("/api/reclamos"), get(base), get(base + "/notificaciones"),
                 get("/api/notificaciones"), get("/api/usuarios"), get("/api/auth/yo"),
                 get("/api/ubicaciones/sugerencias").param("direccion", "Belgrano 450").param("barrioId", "1"),
-                post("/api/reclamos").contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria())),
+                // El 401 sale antes de leer el formulario: alcanza con el tipo multipart, sin partes.
+                post("/api/reclamos").contentType(MediaType.MULTIPART_FORM_DATA),
                 patch(base + "/estado").contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"EN_PROCESO\"}"),
                 patch(base + "/asignacion").contentType(MediaType.APPLICATION_JSON).content("{\"areaId\":" + datos.otraArea() + "}"))) {
             mvc.perform(request.with(csrf())).andExpect(status().isUnauthorized())
@@ -240,8 +234,7 @@ class RestIntegrationTest {
 
     @Test
     void unPostOPatchConSesionPeroSinTokenCsrfEs403YNoCambiaNada() throws Exception {
-        error(mvc.perform(post("/api/reclamos").with(sinCsrf(datos.ciudadano()))
-                .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
+        error(mvc.perform(alta(creacion(datos.categoria())).with(sinCsrf(datos.ciudadano()))),
                 403, "CSRF_INVALIDO", "/api/reclamos");
         String ruta = "/api/reclamos/" + datos.asignado() + "/estado";
         error(mvc.perform(patch(ruta).with(sinCsrf(datos.agente())).contentType(MediaType.APPLICATION_JSON)
@@ -497,6 +490,11 @@ class RestIntegrationTest {
                 .isEqualTo("El tipo de contenido enviado no está soportado para este recurso.");
         assertThat(resultado.getResponse().getContentAsString())
                 .doesNotContain("stackTrace", "HttpMediaTypeNotSupportedException");
+        // Desde el PR 16 el alta es multipart: el JSON solo, como antes, tampoco se acepta.
+        error(mvc.perform(post("/api/reclamos").with(como(datos.ciudadano()))
+                .contentType(MediaType.APPLICATION_JSON).content(creacion(datos.categoria()))),
+                415, "TIPO_CONTENIDO_NO_SOPORTADO", "/api/reclamos");
+        assertThat(reclamos.buscarTodos()).hasSize(4);
     }
 
     private String creacion(Long categoria) throws Exception {

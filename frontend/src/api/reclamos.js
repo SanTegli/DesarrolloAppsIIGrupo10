@@ -3,15 +3,21 @@ import { pedir } from './cliente.js'
 const ruta = (numero) => `/reclamos/${encodeURIComponent(numero)}`
 
 /**
- * POST /api/reclamos. Solo ciudadanos. `ubicacion` es la sugerencia elegida del mapa; sin ella, el reclamo
- * queda con la ubicación pendiente.
+ * POST /api/reclamos. Solo ciudadanos. Va como multipart/form-data: la parte `reclamo` con el JSON y la parte
+ * `foto` con el archivo (obligatoria). `ubicacion` es la sugerencia elegida del mapa; sin ella, el reclamo queda
+ * con la ubicación pendiente.
  */
-export function crearReclamo({ categoriaId, barrioId, descripcion, direccion, ubicacion }) {
-  const cuerpo = { categoriaId, barrioId, descripcion, direccion }
+export function crearReclamo({ categoriaId, barrioId, descripcion, direccion, ubicacion, foto }) {
+  const reclamo = { categoriaId, barrioId, descripcion, direccion }
   if (ubicacion) {
-    cuerpo.ubicacion = ubicacion
+    reclamo.ubicacion = ubicacion
   }
-  return pedir('/reclamos', { metodo: 'POST', cuerpo })
+  const formulario = new FormData()
+  formulario.append('reclamo', new Blob([JSON.stringify(reclamo)], { type: 'application/json' }))
+  if (foto) {
+    formulario.append('foto', foto)
+  }
+  return pedir('/reclamos', { metodo: 'POST', formulario })
 }
 
 /** GET /api/reclamos. El backend decide qué reclamos ve el usuario de la sesión según su rol. */

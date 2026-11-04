@@ -1,5 +1,35 @@
 import { vi } from 'vitest'
 
+/** Lee un Blob como texto; jsdom no siempre trae Blob.text(). */
+function leerTexto(blob) {
+  if (typeof blob.text === 'function') {
+    return blob.text()
+  }
+  return new Promise((listo, fallo) => {
+    const lector = new FileReader()
+    lector.onload = () => listo(lector.result)
+    lector.onerror = () => fallo(lector.error)
+    lector.readAsText(blob)
+  })
+}
+
+/**
+ * El alta multipart queda como un cuerpo plano: los campos de la parte `reclamo` y, en `foto`, el nombre, el
+ * tipo y el tamaño del archivo. Así los tests comparan el contrato sin leer el formulario.
+ */
+async function leerFormulario(formulario) {
+  const cuerpo = { multipart: true }
+  const reclamo = formulario.get('reclamo')
+  if (reclamo) {
+    Object.assign(cuerpo, JSON.parse(await leerTexto(reclamo)), { tipoReclamo: reclamo.type })
+  }
+  const foto = formulario.get('foto')
+  if (foto) {
+    cuerpo.foto = { nombre: foto.name, tipo: foto.type, tamano: foto.size }
+  }
+  return cuerpo
+}
+
 /**
  * Reemplaza fetch por una tabla de rutas. Cada clave es "METODO /ruta" y el valor es el cuerpo,
  * o una función (peticion) => cuerpo | { status, cuerpo }. Devuelve la lista de llamadas hechas.
@@ -17,7 +47,12 @@ export function simularApi(rutas) {
         consulta: Object.fromEntries(searchParams),
         csrf: opciones.headers?.['X-XSRF-TOKEN'],
         credenciales: opciones.credentials,
-        cuerpo: opciones.body ? JSON.parse(opciones.body) : undefined,
+        cuerpo:
+          opciones.body instanceof FormData
+            ? await leerFormulario(opciones.body)
+            : opciones.body
+              ? JSON.parse(opciones.body)
+              : undefined,
       }
       llamadas.push(peticion)
       const manejador = rutas[`${metodo} ${pathname}`]
@@ -60,12 +95,22 @@ export const CATEGORIAS = [
 
 export const BARRIOS = [{ id: 2, nombre: 'Bernal', municipio: 'Quilmes' }]
 
+/** Un archivo de imagen para subir en los tests (el contenido no importa: la interfaz no lo decodifica). */
+export function archivoFoto({ nombre = 'farol.jpg', tipo = 'image/jpeg', tamano = 2048 } = {}) {
+  const archivo = new File([new Uint8Array(Math.min(tamano, 16))], nombre, { type: tipo })
+  if (tamano > 16) {
+    Object.defineProperty(archivo, 'size', { value: tamano })
+  }
+  return archivo
+}
+
 export function reclamo(cambios = {}) {
   return {
     numero: 'REC-4F2A91BC',
     descripcion: 'Farol apagado frente a la plaza',
     direccion: 'Belgrano 450',
     ubicacion: { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null },
+    foto: '/api/reclamos/REC-4F2A91BC/foto',
     estado: 'ASIGNADO',
     prioridad: 'MEDIA',
     origenPrioridad: 'CATEGORIA',

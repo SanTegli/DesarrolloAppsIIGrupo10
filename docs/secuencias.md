@@ -71,9 +71,10 @@ sequenceDiagram
   participant L as Listeners
 
   U->>UI: completa el formulario
-  UI->>C: POST /api/reclamos con la cookie de sesión y X-XSRF-TOKEN
-  C->>F: crear(usuarioId, categoriaId, barrioId, descripcion, direccion)
-  F->>S: crear(...)
+  UI->>C: POST /api/reclamos (multipart: reclamo y foto) con la cookie de sesión y X-XSRF-TOKEN
+  C->>F: crear(usuarioId, categoriaId, barrioId, descripcion, direccion, ubicación, foto)
+  Note over F: valida y re-codifica la foto y la guarda como pendiente (ver arquitectura, Foto del reclamo)
+  F->>S: crear(..., referencia de la foto)
   Note over S: comienza la transacción
   S->>R: buscar usuario, categoría y barrio
   R-->>S: ciudadano, categoría, barrio
@@ -140,7 +141,8 @@ sequenceDiagram
   GEO-->>B: direcciones con coordenadas
   B-->>UI: sugerencias dentro del municipio
   U->>UI: elige una sugerencia y crea el reclamo
-  UI->>B: POST /api/reclamos con la ubicación elegida
+  UI->>B: POST /api/reclamos (multipart) con la ubicación elegida y la foto
+  B->>B: valida la foto (JPEG o PNG), la re-codifica sin EXIF y la guarda como pendiente
   B->>B: valida que la ubicación caiga en el municipio
   Note over B,DB: comienza la transacción
   B->>PRI: POST /api/prioridades/evaluar (categoría y descripción)
@@ -153,6 +155,7 @@ sequenceDiagram
   Note right of B: si falla o pasan 2 s: asignación pendiente
   B->>DB: guarda el reclamo, sus avisos y una fila PENDIENTE por aviso en mensajes_salientes
   Note over B,DB: confirma la transacción
+  B->>B: confirma la foto (la mueve del directorio de pendientes)
   B-->>UI: 201 Created con el reclamo
   loop cada 2 segundos
     B->>DB: lee los mensajes PENDIENTES

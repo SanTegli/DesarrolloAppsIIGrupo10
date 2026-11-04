@@ -6,16 +6,26 @@ import ar.edu.uade.reclamos.aplicacion.rest.mapper.RestMapper;
 import ar.edu.uade.reclamos.aplicacion.seguridad.UsuarioAutenticado;
 import ar.edu.uade.reclamos.dominio.modelo.EstadoReclamo;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
+import ar.edu.uade.reclamos.aplicacion.foto.FotoSubida;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Encoding;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Positive;
+import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.List;
+import org.springframework.http.CacheControl;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Operaciones sobre reclamos. Quién opera sale de la sesión ({@link UsuarioAutenticado}); qué puede hacer lo
@@ -33,15 +43,40 @@ public class ReclamoController {
         this.mapper = mapper;
     }
 
-    @Operation(summary = "Crear un reclamo (solo ciudadanos)")
-    @PostMapping
+    /**
+     * Alta con foto: {@code multipart/form-data} con la parte {@code reclamo} (el JSON de siempre, con tipo
+     * {@code application/json}) y la parte {@code foto} (JPEG o PNG, hasta 5 MB y 4000 × 4000 píxeles).
+     */
+    @Operation(summary = "Crear un reclamo con su foto (solo ciudadanos)",
+            requestBody = @io.swagger.v3.oas.annotations.parameters.RequestBody(content = @Content(
+                    mediaType = MediaType.MULTIPART_FORM_DATA_VALUE,
+                    encoding = @Encoding(name = "reclamo", contentType = MediaType.APPLICATION_JSON_VALUE))))
+    @ApiResponse(responseCode = "413", description = "La foto supera el tamaño o las dimensiones (ARCHIVO_DEMASIADO_GRANDE)")
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ReclamoResponse> crear(
             @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
-            @Valid @RequestBody CrearReclamoRequest request) {
+            @Valid @RequestPart("reclamo") CrearReclamoRequest request,
+            @RequestPart("foto") MultipartFile foto) throws IOException {
         Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.barrioId(),
-                request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()));
+                request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()),
+                new FotoSubida(foto.getBytes()));
         return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
                 .body(respuesta(usuario.id(), reclamo));
+    }
+
+    /** La foto re-codificada a JPEG, sin metadatos. La ve quien puede ver el detalle del reclamo. */
+    @Operation(summary = "Foto del reclamo (mismos permisos que el detalle)")
+    @ApiResponse(responseCode = "200", description = "JPEG sin metadatos",
+            content = @Content(mediaType = MediaType.IMAGE_JPEG_VALUE,
+                    schema = @Schema(type = "string", format = "binary")))
+    @GetMapping("/{numero}/foto")
+    public ResponseEntity<byte[]> foto(@Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+                                       @PathVariable String numero) {
+        // Sin "produces": así un error (403, 404) sale en JSON como el resto de la API.
+        return ResponseEntity.ok()
+                .contentType(MediaType.IMAGE_JPEG)
+                .cacheControl(CacheControl.maxAge(Duration.ofHours(1)).cachePrivate())
+                .body(facade.foto(usuario.id(), numero));
     }
 
     @Operation(summary = "Listar los reclamos que ve el usuario")

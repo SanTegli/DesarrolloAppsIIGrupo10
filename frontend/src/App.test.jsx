@@ -2,7 +2,17 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App.jsx'
-import { AREAS, BARRIOS, CATEGORIAS, SIN_SESION, TOKEN_CSRF, USUARIOS, reclamo, simularApi } from './pruebas/apiFalsa.js'
+import {
+  AREAS,
+  BARRIOS,
+  CATEGORIAS,
+  SIN_SESION,
+  TOKEN_CSRF,
+  USUARIOS,
+  archivoFoto,
+  reclamo,
+  simularApi,
+} from './pruebas/apiFalsa.js'
 
 const [ana, carla, elena] = USUARIOS
 
@@ -156,6 +166,7 @@ describe('App', () => {
     await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.type(screen.getByLabelText(/Descripción del problema/), '  Farol apagado frente a la plaza ')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
 
     expect(await screen.findByText('Reclamo creado y asignado a Alumbrado.')).toBeInTheDocument()
@@ -163,7 +174,15 @@ describe('App', () => {
     const alta = llamadas.find((llamada) => llamada.metodo === 'POST')
     expect(alta).toMatchObject({
       csrf: TOKEN_CSRF,
-      cuerpo: { categoriaId: 1, barrioId: 2, direccion: 'Belgrano 450', descripcion: 'Farol apagado frente a la plaza' },
+      cuerpo: {
+        multipart: true,
+        tipoReclamo: 'application/json',
+        categoriaId: 1,
+        barrioId: 2,
+        direccion: 'Belgrano 450',
+        descripcion: 'Farol apagado frente a la plaza',
+        foto: { nombre: 'farol.jpg', tipo: 'image/jpeg', tamano: 2048 },
+      },
     })
   })
 
@@ -199,6 +218,7 @@ describe('App', () => {
     expect(screen.getAllByRole('link', { name: 'Ver en el mapa' })).toHaveLength(2)
     await usuario.click(opcion)
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado frente a la plaza')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
 
     expect(await screen.findByRole('link', { name: 'Ver en Google Maps' })).toBeInTheDocument()
@@ -230,6 +250,7 @@ describe('App', () => {
     expect(screen.queryByText(/El mapa no responde en este momento/)).not.toBeInTheDocument()
 
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
     await screen.findByRole('alert')
     expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo).not.toHaveProperty('ubicacion')
@@ -252,6 +273,7 @@ describe('App', () => {
     await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'x')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
 
     const alerta = await screen.findByRole('alert')

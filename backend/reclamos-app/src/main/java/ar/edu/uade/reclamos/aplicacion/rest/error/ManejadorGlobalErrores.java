@@ -23,6 +23,9 @@ import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.MultipartException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -52,6 +55,34 @@ public class ManejadorGlobalErrores {
     @ExceptionHandler(LimiteExcedidoException.class)
     public ResponseEntity<ErrorResponse> limiteExcedido(LimiteExcedidoException error, HttpServletRequest request) {
         return respuesta(429, "LIMITE_EXCEDIDO", error.getMessage(), List.of(), request);
+    }
+
+    @ExceptionHandler(ArchivoDemasiadoGrandeException.class)
+    public ResponseEntity<ErrorResponse> archivoGrande(ArchivoDemasiadoGrandeException error,
+                                                       HttpServletRequest request) {
+        return respuesta(413, "ARCHIVO_DEMASIADO_GRANDE", error.getMessage(), List.of(), request);
+    }
+
+    /** El contenedor cortó la subida por superar spring.servlet.multipart.max-file-size. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> subidaGrande(MaxUploadSizeExceededException error,
+                                                      HttpServletRequest request) {
+        return respuesta(413, "ARCHIVO_DEMASIADO_GRANDE",
+                "La foto pesa demasiado. Sacala con menos resolución o recortala.", List.of(), request);
+    }
+
+    @ExceptionHandler(MissingServletRequestPartException.class)
+    public ResponseEntity<ErrorResponse> parteFaltante(MissingServletRequestPartException error,
+                                                       HttpServletRequest request) {
+        String mensaje = "foto".equals(error.getRequestPartName())
+                ? "El reclamo necesita una foto del problema."
+                : "Falta la parte '" + error.getRequestPartName() + "' del formulario.";
+        return respuesta(400, "DATOS_INVALIDOS", mensaje, List.of(), request);
+    }
+
+    @ExceptionHandler(MultipartException.class)
+    public ResponseEntity<ErrorResponse> multipartInvalido(MultipartException error, HttpServletRequest request) {
+        return respuesta(400, "DATOS_INVALIDOS", "El formulario con la foto no se pudo leer.", List.of(), request);
     }
 
     @ExceptionHandler(CredencialesInvalidasException.class)

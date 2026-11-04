@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { SIN_SESION, TOKEN_CSRF, simularApi } from '../pruebas/apiFalsa.js'
+import { SIN_SESION, TOKEN_CSRF, archivoFoto, simularApi } from '../pruebas/apiFalsa.js'
 import { ErrorApi, alVencerSesion, pedir } from './cliente.js'
 import { asignarArea, cambiarEstado, crearReclamo, listarAvisos, listarReclamos } from './reclamos.js'
 
@@ -64,17 +64,41 @@ describe('cliente HTTP', () => {
     expect(llamadas[0].consulta).toEqual({ estado: 'INGRESADO' })
   })
 
-  it('crea un reclamo con POST y el cuerpo del contrato', async () => {
+  it('crea un reclamo con POST multipart: el JSON del contrato en la parte reclamo y la foto', async () => {
     const llamadas = simularApi({ 'POST /api/reclamos': { status: 201, cuerpo: { numero: 'REC-1' } } })
 
-    const creado = await crearReclamo({ categoriaId: 1, barrioId: 2, descripcion: 'Farol apagado', direccion: 'Belgrano 450' })
+    const creado = await crearReclamo({
+      categoriaId: 1,
+      barrioId: 2,
+      descripcion: 'Farol apagado',
+      direccion: 'Belgrano 450',
+      foto: archivoFoto(),
+    })
 
     expect(creado.numero).toBe('REC-1')
     expect(llamadas[0]).toMatchObject({
       metodo: 'POST',
       csrf: TOKEN_CSRF,
-      cuerpo: { categoriaId: 1, barrioId: 2, descripcion: 'Farol apagado', direccion: 'Belgrano 450' },
+      cuerpo: {
+        multipart: true,
+        tipoReclamo: 'application/json',
+        categoriaId: 1,
+        barrioId: 2,
+        descripcion: 'Farol apagado',
+        direccion: 'Belgrano 450',
+        foto: { nombre: 'farol.jpg', tipo: 'image/jpeg' },
+      },
     })
+    expect(fetch.mock.calls[0][1].body).toBeInstanceOf(FormData)
+    // El navegador pone multipart/form-data con el separador: a mano lo rompería.
+    expect(fetch.mock.calls[0][1].headers['Content-Type']).toBeUndefined()
+  })
+
+  it('las demás escrituras siguen yendo en JSON', async () => {
+    simularApi({ 'PATCH /api/reclamos/REC-1/estado': {} })
+
+    await cambiarEstado('REC-1', 'CERRADO', '')
+
     expect(fetch.mock.calls[0][1].headers['Content-Type']).toBe('application/json')
   })
 

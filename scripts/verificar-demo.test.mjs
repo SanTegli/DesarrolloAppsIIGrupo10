@@ -36,6 +36,7 @@ function escenarioNormal() {
     bloqueado: false,
     reclamosDeHoy: 0,
     limiteDiario: 20,
+    fotoServida: true,
   }
 }
 
@@ -48,7 +49,7 @@ const SESION = 'sesion-de-prueba'
 
 function responder(res, estado, cuerpo, tipo = 'application/json', cookies = []) {
   res.writeHead(estado, { 'Content-Type': tipo, ...(cookies.length ? { 'Set-Cookie': cookies } : {}) })
-  res.end(typeof cuerpo === 'string' ? cuerpo : JSON.stringify(cuerpo))
+  res.end(typeof cuerpo === 'string' || Buffer.isBuffer(cuerpo) ? cuerpo : JSON.stringify(cuerpo))
 }
 
 function cookiesDe(req) {
@@ -61,6 +62,23 @@ async function leer(req) {
   let texto = ''
   for await (const parte of req) texto += parte
   return texto
+}
+
+// El alta llega como multipart: se lee con el mismo parser de fetch que usa Node.
+async function leerFormulario(req) {
+  const trozos = []
+  for await (const trozo of req) trozos.push(trozo)
+  const formulario = await new Request('http://local/', {
+    method: 'POST',
+    headers: { 'content-type': req.headers['content-type'] },
+    body: Buffer.concat(trozos),
+  }).formData()
+  const foto = formulario.get('foto')
+  return {
+    reclamo: JSON.parse(await formulario.get('reclamo').text()),
+    tipoReclamo: formulario.get('reclamo').type,
+    foto: foto ? new Uint8Array(await foto.arrayBuffer()) : null,
+  }
 }
 
 before(async () => {
@@ -103,12 +121,16 @@ before(async () => {
     if (ruta === '/backend/api/reclamos' && req.method === 'POST') {
       if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
       if (req.headers['x-xsrf-token'] !== TOKEN) return responder(res, 403, { status: 403, codigo: 'CSRF_INVALIDO' })
-      const cuerpo = JSON.parse(await leer(req))
+      if (!req.headers['content-type']?.startsWith('multipart/form-data')) {
+        return responder(res, 415, { status: 415, codigo: 'TIPO_CONTENIDO_NO_SOPORTADO' })
+      }
+      const formulario = await leerFormulario(req)
+      const cuerpo = formulario.reclamo
       if (escenario.reclamosDeHoy >= escenario.limiteDiario) {
         return responder(res, 429, { status: 429, codigo: 'LIMITE_EXCEDIDO', mensaje: 'Ya creaste 20 reclamos en las últimas 24 horas.' })
       }
       escenario.reclamosDeHoy += 1
-      escenario.altas.push({ cuerpo, usuarioId: req.headers['x-usuario-id'] })
+      escenario.altas.push({ cuerpo, usuarioId: req.headers['x-usuario-id'], foto: formulario.foto, tipoReclamo: formulario.tipoReclamo })
       return responder(res, 201, {
         numero: NUMERO,
         estado: 'ASIGNADO',
@@ -117,10 +139,17 @@ before(async () => {
         motivoPrioridad: 'Luminaria apagada en la vía pública',
         asignacionPendiente: false,
         area: { id: 1, nombre: 'Alumbrado' },
+        foto: `/api/reclamos/${NUMERO}/foto`,
         ubicacion: cuerpo.ubicacion
           ? { estado: 'CONFIRMADA', ...cuerpo.ubicacion, proveedor: 'georef' }
           : { estado: 'PENDIENTE' },
       })
+    }
+    if (ruta === `/backend/api/reclamos/${NUMERO}/foto`) {
+      if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
+      return escenario.fotoServida
+        ? responder(res, 200, Buffer.from(escenario.altas.at(-1).foto), 'image/jpeg')
+        : responder(res, 404, { status: 404, codigo: 'RECURSO_NO_ENCONTRADO' })
     }
     if (ruta === '/cobertura/ws/cobertura.wsdl') {
       return responder(res, 200, '<wsdl:operation name="ConsultarCobertura"/>', 'text/xml')
@@ -177,6 +206,9 @@ describe('verificarDemo', () => {
     assert.equal(alta.usuarioId, undefined, 'la identidad va en la sesión, no en un encabezado')
     assert.match(resultados.find((r) => r.paso === 'Login').detalle, /Ana Pérez/)
     assert.equal(alta.cuerpo.ubicacion.direccionNormalizada, 'BELGRANO 450, Bernal, Quilmes')
+    assert.equal(alta.tipoReclamo, 'application/json')
+    assert.deepEqual([alta.foto[0], alta.foto[1]], [0xff, 0xd8], 'el alta lleva la foto JPEG')
+    assert.match(resultados.find((r) => r.paso === 'Foto').detalle, /JPEG de \d+ bytes/)
     assert.match(resultados.find((r) => r.paso === 'Correo por RabbitMQ').detalle, /lo recibimos/)
   })
 
@@ -251,6 +283,16 @@ describe('verificarDemo', () => {
     assert.match(alta.detalle, /429/)
     assert.match(alta.detalle, /RECLAMOS_USO_RECLAMOS_POR_DIA/)
     assert.equal(estadoDe(resultados, 'Revisión del reclamo'), FALLA)
+  })
+
+  test('si el backend no sirve la foto del reclamo, el paso de la foto falla', async () => {
+    escenario = { ...escenarioNormal(), fotoServida: false }
+    const resultados = await verificarDemo(configuracion())
+
+    const foto = resultados.find((r) => r.paso === 'Foto')
+    assert.equal(foto.estado, FALLA)
+    assert.match(foto.detalle, /404/)
+    assert.equal(estadoDe(resultados, 'Alta del reclamo'), OK)
   })
 
   test('con el backend apagado no se corta: marca las fallas y no intenta revisar el reclamo', async () => {

@@ -22,6 +22,7 @@ public class Reclamo extends Entidad {
     public static final int LONGITUD_MAXIMA_DESCRIPCION = 1000;
     public static final int LONGITUD_MAXIMA_DIRECCION = 200;
     public static final int LONGITUD_MAXIMA_MOTIVO_PRIORIDAD = 300;
+    public static final int LONGITUD_MAXIMA_REFERENCIA_FOTO = 64;
 
     private String numero;
     private String descripcion;
@@ -33,6 +34,8 @@ public class Reclamo extends Entidad {
     private boolean vencido;
     private boolean asignacionPendiente;
     private Ubicacion ubicacion;
+    /** Referencia a la foto en el almacén de fotos; {@code null} en los reclamos anteriores a la foto. */
+    private String foto;
     /** Bloqueo optimista: lo incrementa la persistencia en cada actualización. */
     private long version;
     private LocalDateTime fechaCreacion;
@@ -211,6 +214,21 @@ public class Reclamo extends Entidad {
     /** Guarda dónde ocurre el reclamo; reemplaza la ubicación anterior. */
     public void registrarUbicacion(Ubicacion nuevaUbicacion) {
         this.ubicacion = Validador.requerirNoNulo(nuevaUbicacion, "ubicación");
+    }
+
+    /**
+     * Guarda la referencia a la foto del problema. Es la prueba que acompaña al alta: se registra una sola vez y
+     * no se cambia después.
+     */
+    public void registrarFoto(String referencia) {
+        if (foto != null) {
+            throw new ReglaNegocioException("El reclamo " + numero + " ya tiene una foto.");
+        }
+        this.foto = Validador.requerirTexto(referencia, "foto", LONGITUD_MAXIMA_REFERENCIA_FOTO);
+    }
+
+    public Optional<String> getFoto() {
+        return Optional.ofNullable(foto);
     }
 
     /**
