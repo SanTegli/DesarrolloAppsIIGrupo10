@@ -7,11 +7,16 @@ TPO de Desarrollo de Aplicaciones II (UADE) — Grupo 10. Docente: Mg. Christian
 Los ciudadanos reportan problemas en la vía pública (baches, luminarias rotas, residuos), el sistema
 asigna cada reclamo al área municipal que corresponde y los agentes lo resuelven.
 
-Este repositorio contiene el **Trabajo Práctico Primera Parte (Hito 1)**: aplicación empresarial en
-capas con los patrones Factory, Repository, Strategy, Observer y Facade. La **Segunda Parte**
-(integración SOAP, REST, mensajería, API externa e IA) tiene las cinco integraciones hechas: el servicio
-SOAP de cobertura, el servicio de prioridad con IA, la ubicación de las direcciones con Georef y los avisos
-por correo con RabbitMQ. Lo que sigue está en el [plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
+El repositorio tiene las tres etapas del trabajo práctico:
+
+- **Primera Parte (Hito 1):** aplicación empresarial en capas con los patrones Factory, Repository,
+  Strategy, Observer y Facade.
+- **Segunda Parte:** servicio SOAP de cobertura, servicio REST de prioridad con IA (Gemini), ubicación de
+  las direcciones con Georef, avisos por correo con RabbitMQ y verificación del teléfono con Telegram.
+- **Integrador:** login, foto, posibles duplicados y apoyos, tableros, los
+  [requerimientos](docs/requerimientos.md) (incluidos los de la IA) y la prueba de carga básica.
+
+Cada PR está en el [plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
 
 ## Estructura
 
@@ -29,10 +34,10 @@ servicios/                  Servicios de integración de la Segunda Parte, cada 
   servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
   servicio-prioridad/       REST 2: prioridad sugerida por IA con Gemini (Swagger en el puerto 8082)
   servicio-notificaciones/  Consumidor de RabbitMQ: manda los avisos por correo (Mailpit)
-docs/                       Contrato REST, arquitectura, patrones, secuencias, guion de demo y evidencias
+docs/                       Requerimientos, arquitectura, patrones, contratos, despliegue, demo y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
-scripts/                    Verificación de la demo de punta a punta (Node, sin dependencias)
+scripts/                    Verificación de la demo de punta a punta y prueba de carga (Node, sin dependencias)
 docker-compose.yml          MySQL para desarrollo; backend, frontend y servicios para la demo
 ```
 
@@ -64,7 +69,14 @@ cd servicios
 
 GitHub Actions corre los tests del backend, de los servicios y del frontend en cada pull request y en
 cada push a `main` (`.github/workflows/ci.yml`). Además levanta los ocho contenedores con Docker Compose y
-recorre la demo con `scripts/verificar-demo.mjs`. Un PR con la verificación en rojo no se mergea.
+recorre la demo con `scripts/verificar-demo.mjs` y corre la prueba de carga básica con
+`scripts/prueba-carga.mjs`. Un PR con la verificación en rojo no se mergea.
+
+Los dos scripts tienen sus propios tests, contra un sistema simulado y sin `npm install`:
+
+```bash
+node --test scripts/*.test.mjs
+```
 
 ## Cómo levantar el backend
 
@@ -152,6 +164,14 @@ docker compose run --rm verificar-demo
 
 Crea un reclamo de prueba y sigue su recorrido por Georef, la IA, el servicio SOAP, RabbitMQ y el correo en
 Mailpit. El [guion de la demo](docs/demo.md) tiene el recorrido para presentar y la matriz de fallos.
+
+Para la prueba de carga básica (20 usuarios simultáneos leyendo durante 30 s, sin crear reclamos):
+
+```bash
+docker compose run --rm -T prueba-carga > docs/evidencias/prueba-carga.md
+```
+
+Las metas y lo que mide están en [Prueba de carga](docs/requerimientos.md#prueba-de-carga).
 
 ## Perfiles
 
@@ -241,12 +261,15 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 
 ## Documentación
 
+- [Requerimientos](docs/requerimientos.md): funcionales y no funcionales con su verificación, los del
+  componente de IA (exactitud, latencia, privacidad), la prueba de carga y las decisiones de diseño de la IA.
 - [Arquitectura](docs/arquitectura.md): capas, componentes con sus interfaces provistas y requeridas,
-  servicios y decisiones de diseño.
+  acceso local y remoto entre componentes, servicios, integraciones y decisiones de diseño.
 - [Modelo de dominio](docs/modelo-dominio.md): clases, reglas del dominio y tablas.
 - [Patrones de diseño](docs/patrones.md): Factory, Repository, Strategy, Observer y Facade; Adapter,
   proxy remoto, proxy de caché, Decorator, circuit breaker, outbox y consumidor idempotente en las
-  integraciones.
+  integraciones; Chain of Responsibility en el login y en los controles de uso; lado de lectura separado
+  (Domain Reporting) para los tableros.
 - [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación (con las cinco
   integraciones) y cambio de estado.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
@@ -254,7 +277,8 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 - [Despliegue](docs/despliegue.md): contenedores, puertos, arranque, memoria y configuración.
 - [Guion de la demo](docs/demo.md): recorrido para presentar, fallas a propósito, matriz de fallos y
   verificación automática.
-- [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso y capturas de la interfaz.
+- [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso, capturas de la interfaz,
+  [evaluación de la IA](docs/evidencias/ia-evaluacion.md) y lo pendiente antes de entregar.
 - [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
 
 ## Plan de trabajo del Hito 1
@@ -284,3 +308,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 16 | `feature/16-foto` | Foto obligatoria en el alta (multipart): JPEG o PNG validados por contenido, re-codificados sin EXIF, guardados en un volumen y servidos con los permisos del detalle |
 | 17 | `feature/17-duplicados-apoyos` | Posibles duplicados en el alta (misma categoría, a menos de 50 m, con Haversine) y apoyos únicos por ciudadano, sin datos del autor |
 | 18 | `feature/18-dashboards` | Tablero público (sin sesión ni datos personales) y de gestión (vencidos por fecha y tabla por área y barrio), con consultas agregadas en un puerto de lectura propio |
+| 19 | `feature/19-cierre` | Requerimientos funcionales y no funcionales (con los de la IA y su verificación), metas en la evaluación de la IA, prueba de carga básica en el CI, diagramas de componentes y despliegue al día, acceso local y remoto, y capturas nuevas de la interfaz |

@@ -1,5 +1,5 @@
 // Tests del script de verificación contra un sistema simulado: un servidor HTTP local que responde como
-// el frontend, el backend, los servicios, RabbitMQ y Mailpit. Se corren con: node --test scripts/
+// el frontend, el backend, los servicios, RabbitMQ y Mailpit. Se corren con: node --test scripts/*.test.mjs
 import { after, before, describe, test } from 'node:test'
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'

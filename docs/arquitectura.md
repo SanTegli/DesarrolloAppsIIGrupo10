@@ -94,6 +94,8 @@ flowchart LR
   PRI["servicio-prioridad<br/>REST 2, proceso aparte"]
   LLM["Gemini u OpenAI<br/>API externa"]
   GEO["Georef<br/>API externa"]
+  TG["Telegram Bot API<br/>API externa"]
+  FOTOS[("Volumen de fotos<br/>/data/fotos")]
   MQ[("RabbitMQ<br/>reclamos.eventos")]
   NOT["servicio-notificaciones<br/>consumidor, proceso aparte"]
   MAIL["Mailpit<br/>SMTP de prueba"]
@@ -108,6 +110,8 @@ flowchart LR
   APP -.->|"REST POST /api/prioridades/evaluar<br/>si la estrategia es ia"| PRI
   PRI -->|"HTTPS"| LLM
   APP -->|"HTTPS GET /direcciones"| GEO
+  APP -.->|"HTTPS getUpdates y sendMessage<br/>si el modo es telegram"| TG
+  APP -->|"archivos JPEG"| FOTOS
   APP -.->|"AMQP, outbox<br/>si la mensajería está habilitada"| MQ
   MQ -->|"cola notificaciones.email"| NOT
   NOT -->|"SMTP"| MAIL
@@ -137,6 +141,8 @@ flowchart LR
   NOT["«component»<br/>servicio-notificaciones"]
   MQ["«broker»<br/>RabbitMQ"]
   GEO["«externo»<br/>Georef"]
+  TG["«externo»<br/>Telegram"]
+  FS["«externo»<br/>Volumen de fotos"]
   GEM["«externo»<br/>Gemini"]
   MY["«externo»<br/>MySQL"]
   MAIL["«externo»<br/>Mailpit"]
@@ -153,6 +159,8 @@ flowchart LR
   I10(("JDBC"))
   I11(("notificaciones.<br/>email"))
   I12(("SMTP"))
+  I13(("Bot API"))
+  I14(("Archivos"))
 
   FE -.-> I1 --- APP
   APP -.-> I2 --- DOM
@@ -164,6 +172,8 @@ flowchart LR
   APP -.->|"REST 2"| I6 --- PRI
   PRI -.->|"HTTPS"| I9 --- GEM
   APP -.->|"HTTPS"| I7 --- GEO
+  APP -.->|"HTTPS"| I13 --- TG
+  APP -.-> I14 --- FS
   APP -.->|"AMQP, publica"| I8 --- MQ
   NOT -.->|"AMQP, consume"| I11 --- MQ
   NOT -.-> I12 --- MAIL
@@ -172,9 +182,9 @@ flowchart LR
 | Componente | Provee | Requiere | Contrato |
 | --- | --- | --- | --- |
 | `frontend` | Interfaz web | API de reclamos | [`api-contract.md`](api-contract.md) y `openapi/reclamos.yaml` |
-| `reclamos-app` | API de reclamos (REST 1) | Repository, `ConsultarCobertura`, evaluar prioridad, Georef, exchange `reclamos.eventos` | OpenAPI de REST 1 |
-| `reclamos-dominio` | Modelo e interfaces: Repository, `EstrategiaPrioridad`, `EstrategiaAsignacion`, `CatalogoCobertura`, `Geocodificador`, `PublicadorEventos` | Validación de `reclamos-comun` | Las interfaces Java del paquete `dominio` |
-| `reclamos-persistencia` | Implementación de los Repository | JDBC (MySQL) | `orm.xml` |
+| `reclamos-app` | API de reclamos (REST 1), incluidos los tableros | Repository, `ConsultasTablero`, `ConsultarCobertura`, evaluar prioridad, Georef, Telegram, almacén de fotos, exchange `reclamos.eventos` | OpenAPI de REST 1 |
+| `reclamos-dominio` | Modelo e interfaces: Repository, `ConsultasTablero`, `EstrategiaPrioridad`, `EstrategiaAsignacion`, `CatalogoCobertura`, `Geocodificador`, `PublicadorEventos` | Validación de `reclamos-comun` | Las interfaces Java del paquete `dominio` |
+| `reclamos-persistencia` | Implementación de los Repository y de `ConsultasTablero` | JDBC (MySQL) | `orm.xml` |
 | `reclamos-comun` | Validación y excepciones | — | — |
 | `servicio-cobertura` | `ConsultarCobertura` (SOAP) | Su catálogo, en un archivo propio | [`cobertura.xsd`](contratos/soap/cobertura.xsd) y el WSDL |
 | `servicio-prioridad` | `POST /api/prioridades/evaluar` (REST 2) | API de Gemini (u OpenAI) | `openapi/prioridad.yaml` |
@@ -190,6 +200,27 @@ servicio que usa la interfaz no sabe si la respuesta sale de la base, de otro pr
 | `Geocodificador` | `ServicioUbicaciones` | `GeocodificadorConCache` sobre `GeorefGeocodificador` | — |
 | `SalidaDeAvisos` | `ServicioNotificaciones` | Ninguna salida, u `OutboxAvisos` (RabbitMQ) | `reclamos.mensajeria.habilitada` |
 | `BrokerMensajes` | `PublicadorMensajes` | `BrokerRabbit` | — |
+| `CanalVerificacion` | `ServicioVerificacionTelefono` | `CanalSimulado` o `CanalTelegram` (con `BotTelegram`) | `reclamos.telegram.modo` |
+| `AlmacenFotos` | `ServicioFotos` | `AlmacenFotosLocal` (un directorio o volumen) | `reclamos.fotos.directorio` |
+| `ConsultasTablero` | `ServicioTablero` | `ConsultasTableroJpa` (JPQL agregado) | — |
+
+## Acceso local y remoto entre componentes
+
+El TP Inicial pide comparar la invocación directa con el acceso a través de una interfaz remota. En este
+sistema las dos formas conviven detrás de **la misma interfaz**, y se cambia de una a otra con una propiedad,
+sin tocar el código que la usa:
+
+| Caso | Acceso local (invocación directa) | Acceso remoto (a través de una interfaz) | Propiedad |
+| --- | --- | --- | --- |
+| Áreas que cubren un reclamo | `CoberturaLocal`: consulta la base del backend, en el mismo proceso | `CoberturaSoap`: llama a `ConsultarCobertura` en `servicio-cobertura`, otro proceso, por SOAP | `reclamos.cobertura.origen: local \| soap` |
+| Prioridad del reclamo | `PrioridadPorCategoria` y `PrioridadPorPalabrasClave`, en el mismo proceso | `PrioridadPorIA`: `POST /api/prioridades/evaluar` en `servicio-prioridad`, por REST, con respaldo local | `reclamos.prioridad.estrategia: categoria \| palabras-clave \| ia` |
+| Avisos | Solo avisos internos, en la misma transacción | Mensaje en RabbitMQ que consume `servicio-notificaciones`, otro proceso | `reclamos.mensajeria.habilitada` |
+
+`ServicioAsignacion` no sabe cuál de las dos recibe: le pide candidatas a `CatalogoCobertura`. Lo remoto
+suma lo que lo local no tiene: tiempo límite, errores de red y un modo degradado (la asignación queda
+pendiente). Las evidencias de los dos modos son CP16 a CP20 en
+[evidencias](evidencias/README.md): con el backend levantado a mano (perfil `dev`) la cobertura es local, y en
+Compose es remota.
 
 ## Servicios orientados a componentes
 

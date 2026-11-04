@@ -136,8 +136,8 @@ jobs:
       - name: Compilación
         run: npm run build
       # El script que recorre la demo se prueba contra un sistema simulado; no necesita npm install.
-      - name: Tests del script de verificación de la demo
-        run: node --test ../scripts/verificar-demo.test.mjs
+      - name: Tests de los scripts de verificación y de carga
+        run: node --test ../scripts/verificar-demo.test.mjs ../scripts/prueba-carga.test.mjs
 
   demo:
     name: Demo completa (Docker Compose)
@@ -145,6 +145,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      # Node solo para la prueba de carga, que corre desde la máquina del CI contra el puerto 8080.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       # Sin clave de Gemini en el CI: el servicio de prioridad usa el proveedor simulado, que no es IA pero
       # contesta por el mismo contrato. Georef sí se consulta de verdad; si no responde, es un aviso, no una falla.
       - name: Preparar .env
@@ -156,6 +160,22 @@ jobs:
       # Crea un reclamo y sigue su recorrido: Georef, IA, SOAP, outbox, RabbitMQ y correo en Mailpit.
       - name: Recorrer la demo
         run: docker compose run --rm verificar-demo
+      # Carga básica de solo lectura (RNF-3). En el CI la máquina es chica y comparte CPU con los ocho
+      # contenedores, así que el límite del p95 es más holgado que la meta; los errores tienen que ser cero.
+      - name: Prueba de carga básica
+        run: |
+          node scripts/prueba-carga.mjs --url http://localhost:8080 --usuarios 20 --duracion 20 \
+            --p95-maximo 3000 --salida prueba-carga.md
+      - name: Resumen de la prueba de carga
+        if: always()
+        run: test -f prueba-carga.md && cat prueba-carga.md >> "$GITHUB_STEP_SUMMARY" || true
+      - name: Guardar el informe de carga
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prueba-carga
+          path: prueba-carga.md
+          if-no-files-found: ignore
       - name: Memoria de cada contenedor
         if: always()
         run: docker stats --no-stream --format "table {{.Name}}\t{{.MemUsage}}\t{{.CPUPerc}}"

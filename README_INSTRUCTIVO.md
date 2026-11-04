@@ -648,6 +648,21 @@ Invoke-RestMethod "http://localhost:8080/api/dashboard/gestion" -WebSession $ele
 
 El público no pide sesión y no tiene datos de personas. El de gestión con la sesión de Ana responde `403`. Si no hay reclamos para calcular un porcentaje, viene `null` y la interfaz muestra "sin casos". Los vencidos se calculan por fecha: un reclamo que pasó su fecha límite cuenta aunque la tarea de vencimientos todavía no lo haya marcado.
 
+### Probar la carga
+
+Con el modo demo levantado, desde la raíz del repositorio:
+
+```powershell
+docker compose run --rm -T prueba-carga > docs/evidencias/prueba-carga.md
+Get-Content docs/evidencias/prueba-carga.md
+```
+
+Son 20 usuarios simultáneos leyendo durante 30 segundos, con la sesión de Ana: categorías, tablero público, listado, detalle y avisos. No crea reclamos. El informe tiene una tabla por endpoint y termina con "Resultado: **cumple**" si no hubo errores y el percentil 95 quedó en 1000 ms o menos (RNF-3 en [docs/requerimientos.md](docs/requerimientos.md#prueba-de-carga)).
+
+Para cambiar la carga: `$env:CARGA_USUARIOS="50"; $env:CARGA_DURACION_S="60"` antes del comando. Si la notebook está con poca memoria, los primeros pedidos pueden tardar más mientras Java calienta: conviene correrla una vez de prueba y guardar la segunda.
+
+En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en GitHub, usar `| Out-File -Encoding utf8 docs/evidencias/prueba-carga.md` en lugar de `>`.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -784,3 +799,4 @@ docker compose down
 - [ ] Modo demo: `docker compose up --build` levanta los ocho contenedores, la interfaz responde, `http://localhost:8081/ws/cobertura.wsdl` muestra el WSDL y `http://localhost:8082/swagger-ui.html` muestra el servicio de IA.
 - [ ] Modo demo: al crear un reclamo, el correo llega a Mailpit en `http://localhost:8025`.
 - [ ] Modo demo: `docker compose run --rm verificar-demo` termina con `0 fallas`.
+- [ ] Modo demo: `docker compose run --rm -T prueba-carga` termina con "Resultado: **cumple**".

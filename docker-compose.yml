@@ -200,6 +200,20 @@ services:
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
       MAILPIT_URL: http://mailpit:8025
 
+  # Prueba de carga básica (RNF-3 en docs/requerimientos.md): 20 usuarios simultáneos leyendo durante 30 s.
+  #   docker compose run --rm -T prueba-carga > docs/evidencias/prueba-carga.md
+  # Solo lee, como Ana Pérez: no crea reclamos.
+  prueba-carga:
+    image: node:22-alpine
+    profiles: ["verificacion"]
+    volumes:
+      - ./scripts:/scripts:ro
+    command: ["node", "/scripts/prueba-carga.mjs"]
+    environment:
+      BACKEND_URL: http://backend:8080
+      CARGA_USUARIOS: ${CARGA_USUARIOS:-20}
+      CARGA_DURACION_S: ${CARGA_DURACION_S:-30}
+
 volumes:
   reclamos-mysql-data:
   reclamos-fotos:
