@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.hasSize;
@@ -103,7 +104,7 @@ class UbicacionesIntegrationTest {
             obras.agregarCategoria(bache);
             areas.guardar(obras);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null));
+                    verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null)));
             barrio = bernal.getId();
             categoria = bache.getId();
             ciudadano = ana.getId();

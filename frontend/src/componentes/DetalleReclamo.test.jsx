@@ -90,6 +90,37 @@ describe('DetalleReclamo', () => {
     expect(screen.queryByRole('button', { name: 'Tomar reclamo' })).not.toBeInTheDocument()
   })
 
+  it('para reabrir pide el motivo: sin él el botón queda deshabilitado, y con él lo manda', async () => {
+    let estado = reclamo({ estado: 'RESUELTO', accionesDisponibles: ['CERRADO', 'EN_PROCESO'] })
+    const llamadas = mostrar(ana, {
+      [`GET ${RUTA}`]: () => estado,
+      [`PATCH ${RUTA}/estado`]: () => {
+        estado = reclamo({ estado: 'EN_PROCESO', accionesDisponibles: [] })
+        return estado
+      },
+    })
+    const usuario = userEvent.setup()
+
+    const reabrir = await screen.findByRole('button', { name: 'Reabrir' })
+    expect(reabrir).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Confirmar solución' })).toBeEnabled()
+    expect(screen.getByText(/una sola vez y dentro de los 7 días/)).toBeInTheDocument()
+    await usuario.type(screen.getByLabelText(/para reabrir, contá por qué/), 'Sigue apagado')
+    await usuario.click(reabrir)
+
+    expect(await screen.findByText('El reclamo pasó a En proceso.')).toBeInTheDocument()
+    const cambio = llamadas.find((llamada) => llamada.metodo === 'PATCH')
+    expect(cambio.cuerpo).toEqual({ estado: 'EN_PROCESO', observacion: 'Sigue apagado' })
+  })
+
+  it('si ya no se puede reabrir, el backend no lo ofrece y solo queda confirmar', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: reclamo({ estado: 'RESUELTO', accionesDisponibles: ['CERRADO'] }) })
+
+    expect(await screen.findByRole('button', { name: 'Confirmar solución' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Reabrir' })).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Observación (opcional)')).toBeInTheDocument()
+  })
+
   it('el agente toma el reclamo: envía el PATCH con la observación y avisa el resultado', async () => {
     let estado = reclamo({ accionesDisponibles: ['EN_PROCESO'] })
     const llamadas = mostrar(carla, {

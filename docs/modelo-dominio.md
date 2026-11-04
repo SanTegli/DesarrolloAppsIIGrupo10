@@ -25,12 +25,38 @@ classDiagram
     -String email
     -boolean activo
     -String hashContrasena
+    -boolean bloqueado
     +getRol() Rol
     +getNombreCompleto() String
     +definirContrasena(String)
     +tieneContrasena() boolean
+    +bloquear()
+    +desbloquear()
   }
-  class Ciudadano
+  class Ciudadano {
+    -String telefonoVerificado
+    -LocalDateTime fechaVerificacionTelefono
+    +verificarTelefono(String, LocalDateTime)
+    +tieneTelefonoVerificado() boolean
+  }
+  class CodigoVerificacion {
+    -String codigo
+    -LocalDateTime fechaCreacion
+    -LocalDateTime vence
+    -LocalDateTime fechaUso
+    +estaVigente(LocalDateTime) boolean
+    +usar(LocalDateTime)
+  }
+  class PoliticaReapertura {
+    <<value object>>
+    -int maximo
+    -Duration plazo
+  }
+  class Telefono {
+    <<utilidad>>
+    +normalizar(String)$ String
+    +enmascarar(String)$ String
+  }
   class Administrador
   class AgenteMunicipal {
     +perteneceA(AreaMunicipal) boolean
@@ -68,7 +94,9 @@ classDiagram
     -LocalDateTime fechaLimite
     -long version
     +asignarArea(AreaMunicipal, Usuario, String, LocalDateTime)
-    +cambiarEstado(EstadoReclamo, Usuario, String, LocalDateTime)
+    +cambiarEstado(EstadoReclamo, Usuario, String, LocalDateTime, PoliticaReapertura)
+    +getCantidadReaperturas() int
+    +puedeReabrir(LocalDateTime, PoliticaReapertura) boolean
     +marcarVencido(LocalDateTime) boolean
     +definirPrioridad(Prioridad, OrigenPrioridad, String)
     +registrarUbicacion(Ubicacion)
@@ -119,6 +147,8 @@ classDiagram
   Entidad <|-- Reclamo
   Entidad <|-- AreaMunicipal
   Usuario <|-- Ciudadano
+  CodigoVerificacion "*" --> "1" Ciudadano
+  Reclamo ..> PoliticaReapertura
   Usuario <|-- AgenteMunicipal
   Usuario <|-- Administrador
   Municipio "1" <-- "*" Barrio
@@ -173,6 +203,9 @@ habilitada, además salen por correo a través de la outbox.
 | Una ubicación solo se confirma si el ciudadano eligió una sugerencia del geocodificador dentro de su municipio | `ServicioUbicaciones.confirmar` |
 | Todo reclamo nace `INGRESADO`, con número, fecha límite e historial | `ReclamoFactory.crear` |
 | Un usuario guarda el hash de su contraseña, nunca la contraseña; un hash vacío no se acepta | `Usuario.definirContrasena` |
+| Reabrir exige motivo, se permite hasta `maximo` veces y dentro de `plazo` desde la última resolución; ambos datos salen del historial | `Reclamo.cambiarEstado` con `PoliticaReapertura` |
+| Un teléfono se guarda en E.164, de 8 a 15 dígitos, y se muestra enmascarado | `Telefono.normalizar` y `enmascarar` |
+| Un código de verificación se usa una sola vez y antes de vencer | `CodigoVerificacion.usar` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
 
@@ -198,6 +231,7 @@ erDiagram
   usuarios |o--o{ historial_estados : "usuario_id"
   reclamos ||--o{ notificaciones : genera
   usuarios ||--o{ notificaciones : "destinatario_id"
+  usuarios ||--o{ codigos_verificacion : "ciudadano_id"
 
   usuarios {
     bigint id PK
@@ -209,6 +243,9 @@ erDiagram
     string telefono
     boolean activo
     string hash_contrasena "BCrypt; nulo si no puede entrar"
+    boolean bloqueado "default false"
+    string telefono_verificado UK "E.164; solo ciudadanos"
+    datetime fecha_verificacion_telefono
     bigint area_id FK "solo agentes"
   }
   municipios {
@@ -277,6 +314,14 @@ erDiagram
     bigint reclamo_id FK
     bigint destinatario_id FK
   }
+  codigos_verificacion {
+    bigint id PK
+    string codigo UK "8 caracteres"
+    datetime fecha_creacion
+    datetime vence
+    datetime fecha_uso "nulo hasta que se usa"
+    bigint ciudadano_id FK
+  }
   mensajes_salientes {
     bigint id PK
     string event_id UK
@@ -293,3 +338,7 @@ erDiagram
 
 `mensajes_salientes` es la outbox: no tiene claves foráneas, porque el mensaje ya lleva todo lo que necesita
 el consumidor y tiene que poder publicarse aunque cambien los datos del reclamo.
+
+`telefono_verificado` es único: es lo que asegura "un número, una cuenta" aun si dos confirmaciones llegan a la
+vez. El campo `telefono` es el que se cargó en el alta, sin verificar; el que cuenta para crear reclamos es
+`telefono_verificado`.

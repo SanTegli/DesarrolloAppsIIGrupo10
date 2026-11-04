@@ -12,6 +12,8 @@ public abstract class Usuario extends Entidad {
     private String email;
     private String telefono;
     private boolean activo = true;
+    /** Bloqueada por un administrador: puede entrar y consultar, pero no crear ni reabrir reclamos. */
+    private boolean bloqueado;
     /** Hash de la contraseña (BCrypt). El dominio no sabe cómo se calcula: lo recibe hecho. Nulo si no puede entrar. */
     private String hashContrasena;
 
@@ -47,6 +49,19 @@ public abstract class Usuario extends Entidad {
 
     public String getHashContrasena() {
         return hashContrasena;
+    }
+
+    /** Bloquear no borra nada: los reclamos y el historial de la cuenta quedan como estaban. */
+    public void bloquear() {
+        this.bloqueado = true;
+    }
+
+    public void desbloquear() {
+        this.bloqueado = false;
+    }
+
+    public boolean isBloqueado() {
+        return bloqueado;
     }
 
     public void activar() {

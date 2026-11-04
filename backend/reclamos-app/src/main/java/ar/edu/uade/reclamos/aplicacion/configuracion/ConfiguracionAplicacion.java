@@ -1,5 +1,7 @@
 package ar.edu.uade.reclamos.aplicacion.configuracion;
 
+import ar.edu.uade.reclamos.aplicacion.control.ControlesDeUso;
+import ar.edu.uade.reclamos.aplicacion.control.LimiteDiarioDeReclamos;
 import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorCargaDeTrabajo;
 import ar.edu.uade.reclamos.aplicacion.estrategia.AsignacionPorJurisdiccion;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadConRespaldo;
@@ -16,6 +18,7 @@ import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
 import ar.edu.uade.reclamos.dominio.integracion.Geocodificador;
+import ar.edu.uade.reclamos.dominio.modelo.PoliticaReapertura;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import java.time.Clock;
@@ -36,6 +39,17 @@ public class ConfiguracionAplicacion {
     @Bean
     public ReclamoFactory reclamoFactory(Clock reloj) {
         return new ReclamoFactory(reloj);
+    }
+
+    /** Controles antes de crear o reabrir: teléfono verificado, cuenta no bloqueada y límite diario. */
+    @Bean
+    public ControlesDeUso controlesDeUso(PropiedadesReclamos propiedades, ReclamoRepository reclamos) {
+        return ControlesDeUso.estandar(new LimiteDiarioDeReclamos(reclamos, propiedades.uso().reclamosPorDia()));
+    }
+
+    @Bean
+    public PoliticaReapertura politicaReapertura(PropiedadesReclamos propiedades) {
+        return new PoliticaReapertura(propiedades.reaperturas().maximo(), propiedades.reaperturas().plazo());
     }
 
     /**

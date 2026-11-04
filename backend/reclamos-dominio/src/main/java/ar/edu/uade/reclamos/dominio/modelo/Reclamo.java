@@ -7,7 +7,9 @@ import ar.edu.uade.reclamos.comun.validacion.Validador;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Reclamo de un ciudadano sobre un problema urbano. Es el agregado principal: protege su estado,
@@ -96,13 +98,27 @@ public class Reclamo extends Entidad {
      * <p>Para pasar a {@link EstadoReclamo#ASIGNADO} se usa {@link #asignarArea}, que necesita el área.
      */
     public void cambiarEstado(EstadoReclamo nuevoEstado, Usuario actor, String observacion, LocalDateTime ahora) {
+        cambiarEstado(nuevoEstado, actor, observacion, ahora, PoliticaReapertura.PREDETERMINADA);
+    }
+
+    /**
+     * Igual que {@link #cambiarEstado(EstadoReclamo, Usuario, String, LocalDateTime)}, con la política de
+     * reaperturas configurada. Reabrir (de {@code RESUELTO} a {@code EN_PROCESO}) exige un motivo, no superar la
+     * cantidad máxima de reaperturas y estar dentro del plazo desde la última resolución.
+     */
+    public void cambiarEstado(EstadoReclamo nuevoEstado, Usuario actor, String observacion, LocalDateTime ahora,
+                              PoliticaReapertura reaperturas) {
         Validador.requerirNoNulo(nuevoEstado, "estado");
         Validador.requerirNoNulo(actor, "usuario");
+        Validador.requerirNoNulo(reaperturas, "política de reaperturas");
         if (nuevoEstado == EstadoReclamo.ASIGNADO) {
             throw new DatosInvalidosException("Para asignar un área se usa la operación de asignación.");
         }
         PoliticaTransiciones.validar(estado, nuevoEstado, actor.getRol());
         validarPertenencia(actor);
+        if (esReapertura(estado, nuevoEstado)) {
+            validarReapertura(observacion, ahora, reaperturas);
+        }
 
         EstadoReclamo anterior = estado;
         if (anterior == EstadoReclamo.ASIGNADO && nuevoEstado == EstadoReclamo.EN_PROCESO) {
@@ -110,6 +126,59 @@ public class Reclamo extends Entidad {
         }
         this.estado = nuevoEstado;
         registrarCambio(anterior, actor, observacion, ahora);
+    }
+
+    /**
+     * Cuántas veces se reabrió. Sale del historial: así cuenta también las reaperturas de antes de que existiera
+     * el límite, y no se reinicia cuando el agente vuelve a resolver.
+     */
+    public int getCantidadReaperturas() {
+        return (int) historial.stream()
+                .filter(cambio -> esReapertura(cambio.getEstadoAnterior(), cambio.getEstadoNuevo()))
+                .count();
+    }
+
+    /** Cuándo se resolvió por última vez, según el historial; vacío si nunca se resolvió. */
+    public Optional<LocalDateTime> getFechaUltimaResolucion() {
+        return historial.stream()
+                .filter(cambio -> cambio.getEstadoNuevo() == EstadoReclamo.RESUELTO)
+                .map(HistorialEstado::getFecha)
+                .max(Comparator.naturalOrder());
+    }
+
+    /** Si hoy se podría reabrir, sin contar quién lo pide ni el motivo. Sirve para ofrecer o no la acción. */
+    public boolean puedeReabrir(LocalDateTime ahora, PoliticaReapertura reaperturas) {
+        return estado == EstadoReclamo.RESUELTO && motivoParaNoReabrir(ahora, reaperturas) == null;
+    }
+
+    private static boolean esReapertura(EstadoReclamo anterior, EstadoReclamo nuevo) {
+        return anterior == EstadoReclamo.RESUELTO && nuevo == EstadoReclamo.EN_PROCESO;
+    }
+
+    private void validarReapertura(String motivo, LocalDateTime ahora, PoliticaReapertura reaperturas) {
+        if (motivo == null || motivo.isBlank()) {
+            throw new DatosInvalidosException("Para reabrir el reclamo hay que explicar el motivo.");
+        }
+        String problema = motivoParaNoReabrir(ahora, reaperturas);
+        if (problema != null) {
+            throw new ReglaNegocioException(problema);
+        }
+    }
+
+    private String motivoParaNoReabrir(LocalDateTime ahora, PoliticaReapertura reaperturas) {
+        int cantidad = getCantidadReaperturas();
+        if (cantidad >= reaperturas.maximo()) {
+            return reaperturas.maximo() == 0
+                    ? "Los reclamos resueltos no se pueden reabrir: creá un reclamo nuevo."
+                    : "El reclamo " + numero + " ya se reabrió " + (cantidad == 1 ? "una vez" : cantidad + " veces")
+                            + ", que es el máximo. Si el problema sigue, creá un reclamo nuevo.";
+        }
+        Optional<LocalDateTime> resolucion = getFechaUltimaResolucion();
+        if (resolucion.isPresent() && ahora.isAfter(resolucion.get().plus(reaperturas.plazo()))) {
+            return "Pasaron más de " + reaperturas.plazoEnDias() + " desde que se resolvió el reclamo " + numero
+                    + ": ya no se puede reabrir. Si el problema sigue, creá un reclamo nuevo.";
+        }
+        return null;
     }
 
     /**

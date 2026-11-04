@@ -65,6 +65,9 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
   const puedeAsignar = reclamo.accionesDisponibles.includes('ASIGNADO')
   const areasElegibles = areas.filter((area) => area.activa && area.id !== reclamo.area?.id)
   const verboAsignar = reclamo.area ? 'Reasignar' : 'Asignar'
+  // Reabrir exige explicar por qué: el backend responde 400 sin motivo, y la interfaz lo pide antes.
+  const puedeReabrir = reclamo.estado === 'RESUELTO' && cambios.includes('EN_PROCESO')
+  const faltaMotivo = puedeReabrir && observacion.trim() === ''
 
   return (
     <section className="detalle">
@@ -119,7 +122,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
             <div className="panel-acciones">
               <h3>Acciones</h3>
               <label>
-                <span>Observación (opcional)</span>
+                <span>{puedeReabrir ? 'Observación (para reabrir, contá por qué sigue el problema)' : 'Observación (opcional)'}</span>
                 <input
                   type="text"
                   value={observacion}
@@ -127,6 +130,13 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
                   maxLength={1000}
                 />
               </label>
+
+              {puedeReabrir && (
+                <p className="ayuda">
+                  Un reclamo se puede reabrir una sola vez y dentro de los 7 días de resuelto. Si el problema vuelve
+                  después, creá un reclamo nuevo.
+                </p>
+              )}
 
               {cambios.length > 0 && (
                 <div className="acciones">
@@ -137,7 +147,8 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
                         key={destino}
                         type="button"
                         className={esAccionDefinitiva(destino) ? 'boton-peligro' : 'boton-primario'}
-                        disabled={enviando}
+                        disabled={enviando || (destino === 'EN_PROCESO' && faltaMotivo)}
+                        title={destino === 'EN_PROCESO' && faltaMotivo ? 'Escribí el motivo para reabrir' : undefined}
                         onClick={() =>
                           ejecutar(
                             () => cambiarEstado(reclamo.numero, destino, observacion.trim()),

@@ -295,6 +295,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | Cobertura por SOAP | `CatalogoCobertura`, que usa `ServicioAsignacion` | **Hecho (PR 9)**: `CoberturaSoap` y `servicio-cobertura`; ver abajo | — |
 | Geocodificación (API externa) | `Geocodificador` | **Hecho (PR 11)**: `GeorefGeocodificador`, `GeocodificadorConCache` y `ServicioUbicaciones`; ver abajo | — |
 | Mensajería | `ServicioNotificaciones` | **Hecho (PR 12)**: outbox, `PublicadorMensajes`, RabbitMQ y `servicio-notificaciones`; ver abajo | — |
+| Teléfono verificado (segunda API externa) | `CanalVerificacion` | **Hecho (PR 15)**: `CanalTelegram`, `BotTelegram` y `ServicioVerificacionTelefono`; ver abajo | — |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
@@ -482,14 +483,79 @@ el mensaje espera en la cola y, si se agotan los reintentos, queda en `notificac
 revisarlo. No hay entrega exactamente una vez: si el consumidor cae entre el envío y el registro, el correo se
 repite. Está documentado en [el contrato](contratos/mensajes.md).
 
+### Teléfono verificado con Telegram (segunda API externa)
+
+Para crear o reabrir reclamos, un ciudadano tiene que verificar su teléfono, y **un número sirve para una
+sola cuenta**: así no se abren cuentas en serie para cargar reclamos falsos. Telegram es la segunda API
+externa del sistema (la primera es Georef): su Bot API es gratuita y, al compartir el contacto, Telegram
+manda el número real de la cuenta, que el usuario no puede escribir a mano.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor C as Ciudadano
+  participant UI as React
+  participant VC as VerificacionTelefonoController
+  participant SV as ServicioVerificacionTelefono
+  participant BT as BotTelegram<br/>(tarea cada 2 s)
+  participant CT as ClienteTelegram<br/>(Adapter)
+  participant TG as Telegram Bot API
+
+  C->>UI: Crear reclamo (sin teléfono verificado)
+  UI->>VC: POST /api/verificacion-telefono
+  VC->>SV: iniciar(usuario)
+  SV-->>UI: código K7M2Q9XP y enlace t.me/bot?start=K7M2Q9XP
+  C->>TG: abre el enlace, toca Iniciar
+  BT->>CT: recibir(desde)
+  CT->>TG: getUpdates?offset=…
+  TG-->>CT: /start K7M2Q9XP
+  BT->>CT: enviar("Compartí tu teléfono", botón de contacto)
+  C->>TG: comparte su contacto
+  BT->>CT: recibir(desde)
+  CT-->>BT: contacto propio con phone_number
+  BT->>SV: confirmar(código, teléfono)
+  Note over SV: normaliza a E.164, controla vigencia,<br/>bloqueo y que el número no esté en otra cuenta
+  BT->>CT: enviar("Listo, tu teléfono quedó verificado")
+  UI->>VC: GET /api/auth/yo cada 3 s
+  VC-->>UI: telefonoVerificado: +54 •••••••0000 → muestra el formulario
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `ServicioVerificacionTelefono` | Emite códigos de un solo uso (8 caracteres, `SecureRandom`, vencen a los 10 minutos, hasta 3 por hora) y los confirma. Devuelve un `ResultadoVerificacion` en lugar de lanzar excepciones, para que el bot conteste algo claro |
+| `CanalVerificacion` | Interfaz del canal. `CanalTelegram` arma el enlace al bot; `CanalSimulado` no tiene enlace y habilita `POST /api/verificacion-telefono/simulada` |
+| `BotTelegram` | Tarea programada (solo con `reclamos.telegram.modo=telegram`) que consulta `getUpdates` cada 2 s, pide el contacto y confirma. Solo acepta el contacto del mismo usuario que lo manda. Si Telegram no responde, lo registra y vuelve a probar en el siguiente ciclo |
+| `ClienteTelegram` | Adapter y capa anticorrupción: el JSON de Telegram no sale de esta clase. La URL lleva el token, así que nunca conserva la causa de una excepción ni loguea la URL |
+
+Se usa *long polling* (`getUpdates`) y no un webhook porque el backend corre en una computadora sin
+dirección pública. El token se lee de `TELEGRAM_BOT_TOKEN` (solo en `.env`) y `toString` de la configuración
+lo oculta. En modo `simulado`, que es el predeterminado, no hay bot ni conexión con Telegram.
+
+### Controles de uso y reaperturas
+
+Antes de crear un reclamo, `ReclamoService` pasa al ciudadano por una cadena de controles
+(`ControlesDeUso`): teléfono verificado → cuenta sin bloquear → límite diario (5 reclamos en 24 horas). Al
+reabrir se aplican los dos primeros. Cada control corta con su propio error (`403` o `429`) o deja pasar al
+siguiente. Los límites están en `reclamos.uso` y `reclamos.reaperturas`.
+
+Las reglas de la reapertura viven en el dominio (`Reclamo` con `PoliticaReapertura`): motivo obligatorio,
+una vez y dentro de 7 días desde la última resolución. La cantidad y la fecha se calculan del historial, así
+que no hay columnas nuevas en `reclamos` y se cuentan también las reaperturas viejas. El `@Version` del
+reclamo evita que un doble clic lo reabra dos veces. El administrador bloquea y desbloquea cuentas de
+ciudadanos desde la interfaz; una cuenta bloqueada sigue pudiendo entrar y consultar.
+
 ## Límites conocidos
 
 - **Correo de laboratorio.** Con la mensajería habilitada, los avisos salen por correo, pero a Mailpit, que
   los muestra en un buzón web y no los entrega a casillas reales. No hay SMS.
 - **Un solo publicador.** La outbox la publica una tarea del backend; con dos instancias del backend, las dos
   publicarían los mismos pendientes (el consumidor descarta los repetidos, pero sobra trabajo).
-- **Sin límite de intentos de login.** Un atacante puede probar contraseñas sin freno. Los límites de uso
-  llegan con el PR 15.
+- **Sin límite de intentos de login.** Un atacante puede probar contraseñas sin freno. El PR 15 limita
+  reclamos y códigos de verificación, no los intentos de login.
+- **Límites por cuenta, no por persona.** El teléfono verificado frena las cuentas en serie, pero alguien con
+  varias líneas de Telegram puede verificar varias cuentas.
+- **Un solo bot por backend.** Con dos instancias del backend en modo `telegram`, las dos leerían las mismas
+  actualizaciones.
 - **Sin confirmación del email.** El registro no verifica que el correo sea de quien se registra.
 - **Una cuenta desactivada conserva su sesión abierta** hasta que vence. Cada operación se valida con el
   usuario de la base, así que igual no puede crear reclamos: el dominio la rechaza con `409`.

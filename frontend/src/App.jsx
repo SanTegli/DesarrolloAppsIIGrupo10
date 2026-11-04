@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { listarAreas, listarBarrios, listarCategorias } from './api/catalogos.js'
 import { alVencerSesion } from './api/cliente.js'
 import { cerrarSesion, usuarioActual } from './api/sesion.js'
@@ -10,6 +10,7 @@ import FormularioReclamo from './componentes/FormularioReclamo.jsx'
 import Ingreso from './componentes/Ingreso.jsx'
 import ListaReclamos from './componentes/ListaReclamos.jsx'
 import PanelAdministracion from './componentes/PanelAdministracion.jsx'
+import VerificacionTelefono from './componentes/VerificacionTelefono.jsx'
 import { useCarga } from './hooks/useCarga.js'
 
 const TITULOS_LISTADO = {
@@ -71,6 +72,9 @@ export default function App() {
       }),
     [],
   )
+
+  // Al verificar el teléfono cambia el usuario de la sesión, no la vista.
+  const actualizarUsuario = useCallback((actualizado) => setSesion({ estado: 'activa', usuario: actualizado }), [])
 
   function entrar(usuarioNuevo) {
     setSesion({ estado: 'activa', usuario: usuarioNuevo })
@@ -135,7 +139,20 @@ export default function App() {
           </>
         )}
 
-        {usuario && vista.nombre === 'crear' && usuario.rol === 'CIUDADANO' && (
+        {usuario && vista.nombre === 'crear' && usuario.rol === 'CIUDADANO' && usuario.bloqueado && (
+          <div className="aviso aviso-error" role="alert">
+            <p>
+              Tu cuenta está bloqueada: podés consultar tus reclamos, pero no crear ni reabrir. Comunicate con el
+              municipio.
+            </p>
+          </div>
+        )}
+
+        {usuario && vista.nombre === 'crear' && usuario.rol === 'CIUDADANO' && !usuario.bloqueado &&
+          !usuario.telefonoVerificado && <VerificacionTelefono onVerificado={actualizarUsuario} />}
+
+        {usuario && vista.nombre === 'crear' && usuario.rol === 'CIUDADANO' && !usuario.bloqueado &&
+          usuario.telefonoVerificado && (
           <FormularioReclamo
             categorias={catalogos.datos.categorias}
             barrios={catalogos.datos.barrios}

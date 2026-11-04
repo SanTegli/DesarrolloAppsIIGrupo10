@@ -59,10 +59,13 @@ Todos los errores tienen la misma forma:
 | 401 | `NO_AUTENTICADO` | No hay sesión, o venció | `RespuestasDeSeguridad` (Spring Security) |
 | 401 | `CREDENCIALES_INVALIDAS` | El login falló. Mismo mensaje si el email no existe, la contraseña está mal o la cuenta está desactivada | `CredencialesInvalidasException` |
 | 403 | `ACCESO_DENEGADO` | El usuario existe pero su rol no puede hacer la operación, o el reclamo no es suyo ni de su área | `AccesoDenegadoException` |
+| 403 | `TELEFONO_NO_VERIFICADO` | Un ciudadano sin teléfono verificado intenta crear o reabrir un reclamo | `UsoRestringidoException` |
+| 403 | `CUENTA_BLOQUEADA` | Un ciudadano con la cuenta bloqueada intenta crear, reabrir o verificar el teléfono | `UsoRestringidoException` |
 | 403 | `CSRF_INVALIDO` | Un `POST` o `PATCH` sin el encabezado `X-XSRF-TOKEN`, o con un valor distinto al de la cookie | `RespuestasDeSeguridad` (Spring Security) |
 | 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo mientras se procesaba esta; hay que volver a cargarlo | Bloqueo optimista de JPA |
+| 429 | `LIMITE_EXCEDIDO` | Se superó un límite de uso: reclamos por día o códigos de verificación por hora | `LimiteExcedidoException` |
 | 405 | `METODO_NO_PERMITIDO` | El recurso no admite ese método HTTP | Error de Spring |
 | 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | El cuerpo no es `application/json` | Error de Spring |
 | 500 | `ERROR_INTERNO` | Error inesperado | Cualquier otra |
@@ -161,7 +164,8 @@ Lo devuelve el listado. Es el reclamo sin `historial` y sin `descripcion` comple
 
 ### `POST /api/reclamos` — crear un reclamo
 
-Solo `CIUDADANO`. El reclamo queda a nombre del usuario del encabezado.
+Solo `CIUDADANO`, con el **teléfono verificado** y la cuenta sin bloquear. El reclamo queda a nombre del
+usuario de la sesión. Hasta `reclamos.uso.reclamos-por-dia` reclamos (5 por defecto) en las últimas 24 horas.
 
 ```json
 {
@@ -192,7 +196,11 @@ Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y e
 - Si ninguna lo cubre, vuelve `INGRESADO` con `area: null`. Sigue siendo `201`.
 
 Errores: `400` datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de
-Quilmes.`), `403` el usuario no es ciudadano, `404` usuario, barrio o categoría inexistente.
+Quilmes.`), `403 ACCESO_DENEGADO` el usuario no es ciudadano, `403 TELEFONO_NO_VERIFICADO`,
+`403 CUENTA_BLOQUEADA`, `404` usuario, barrio o categoría inexistente, `429 LIMITE_EXCEDIDO` límite diario.
+
+Los controles de uso se aplican en este orden, y responde el primero que falla: teléfono verificado, cuenta
+sin bloquear, límite diario.
 
 ### `GET /api/reclamos/{numero}` — consultar un reclamo
 
@@ -249,8 +257,19 @@ Respuesta `200 OK` con un arreglo de resúmenes; `[]` si no hay ninguno.
 
 Pasar a `ASIGNADO` no va por este endpoint: se usa el de asignación.
 
-Errores: `400` estado faltante, desconocido o `ASIGNADO`; `403` rol no permitido, reclamo ajeno o de
-otra área; `404` reclamo o usuario inexistente; `409` transición inexistente.
+**Reabrir** (`RESUELTO` → `EN_PROCESO`) tiene reglas propias:
+
+- `observacion` es **obligatoria**: es el motivo. Sin ella, `400 DATOS_INVALIDOS`.
+- Hasta `reclamos.reaperturas.maximo` veces (1 por defecto) y dentro de `reclamos.reaperturas.plazo`
+  (7 días) desde la última resolución. Fuera de eso, `409 REGLA_NEGOCIO` con el motivo. La cantidad y la
+  fecha se calculan del historial.
+- El ciudadano necesita el teléfono verificado y la cuenta sin bloquear (`403`), como al crear.
+- Cuando ya no se puede reabrir, `accionesDisponibles` no incluye `EN_PROCESO`: la interfaz no ofrece el
+  botón.
+
+Errores: `400` estado faltante, desconocido o `ASIGNADO`, o reapertura sin motivo; `403` rol no permitido,
+reclamo ajeno o de otra área, teléfono sin verificar o cuenta bloqueada; `404` reclamo o usuario
+inexistente; `409` transición inexistente o reapertura fuera de límite.
 
 ### `PATCH /api/reclamos/{numero}/asignacion` — asignar o reasignar el área
 
@@ -324,7 +343,35 @@ POST /api/auth/login
 { "email": "ana@example.org", "contrasena": "demo1234" }
 
 200
-{ "id": 1, "nombreCompleto": "Ana Pérez", "rol": "CIUDADANO", "area": null }
+{ "id": 1, "nombreCompleto": "Ana Pérez", "rol": "CIUDADANO", "area": null,
+  "telefonoVerificado": "+54 •••••••0001", "bloqueado": false }
+```
+
+## Verificación del teléfono
+
+Un ciudadano necesita el teléfono verificado para crear y reabrir reclamos. **Un número verificado vale
+para una sola cuenta.** El canal se elige con `reclamos.telegram.modo`:
+
+- `telegram`: el ciudadano abre el enlace al bot, toca **Iniciar** y comparte su contacto. Telegram manda
+  el número real del usuario: no se puede escribir uno ajeno. El bot confirma el código y contesta.
+- `simulado` (por defecto): sin bot. El número se escribe en la interfaz. Sirve para desarrollar y para la
+  demo sin conexión.
+
+| Endpoint | Qué hace | Respuesta |
+| --- | --- | --- |
+| `POST /api/verificacion-telefono` | Crea un código de un solo uso, de 8 caracteres, que vence a los 10 minutos. Hasta 3 por hora | `201` con `{ "codigo", "enlace", "vence", "modo" }`. `enlace` es `https://t.me/<bot>?start=<codigo>`, o `null` en modo simulado. `403` si no es ciudadano o la cuenta está bloqueada; `429` si pidió demasiados |
+| `POST /api/verificacion-telefono/simulada` | Solo en modo simulado: `{ "codigo", "telefono" }`. El código tiene que ser del usuario de la sesión | `200` con el usuario. `400` teléfono inválido; `404` código inexistente o ajeno, o modo `telegram`; `409` código vencido o usado, o número verificado en otra cuenta |
+
+El teléfono se normaliza a E.164 (`+5491155550000`, de 8 a 15 dígitos) y **la API solo lo devuelve
+enmascarado** (`+54 •••••••0000`). No viaja a la IA, a RabbitMQ ni a los logs. Verificar otro número
+reemplaza al anterior, que queda libre.
+
+```json
+POST /api/verificacion-telefono
+
+201
+{ "codigo": "K7M2Q9XP", "enlace": "https://t.me/ReclamosQuilmesBot?start=K7M2Q9XP",
+  "vence": "2026-11-02T10:10:00", "modo": "telegram" }
 ```
 
 ## Avisos
@@ -358,13 +405,26 @@ a sí mismo por id; a otro, solo si es administrador.
 
 ```json
 [
-  { "id": 1, "nombreCompleto": "Ana Pérez", "rol": "CIUDADANO", "area": null },
-  { "id": 3, "nombreCompleto": "Carla Gómez", "rol": "AGENTE_MUNICIPAL", "area": { "id": 1, "nombre": "Alumbrado" } },
-  { "id": 7, "nombreCompleto": "Elena Ruiz", "rol": "ADMINISTRADOR", "area": null }
+  { "id": 1, "nombreCompleto": "Ana Pérez", "rol": "CIUDADANO", "area": null,
+    "telefonoVerificado": "+54 •••••••0001", "bloqueado": false },
+  { "id": 3, "nombreCompleto": "Carla Gómez", "rol": "AGENTE_MUNICIPAL", "area": { "id": 1, "nombre": "Alumbrado" },
+    "telefonoVerificado": null, "bloqueado": false },
+  { "id": 7, "nombreCompleto": "Elena Ruiz", "rol": "ADMINISTRADOR", "area": null,
+    "telefonoVerificado": null, "bloqueado": false }
 ]
 ```
 
-`area` solo tiene valor para los agentes.
+`area` solo tiene valor para los agentes; `telefonoVerificado`, solo para ciudadanos que lo verificaron, y
+siempre enmascarado.
+
+### `PATCH /api/usuarios/{id}/bloqueo` — bloquear o desbloquear una cuenta
+
+Solo `ADMINISTRADOR`, y solo sobre cuentas de ciudadanos. Cuerpo: `{ "bloqueado": true }`. Respuesta
+`200` con el usuario.
+
+Una cuenta bloqueada **puede entrar y consultar** sus reclamos, pero no crear, reabrir ni verificar el
+teléfono (`403 CUENTA_BLOQUEADA`). Errores: `403` si no es administrador, `404` usuario inexistente,
+`409` si la cuenta no es de un ciudadano.
 
 ### `GET /api/categorias`
 
@@ -474,7 +534,8 @@ Municipio: Quilmes, provincia de Buenos Aires.
 | 7 | Elena Ruiz | `elena@example.org` | Administrador | |
 
 Los siete entran con la contraseña de desarrollo **`demo1234`**. Es solo para la semilla local: la base
-guarda su hash BCrypt.
+guarda su hash BCrypt. Ana (`+5491100000001`) y Bruno (`+5491100000002`) ya tienen el teléfono
+verificado, con números ficticios, para crear reclamos sin pasar por la verificación.
 
 Con esta semilla se pueden demostrar los casos que dependen del territorio:
 

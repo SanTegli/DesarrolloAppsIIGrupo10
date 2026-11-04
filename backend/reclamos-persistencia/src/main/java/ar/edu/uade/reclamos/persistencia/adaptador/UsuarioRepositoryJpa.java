@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.persistencia.adaptador;
 
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
 import ar.edu.uade.reclamos.persistencia.jpa.UsuarioJpaRepository;
@@ -38,6 +39,12 @@ public class UsuarioRepositoryJpa implements UsuarioRepository {
     public Optional<Usuario> buscarPorEmail(String email) {
         return email == null ? Optional.empty()
                 : jpa.findFirstByEmailIgnoreCaseOrderByIdAsc(email.strip()).map(CargadorRelaciones::cargar);
+    }
+
+    @Override
+    public Optional<Ciudadano> buscarPorTelefonoVerificado(String telefono) {
+        // Un ciudadano no tiene relaciones perezosas: no hace falta CargadorRelaciones.
+        return telefono == null ? Optional.empty() : jpa.buscarPorTelefonoVerificado(telefono);
     }
 
     @Override

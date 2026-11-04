@@ -147,6 +147,7 @@ select,
 input[type='text'],
 input[type='email'],
 input[type='password'],
+input[type='tel'],
 input:not([type]),
 textarea {
   font: inherit;
@@ -616,4 +617,35 @@ td .secundario {
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Verificación del teléfono */
+.verificacion {
+  max-width: 620px;
+}
+
+.codigo-verificacion {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.codigo {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 1.15em;
+  letter-spacing: 0.12em;
+  padding: 2px 8px;
+  border-radius: var(--radio);
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+}
+
+.pasos {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.codigo-verificacion .formulario {
+  width: 100%;
 }

@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import ar.edu.uade.reclamos.aplicacion.facade.GestionReclamosFacade;
@@ -41,7 +42,7 @@ class ServiciosAplicacionIntegrationTest {
             area.agregarCategoria(categoria);
             area.agregarBarrio(barrio);
             area = areas.guardar(area);
-            Usuario ciudadano = usuarios.guardar(new Ciudadano("70111222", "Ana", "Test", "ana@test.org", null));
+            Usuario ciudadano = usuarios.guardar(verificado(new Ciudadano("70111222", "Ana", "Test", "ana@test.org", null)));
             Usuario agente = usuarios.guardar(new AgenteMunicipal("70222333", "Carla", "Test", "carla@test.org", null, area));
             Usuario administrador = usuarios.guardar(new Administrador("70333444", "Elena", "Test", "elena@test.org", null));
             return new Datos(ciudadano.getId(), agente.getId(), administrador.getId(),

@@ -15,7 +15,8 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
 public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultValue Asignacion asignacion,
                                   @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura,
                                   @DefaultValue Geocodificacion geocodificacion,
-                                  @DefaultValue Mensajeria mensajeria) {
+                                  @DefaultValue Mensajeria mensajeria, @DefaultValue Uso uso,
+                                  @DefaultValue Reaperturas reaperturas, @DefaultValue Telegram telegram) {
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -165,6 +166,78 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                 throw new IllegalArgumentException("reclamos.mensajeria.lote debe ser mayor que cero");
             }
             requerirPositivo(esperaConfirmacion, "reclamos.mensajeria.espera-confirmacion");
+        }
+    }
+
+    /**
+     * Límites de uso para los ciudadanos. Suben el costo de abusar; no lo eliminan.
+     *
+     * @param reclamosPorDia  cuántos reclamos nuevos puede presentar un ciudadano por día calendario
+     * @param codigosPorHora  cuántos códigos de verificación del teléfono puede pedir por hora
+     * @param vigenciaCodigo  cuánto dura un código de verificación
+     */
+    public record Uso(@DefaultValue("5") int reclamosPorDia,
+                      @DefaultValue("3") int codigosPorHora,
+                      @DefaultValue("10m") Duration vigenciaCodigo) {
+        public Uso {
+            if (reclamosPorDia < 1) {
+                throw new IllegalArgumentException("reclamos.uso.reclamos-por-dia debe ser mayor que cero");
+            }
+            if (codigosPorHora < 1) {
+                throw new IllegalArgumentException("reclamos.uso.codigos-por-hora debe ser mayor que cero");
+            }
+            requerirPositivo(vigenciaCodigo, "reclamos.uso.vigencia-codigo");
+        }
+    }
+
+    /** Reaperturas: cuántas por reclamo y hasta cuánto después de la última resolución. */
+    public record Reaperturas(@DefaultValue("1") int maximo, @DefaultValue("7d") Duration plazo) {
+        public Reaperturas {
+            if (maximo < 0) {
+                throw new IllegalArgumentException("reclamos.reaperturas.maximo no puede ser negativo");
+            }
+            requerirPositivo(plazo, "reclamos.reaperturas.plazo");
+        }
+    }
+
+    /**
+     * Verificación del teléfono por Telegram.
+     *
+     * @param modo        {@code simulado} (sin Telegram: un endpoint confirma el código) o {@code telegram}
+     * @param token       token del bot que da @BotFather; solo por la variable TELEGRAM_BOT_TOKEN, nunca en Git
+     * @param usuarioBot  nombre del bot sin la arroba, para armar el enlace {@code t.me/<bot>?start=<código>}
+     * @param intervaloMs cada cuánto se consultan los mensajes nuevos del bot
+     */
+    public record Telegram(@DefaultValue("simulado") String modo,
+                           @DefaultValue("https://api.telegram.org") String url,
+                           @DefaultValue("") String token,
+                           @DefaultValue("") String usuarioBot,
+                           @DefaultValue("2000") long intervaloMs,
+                           @DefaultValue("10s") Duration tiempoLimite) {
+        public Telegram {
+            if (!"simulado".equals(modo) && !"telegram".equals(modo)) {
+                throw new IllegalArgumentException("reclamos.telegram.modo debe ser simulado o telegram");
+            }
+            if ("telegram".equals(modo) && (token == null || token.isBlank() || usuarioBot == null
+                    || usuarioBot.isBlank())) {
+                throw new IllegalArgumentException("Con reclamos.telegram.modo=telegram hay que definir "
+                        + "TELEGRAM_BOT_TOKEN y TELEGRAM_BOT_USUARIO");
+            }
+            if (intervaloMs <= 0) {
+                throw new IllegalArgumentException("reclamos.telegram.intervalo-ms debe ser mayor que cero");
+            }
+            requerirPositivo(tiempoLimite, "reclamos.telegram.tiempo-limite");
+        }
+
+        public boolean simulado() {
+            return "simulado".equals(modo);
+        }
+
+        /** Sin el token: así el record se puede loguear sin filtrar la clave del bot. */
+        @Override
+        public String toString() {
+            return "Telegram[modo=" + modo + ", usuarioBot=" + usuarioBot + ", token="
+                    + (token == null || token.isBlank() ? "sin definir" : "****") + "]";
         }
     }
 

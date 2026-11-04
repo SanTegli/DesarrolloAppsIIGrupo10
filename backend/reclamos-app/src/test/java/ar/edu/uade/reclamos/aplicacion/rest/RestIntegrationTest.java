@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.rest;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.sinCsrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -91,8 +92,8 @@ class RestIntegrationTest {
                 candidata.agregarBarrio(barrio);
                 areas.guardar(candidata);
             }
-            Ciudadano ciudadano = (Ciudadano) usuarios.guardar(new Ciudadano("30111222", "Ana", "Perez", "ana@test.org", null));
-            Ciudadano otro = (Ciudadano) usuarios.guardar(new Ciudadano("30222333", "Luis", "Diaz", "luis@test.org", null));
+            Ciudadano ciudadano = (Ciudadano) usuarios.guardar(verificado(new Ciudadano("30111222", "Ana", "Perez", "ana@test.org", null)));
+            Ciudadano otro = (Ciudadano) usuarios.guardar(verificado(new Ciudadano("30222333", "Luis", "Diaz", "luis@test.org", null)));
             AgenteMunicipal agente = (AgenteMunicipal) usuarios.guardar(new AgenteMunicipal("30333444", "Carla", "Gomez", "carla@test.org", null, area));
             AgenteMunicipal otroAgente = (AgenteMunicipal) usuarios.guardar(new AgenteMunicipal("30444555", "Diego", "Sosa", "diego@test.org", null, otraArea));
             Usuario administrador = usuarios.guardar(new Administrador("30555666", "Elena", "Ruiz", "elena@test.org", null));
@@ -426,7 +427,10 @@ class RestIntegrationTest {
     void losUsuariosSonSoloParaElAdministradorYLosCatalogosSonPublicos() throws Exception {
         JsonNode usuariosDto = leer(mvc.perform(get("/api/usuarios").with(como(datos.administrador())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(5))).andReturn());
-        campos(usuariosDto.get(0), "id", "nombreCompleto", "rol", "area");
+        campos(usuariosDto.get(0), "id", "nombreCompleto", "rol", "area", "telefonoVerificado", "bloqueado");
+        // El teléfono sale enmascarado: el código de país y los últimos cuatro dígitos.
+        assertThat(usuariosDto.get(0).get("telefonoVerificado").asText()).startsWith("+54 ").endsWith("1222")
+                .doesNotContain("30111");
         error(mvc.perform(get("/api/usuarios").with(como(datos.ciudadano()))), 403, "ACCESO_DENEGADO", "/api/usuarios");
         error(mvc.perform(get("/api/usuarios").with(como(datos.agente()))), 403, "ACCESO_DENEGADO", "/api/usuarios");
         JsonNode agente = leer(mvc.perform(get("/api/usuarios/" + datos.agente()).with(como(datos.administrador())))

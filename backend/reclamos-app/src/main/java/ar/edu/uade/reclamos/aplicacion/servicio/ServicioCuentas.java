@@ -1,8 +1,12 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException;
+import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
+import ar.edu.uade.reclamos.dominio.modelo.Administrador;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
@@ -44,6 +48,30 @@ public class ServicioCuentas {
         }
         ciudadano.definirContrasena(contrasenas.encode(contrasena));
         return (Ciudadano) usuarios.guardar(ciudadano);
+    }
+
+    /**
+     * Bloquea o desbloquea la cuenta de un ciudadano. Solo un administrador. Bloquear no borra nada: los
+     * reclamos y el historial quedan; la cuenta puede entrar y consultar, pero no crear ni reabrir.
+     */
+    @Transactional
+    public Usuario cambiarBloqueo(Long actorId, Long usuarioId, boolean bloqueado) {
+        if (!(buscar(actorId) instanceof Administrador)) {
+            throw new AccesoDenegadoException("Solo un administrador puede bloquear cuentas.");
+        }
+        if (!(buscar(usuarioId) instanceof Ciudadano ciudadano)) {
+            throw new ReglaNegocioException("Solo se bloquean cuentas de ciudadanos.");
+        }
+        if (bloqueado) {
+            ciudadano.bloquear();
+        } else {
+            ciudadano.desbloquear();
+        }
+        return usuarios.guardar(ciudadano);
+    }
+
+    private Usuario buscar(Long id) {
+        return usuarios.buscarPorId(id).orElseThrow(() -> new RecursoNoEncontradoException("usuario", id));
     }
 
     private static void validarContrasena(String contrasena) {

@@ -145,6 +145,13 @@ services:
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-reclamos}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-reclamos_dev}
+      # Verificación del teléfono: "simulado" funciona sin Telegram; "telegram" necesita el token y el usuario
+      # del bot en .env. El token nunca va en este archivo ni en Git.
+      RECLAMOS_TELEGRAM_MODO: ${RECLAMOS_TELEGRAM_MODO:-simulado}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USUARIO: ${TELEGRAM_BOT_USUARIO:-}
+      # La demo crea varios reclamos seguidos con la misma cuenta: se sube el límite diario (5 por defecto).
+      RECLAMOS_USO_RECLAMOS_POR_DIA: ${RECLAMOS_USO_RECLAMOS_POR_DIA:-20}
       JAVA_TOOL_OPTIONS: -Xmx512m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
     ports:

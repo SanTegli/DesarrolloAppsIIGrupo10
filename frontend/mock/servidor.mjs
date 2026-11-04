@@ -4,6 +4,8 @@
 // Sigue docs/api-contract.md y guarda todo en memoria: al reiniciar se pierde.
 // Como el backend, usa login con sesión (cookie JSESSIONID) y CSRF (cookie XSRF-TOKEN y encabezado
 // X-XSRF-TOKEN). Los siete usuarios de la semilla entran con la contraseña demo1234.
+// La verificación del teléfono funciona siempre en modo simulado (sin Telegram); Ana y Bruno ya lo tienen
+// verificado. Límites como en el backend: 5 reclamos por día, 3 códigos por hora y una reapertura en 7 días.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -15,6 +17,11 @@ const ESTRATEGIA_ASIGNACION = process.env.ESTRATEGIA_ASIGNACION || 'jurisdiccion
 const INTERVALO_VENCIMIENTOS_MS = Number(process.env.INTERVALO_VENCIMIENTOS_MS || 60000)
 // Para probar el vencimiento sin esperar días: plazo en segundos para todos los reclamos nuevos.
 const SLA_SEGUNDOS = process.env.SLA_SEGUNDOS ? Number(process.env.SLA_SEGUNDOS) : null
+const RECLAMOS_POR_DIA = Number(process.env.RECLAMOS_POR_DIA || 5)
+const CODIGOS_POR_HORA = 3
+const VIGENCIA_CODIGO_SEGUNDOS = 10 * 60
+const MAXIMO_REAPERTURAS = 1
+const PLAZO_REAPERTURA_SEGUNDOS = 7 * 24 * 3600
 
 // Datos semilla acordados en el contrato.
 const barrios = [
@@ -43,7 +50,12 @@ const usuarios = [
   { id: 5, nombreCompleto: 'Fabián Luna', rol: 'AGENTE_MUNICIPAL', areaId: 3, email: 'fabian@example.org', dni: '27555666' },
   { id: 6, nombreCompleto: 'Gabriela Paz', rol: 'AGENTE_MUNICIPAL', areaId: 4, email: 'gabriela@example.org', dni: '28666777' },
   { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', areaId: null, email: 'elena@example.org', dni: '20555666' },
-].map((usuario) => ({ ...usuario, contrasena: CONTRASENA_SEMILLA }))
+].map((usuario) => ({ ...usuario, contrasena: CONTRASENA_SEMILLA, telefono: null, bloqueado: false }))
+// Como el UPDATE de datos-dev.sql: Ana y Bruno ya verificaron el teléfono.
+usuarios[0].telefono = '+5491100000001'
+usuarios[1].telefono = '+5491100000002'
+// Códigos de verificación: { codigo, usuarioId, creado, vence, usado }.
+const codigos = []
 // id de sesión -> id de usuario, como la sesión HTTP del backend.
 const sesiones = new Map()
 const reclamos = []
@@ -113,6 +125,9 @@ const denegado = (mensaje) => new ErrorHttp(403, 'ACCESO_DENEGADO', mensaje)
 const inexistente = (recurso, id) =>
   new ErrorHttp(404, 'RECURSO_NO_ENCONTRADO', `No existe ${recurso} con identificador ${id}`)
 const regla = (mensaje) => new ErrorHttp(409, 'REGLA_NEGOCIO', mensaje)
+const restringido = (codigo, mensaje) => new ErrorHttp(403, codigo, mensaje)
+const limite = (mensaje) => new ErrorHttp(429, 'LIMITE_EXCEDIDO', mensaje)
+const CUENTA_BLOQUEADA = 'Tu cuenta está bloqueada: podés consultar tus reclamos, pero no crear ni reabrir. Comunicate con el municipio.'
 
 function ahora() {
   const fecha = new Date()
@@ -144,7 +159,89 @@ const usuarioPublico = (usuario) => ({
   nombreCompleto: usuario.nombreCompleto,
   rol: usuario.rol,
   area: referencia(areas.find((a) => a.id === usuario.areaId)),
+  telefonoVerificado: enmascarar(usuario.telefono),
+  bloqueado: usuario.bloqueado,
 })
+
+// Igual que Telefono.normalizar y Telefono.enmascarar del dominio.
+function normalizarTelefono(texto) {
+  const digitos = String(texto ?? '').replace(/\D/g, '')
+  if (digitos.length < 8 || digitos.length > 15) {
+    throw invalido('El teléfono tiene que tener entre 8 y 15 dígitos, con el código de país.')
+  }
+  return `+${digitos}`
+}
+function enmascarar(telefono) {
+  if (!telefono) return null
+  const digitos = telefono.slice(1)
+  return `+${digitos.slice(0, 2)} ${'•'.repeat(Math.max(digitos.length - 6, 0))}${digitos.slice(-4)}`
+}
+
+// Chain of Responsibility del backend (ControlesDeUso): teléfono, bloqueo y, al crear, el límite diario.
+function controlarUso(usuario, alCrear) {
+  if (!usuario.telefono) {
+    throw restringido('TELEFONO_NO_VERIFICADO', 'Antes de crear o reabrir reclamos tenés que verificar tu teléfono.')
+  }
+  if (usuario.bloqueado) throw restringido('CUENTA_BLOQUEADA', CUENTA_BLOQUEADA)
+  if (alCrear) {
+    const desde = sumarSegundos(ahora(), -24 * 3600)
+    const hoy = reclamos.filter((r) => r.ciudadanoId === usuario.id && r.fechaCreacion >= desde).length
+    if (hoy >= RECLAMOS_POR_DIA) {
+      throw limite(`Ya creaste ${RECLAMOS_POR_DIA} reclamos en las últimas 24 horas. Probá de nuevo más tarde.`)
+    }
+  }
+}
+
+const ALFABETO = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function pedirCodigo(usuario) {
+  if (usuario.rol !== 'CIUDADANO') throw denegado('Solo los ciudadanos verifican su teléfono.')
+  if (usuario.bloqueado) throw restringido('CUENTA_BLOQUEADA', CUENTA_BLOQUEADA)
+  const fecha = ahora()
+  const haceUnaHora = sumarSegundos(fecha, -3600)
+  if (codigos.filter((c) => c.usuarioId === usuario.id && c.creado >= haceUnaHora).length >= CODIGOS_POR_HORA) {
+    throw limite(`Ya pediste ${CODIGOS_POR_HORA} códigos en la última hora. Esperá un rato y probá de nuevo.`)
+  }
+  const codigo = Array.from({ length: 8 }, () => ALFABETO[Math.floor(Math.random() * ALFABETO.length)]).join('')
+  const vence = sumarSegundos(fecha, VIGENCIA_CODIGO_SEGUNDOS)
+  codigos.push({ codigo, usuarioId: usuario.id, creado: fecha, vence, usado: false })
+  return { codigo, enlace: null, vence, modo: 'simulado' }
+}
+function confirmarSimulado(usuario, cuerpo) {
+  const texto = String(cuerpo.codigo ?? '').trim().toUpperCase()
+  const codigo = codigos.find((c) => c.codigo === texto && c.usuarioId === usuario.id)
+  if (!codigo) throw inexistente('código', texto)
+  if (codigo.usado || codigo.vence < ahora()) throw regla('El código venció o ya se usó. Pedí uno nuevo.')
+  if (usuario.bloqueado) throw restringido('CUENTA_BLOQUEADA', CUENTA_BLOQUEADA)
+  const telefono = normalizarTelefono(cuerpo.telefono)
+  if (usuarios.some((u) => u.telefono === telefono && u.id !== usuario.id)) {
+    throw regla('Ese número ya está verificado en otra cuenta.')
+  }
+  codigo.usado = true
+  usuario.telefono = telefono
+  return usuarioPublico(usuario)
+}
+function cambiarBloqueo(actor, id, cuerpo) {
+  if (actor.rol !== 'ADMINISTRADOR') throw denegado('Solo un administrador puede bloquear cuentas.')
+  if (typeof cuerpo.bloqueado !== 'boolean') throw invalido('Los datos recibidos no son validos.', ['bloqueado: es obligatorio'])
+  const usuario = buscar(usuarios, id, 'usuario')
+  if (usuario.rol !== 'CIUDADANO') throw regla('Solo se bloquean cuentas de ciudadanos.')
+  usuario.bloqueado = cuerpo.bloqueado
+  return usuarioPublico(usuario)
+}
+
+// Reaperturas: se cuentan en el historial, como Reclamo.getCantidadReaperturas.
+const reaperturas = (reclamo) =>
+  reclamo.historial.filter((c) => c.estadoAnterior === 'RESUELTO' && c.estadoNuevo === 'EN_PROCESO').length
+function motivoParaNoReabrir(reclamo) {
+  if (reaperturas(reclamo) >= MAXIMO_REAPERTURAS) {
+    return `El reclamo ${reclamo.numero} ya se reabrió una vez, que es el máximo. Si el problema sigue, creá un reclamo nuevo.`
+  }
+  const resuelto = reclamo.historial.filter((c) => c.estadoNuevo === 'RESUELTO').map((c) => c.fecha).sort().at(-1)
+  if (resuelto && sumarSegundos(resuelto, PLAZO_REAPERTURA_SEGUNDOS) < ahora()) {
+    return `Pasaron más de 7 días desde que se resolvió el reclamo ${reclamo.numero}: ya no se puede reabrir.`
+  }
+  return null
+}
 
 function leerCookies(peticion) {
   const cookies = {}
@@ -212,9 +309,9 @@ function validarTransicion(origen, destino, rol) {
   }
 }
 const accionesDisponibles = (usuario, reclamo) =>
-  TRANSICIONES.filter(([desde, , roles]) => desde === reclamo.estado && roles.includes(usuario.rol)).map(
-    ([, hacia]) => hacia,
-  )
+  TRANSICIONES.filter(([desde, , roles]) => desde === reclamo.estado && roles.includes(usuario.rol))
+    .map(([, hacia]) => hacia)
+    .filter((hacia) => !(reclamo.estado === 'RESUELTO' && hacia === 'EN_PROCESO' && motivoParaNoReabrir(reclamo)))
 
 function resumen(reclamo) {
   return {
@@ -310,6 +407,7 @@ function crear(usuario, cuerpo) {
   }
   if (detalles.length) throw invalido('Los datos recibidos no son validos.', detalles)
   if (usuario.rol !== 'CIUDADANO') throw denegado('Solo un ciudadano puede crear reclamos.')
+  controlarUso(usuario, true)
   const categoria = buscar(categorias, cuerpo.categoriaId, 'categoría')
   const barrio = buscar(barrios, cuerpo.barrioId, 'barrio')
   const ubicacion = confirmarUbicacion(cuerpo.ubicacion)
@@ -372,6 +470,12 @@ function cambiarEstado(usuario, reclamo, cuerpo) {
   }
   if (usuario.rol === 'AGENTE_MUNICIPAL' && reclamo.areaId !== usuario.areaId) {
     throw denegado(`El reclamo ${reclamo.numero} está asignado a otra área.`)
+  }
+  if (reclamo.estado === 'RESUELTO' && cuerpo.estado === 'EN_PROCESO') {
+    controlarUso(usuario, false)
+    if (!String(cuerpo.observacion ?? '').trim()) throw invalido('Para reabrir el reclamo hay que explicar el motivo.')
+    const problema = motivoParaNoReabrir(reclamo)
+    if (problema) throw regla(problema)
   }
   const anterior = reclamo.estado
   const fecha = ahora()
@@ -474,6 +578,16 @@ async function atender(peticion, contexto) {
       contexto.setCookies.push('JSESSIONID=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax')
       return [204, null]
     }
+  }
+
+  if (partes[1] === 'verificacion-telefono' && metodo === 'POST') {
+    const usuario = usuarioDe(contexto)
+    if (partes.length === 2) return [201, pedirCodigo(usuario)]
+    if (partes.length === 3 && partes[2] === 'simulada') return [200, confirmarSimulado(usuario, await leerCuerpo(peticion))]
+  }
+
+  if (partes[1] === 'usuarios' && partes.length === 4 && partes[3] === 'bloqueo' && metodo === 'PATCH') {
+    return [200, cambiarBloqueo(usuarioDe(contexto), Number(partes[2]), await leerCuerpo(peticion))]
   }
 
   if (metodo === 'GET' && partes[1] === 'ubicaciones' && partes[2] === 'sugerencias' && partes.length === 3) {

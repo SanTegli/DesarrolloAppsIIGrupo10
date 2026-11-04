@@ -14,7 +14,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 38 tests: capa de API, etiquetas y componentes
+npm test             # 50 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
@@ -136,6 +136,17 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | CP45 | Registro de un vecino: queda ciudadano, con la contraseña en BCrypt, y puede entrar. Email o DNI repetidos se rechazan | `AutenticacionIntegrationTest.elRegistroCreaUnCiudadanoQuePuedeEntrar`, `elRegistroRechazaEmailODniRepetidosYContrasenasCortas`, `ServicioCuentasTest` | **Crear una cuenta** en la pantalla de ingreso. Con un email que ya existe: "Ya hay una cuenta con ese correo electrónico." |
 | CP46 | Cerrar sesión la invalida; la lista de usuarios es solo para el administrador | `AutenticacionIntegrationTest.cerrarSesionLaInvalidaYDespuesYoEs401`, `RestIntegrationTest.losUsuariosSonSoloParaElAdministradorYLosCatalogosSonPublicos` | **Salir** vuelve al ingreso. Solo por API: `GET /api/usuarios` con la sesión de Ana responde `403` |
 
+### Segunda Parte: teléfono verificado, límites, bloqueo y reaperturas
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP47 | Sin teléfono verificado, un ciudadano no crea reclamos; con la verificación simulada, sí | `VerificacionYReaperturasIntegrationTest.sinTelefonoVerificadoNoCreaReclamosYConLaVerificacionSimuladaSi`, `App.verificacion.test.jsx` | Crear una cuenta e ir a **Crear reclamo**: pide verificar el teléfono. **Pedir código**, escribir el número y **Confirmar teléfono**: aparece el formulario |
+| CP48 | Un número verificado vale para una sola cuenta | `VerificacionYReaperturasIntegrationTest.unNumeroYaVerificadoEnOtraCuentaSeRechaza`, `ServicioVerificacionTelefonoTest.unNumeroVerificadoEnOtraCuentaNoSeAcepta`, `VerificacionYLimitesRepositoryJpaTest` | Con otra cuenta nueva, confirmar con `+5491100000001` (el de Ana): "Ese número ya está verificado en otra cuenta." |
+| CP49 | Verificación por el bot de Telegram: pide el contacto, solo acepta el propio y confirma | `BotTelegramTest` (con `MockRestServiceServer`) | Con `RECLAMOS_TELEGRAM_MODO=telegram` y el bot configurado: abrir el enlace, **Iniciar**, **Compartir mi teléfono**. La pantalla pasa sola al formulario |
+| CP50 | Límites de uso: 5 reclamos por día y 3 códigos por hora, con `429` | `VerificacionYReaperturasIntegrationTest.elLimiteDiarioDeReclamosSeRespeta`, `hastaTresCodigosPorHoraYSoloSeConfirmaElCodigoPropio`, `ControlesDeUsoTest` | Pedir un cuarto código en la misma hora: "Ya pediste 3 códigos en la última hora." |
+| CP51 | El administrador bloquea una cuenta: entra y consulta, pero no crea ni reabre | `VerificacionYReaperturasIntegrationTest.elAdministradorBloqueaUnaCuentaQueSigueConsultandoPeroNoCrea`, `unaCuentaBloqueadaNoReabre`, `ServicioCuentasTest` | Elena → **Administración** → **Cuentas de ciudadanos** → **Bloquear**. Con esa cuenta, **Crear reclamo** muestra el aviso |
+| CP52 | Reabrir exige motivo, se permite una vez y dentro de 7 días; después no se ofrece | `VerificacionYReaperturasIntegrationTest.seReabreUnaSolaVezConMotivoYDespuesNoSeOfrece`, `ReaperturaTest`, `DetalleReclamo.test.jsx` | Reclamo resuelto: **Reabrir** queda deshabilitado hasta escribir el motivo. Después de la segunda resolución, el botón ya no está |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -175,6 +186,8 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
 - [ ] Rehacer las capturas de `interfaz/`: todavía muestran el selector de usuario que el login del PR 14 reemplazó.
 - [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
+- [ ] Captura de la verificación con el bot real de Telegram: el chat con el bot y la pantalla que pasa al formulario (CP49).
+- [ ] Capturas de la verificación simulada, el número repetido, el panel de cuentas y la reapertura contra el backend real (CP47, CP48, CP51 y CP52).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).

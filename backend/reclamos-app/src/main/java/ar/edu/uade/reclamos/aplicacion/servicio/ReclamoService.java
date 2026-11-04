@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import ar.edu.uade.reclamos.aplicacion.control.ControlesDeUso;
 import ar.edu.uade.reclamos.aplicacion.seguridad.PermisosReclamo;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaPrioridad;
@@ -10,6 +11,7 @@ import ar.edu.uade.reclamos.dominio.modelo.*;
 import ar.edu.uade.reclamos.dominio.repositorio.*;
 import java.time.Clock;
 import java.time.LocalDateTime;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,11 +32,29 @@ public class ReclamoService {
     private final PermisosReclamo permisos;
     private final Clock reloj;
     private final PublicadorEventos eventos;
+    private final ControlesDeUso controles;
+    private final PoliticaReapertura reaperturas;
 
     public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, BarrioRepository barrios,
                           ReclamoRepository reclamos, ReclamoFactory factory,
                           EstrategiaPrioridad prioridad, ServicioAsignacion asignacion,
                           PermisosReclamo permisos, Clock reloj, PublicadorEventos eventos) {
+        this(usuarios, categorias, barrios, reclamos, factory, prioridad, asignacion, permisos, reloj, eventos,
+                ControlesDeUso.NINGUNO, PoliticaReapertura.PREDETERMINADA);
+    }
+
+    /**
+     * @param controles   teléfono verificado, cuenta no bloqueada y límite diario, antes de crear o reabrir
+     * @param reaperturas cuántas veces y hasta cuándo se puede reabrir un reclamo
+     */
+    @Autowired
+    public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, BarrioRepository barrios,
+                          ReclamoRepository reclamos, ReclamoFactory factory,
+                          EstrategiaPrioridad prioridad, ServicioAsignacion asignacion,
+                          PermisosReclamo permisos, Clock reloj, PublicadorEventos eventos,
+                          ControlesDeUso controles, PoliticaReapertura reaperturas) {
+        this.controles = controles;
+        this.reaperturas = reaperturas;
         this.usuarios = usuarios;
         this.categorias = categorias;
         this.barrios = barrios;
@@ -61,6 +81,7 @@ public class ReclamoService {
     public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
                          Ubicacion ubicacion) {
         Ciudadano ciudadano = permisos.validarCreacion(usuario(usuarioId));
+        controles.antesDeCrear(ciudadano, ahora());
         Categoria categoria = categorias.buscarPorId(categoriaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
         Barrio barrio = barrios.buscarPorId(barrioId)
@@ -96,7 +117,11 @@ public class ReclamoService {
         Reclamo reclamo = reclamo(numero);
         EstadoReclamo anterior = reclamo.getEstado();
         LocalDateTime fecha = ahora();
-        reclamo.cambiarEstado(estado, actor, observacion, fecha);
+        if (actor instanceof Ciudadano ciudadano && anterior == EstadoReclamo.RESUELTO
+                && estado == EstadoReclamo.EN_PROCESO) {
+            controles.antesDeReabrir(ciudadano, fecha);
+        }
+        reclamo.cambiarEstado(estado, actor, observacion, fecha, reaperturas);
         Reclamo guardado = reclamos.guardar(reclamo);
         eventos.publicar(new EstadoReclamoCambiado(guardado.getNumero(), anterior, guardado.getEstado(),
                 actor.getId(), fecha));

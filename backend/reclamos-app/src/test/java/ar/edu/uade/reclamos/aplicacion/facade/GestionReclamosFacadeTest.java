@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
+import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
+import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import java.util.List;
@@ -19,8 +21,9 @@ class GestionReclamosFacadeTest {
     private final ConsultaCatalogosService catalogos = mock(ConsultaCatalogosService.class);
     private final ServicioUbicaciones ubicaciones = mock(ServicioUbicaciones.class);
     private final ServicioCuentas cuentas = mock(ServicioCuentas.class);
+    private final ServicioVerificacionTelefono verificacion = mock(ServicioVerificacionTelefono.class);
     private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
-            ubicaciones, cuentas);
+            ubicaciones, cuentas, verificacion);
 
     @Test
     void crearDelegaParametrosYResultadoSinOtrasInteracciones() {
@@ -222,6 +225,19 @@ class GestionReclamosFacadeTest {
         when(catalogos.usuario(7L, 1L)).thenReturn(resultado);
         assertThat(facade.usuario(7L, 1L)).isSameAs(resultado);
         verify(catalogos).usuario(7L, 1L);
+        verifyNoMoreInteractions(escritura, consultas, catalogos);
+    }
+
+    @Test
+    void verificacionYBloqueoDeleganEnSusServicios() {
+        var codigo = new CodigoEmitido("RU4K7P2Q", null, java.time.LocalDateTime.of(2026, 1, 1, 0, 10), "simulado");
+        when(verificacion.iniciar(1L)).thenReturn(codigo);
+        when(verificacion.confirmarSimulado(1L, "RU4K7P2Q", "+5491155550000")).thenReturn(e.ciudadano);
+        when(cuentas.cambiarBloqueo(5L, 1L, true)).thenReturn(e.ciudadano);
+
+        assertThat(facade.iniciarVerificacionTelefono(1L)).isSameAs(codigo);
+        assertThat(facade.confirmarVerificacionSimulada(1L, "RU4K7P2Q", "+5491155550000")).isSameAs(e.ciudadano);
+        assertThat(facade.cambiarBloqueo(5L, 1L, true)).isSameAs(e.ciudadano);
         verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 

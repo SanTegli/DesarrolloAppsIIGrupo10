@@ -63,7 +63,12 @@ public class RestMapper {
 
     public UsuarioResponse usuario(Usuario usuario) {
         ReferenciaResponse area = usuario instanceof AgenteMunicipal agente ? areaReferencia(agente.getArea()) : null;
-        return new UsuarioResponse(usuario.getId(), usuario.getNombreCompleto(), usuario.getRol(), area);
+        // El teléfono sale solo enmascarado: el número completo no deja el backend.
+        String telefono = usuario instanceof Ciudadano ciudadano
+                ? Telefono.enmascarar(ciudadano.getTelefonoVerificado())
+                : null;
+        return new UsuarioResponse(usuario.getId(), usuario.getNombreCompleto(), usuario.getRol(), area, telefono,
+                usuario.isBloqueado());
     }
 
     public CategoriaResponse categoria(Categoria categoria) {

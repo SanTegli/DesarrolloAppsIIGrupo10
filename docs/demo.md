@@ -55,6 +55,9 @@ contenedor en el paso «Memoria de cada contenedor».
 | 8 | Pestañas del WSDL y de los dos Swagger | `ConsultarCobertura`, `POST /api/prioridades/evaluar` y los endpoints de REST 1 | **Contratos**: WSDL y OpenAPI |
 | 9 | **Salir** y entrar como **Carla Gómez** (`carla@example.org`, agente de Alumbrado): tomar el reclamo y resolverlo | El historial suma dos pasos | Cada rol ve y hace lo suyo: lo decide el dominio con el usuario de la sesión |
 | 10 | Volver a Mailpit | "cambió de estado" y "está resuelto" para Ana | El mismo flujo de mensajería, otro evento |
+| 11 | Entrar como Ana, abrir el reclamo resuelto y **Reabrir** con el motivo "Sigue apagado". Que Carla lo resuelva otra vez | La segunda vez, el botón **Reabrir** ya no aparece: solo **Confirmar solución** | Reaperturas con límite (dominio) |
+| 12 | **Crear una cuenta** nueva e ir a **Crear reclamo** | Pide verificar el teléfono. Con el bot: código, enlace a Telegram y "Compartir mi teléfono". Sin bot: el número en un formulario. Repetir con el número de otra cuenta: "Ese número ya está verificado en otra cuenta" | **Segunda API externa** (Telegram), Adapter |
+| 13 | Entrar como **Elena Ruiz** → **Administración** → **Cuentas de ciudadanos** → **Bloquear** la cuenta nueva | Esa cuenta entra y ve sus reclamos, pero **Crear reclamo** muestra el aviso de cuenta bloqueada | Chain of Responsibility de los controles de uso |
 
 Para el paso 5: la IA puede subir la prioridad de la categoría pero nunca bajarla. Si sugiere una menor, el
 detalle dice "por categoría" y el motivo lo explica. Si dice "por categoría (la IA no respondió)", el servicio
@@ -91,6 +94,7 @@ la base de datos.
 | SMTP caído | Tres intentos (1 s y 2 s de espera) y después a la cola de errores | Nada; ese correo no llega | Revisar la cola de errores a mano | `ConfiguracionReintentosTest`, `FlujoCorreoIntegrationTest` |
 | Mensaje repetido | El consumidor lo descarta por su `eventId` | Un solo correo | — | `ProcesadorAvisosTest.unMensajeRepetidoNoSeVuelveAMandar` |
 | Mensaje inválido | Va directo a la cola de errores, sin reintentos | Nada | Revisarlo a mano | `FlujoCorreoIntegrationTest.unMensajeInvalidoTerminaEnLaColaDeErroresSinReintentos` |
+| Telegram caído o sin Internet (modo `telegram`) | El bot registra el error y vuelve a consultar cada 2 s, desde la misma actualización | El código sigue vigente 10 minutos; la pantalla espera la confirmación | Automática al volver. Plan B: `RECLAMOS_TELEGRAM_MODO=simulado` y reiniciar el backend | `BotTelegramTest.siTelegramFallaNoSeCaeYVuelveAPedirDesdeElMismoPunto` |
 | MySQL caído | Sin respaldo: es la base del sistema. Las operaciones responden error | Mensaje de error en la interfaz | `docker compose start mysql`; los datos están en el volumen | — |
 
 Los tiempos límite suman como máximo unos 8 segundos dentro del alta (6 de la IA y 2 del SOAP). Georef se
@@ -110,7 +114,7 @@ correr desde la máquina: `node scripts/verificar-demo.mjs`.
 | Paso | Qué comprueba |
 | --- | --- |
 | Frontend, backend, cobertura, prioridad, RabbitMQ y Mailpit | Que cada contenedor responda: la interfaz y el proxy de `/api`, los contratos OpenAPI, el WSDL, el exchange con su cola y su consumidor, y el buzón |
-| Login | Que Ana Pérez entre con `demo1234`: toma la cookie `XSRF-TOKEN`, la devuelve en `X-XSRF-TOKEN` y guarda la cookie de sesión, como el navegador |
+| Login | Que Ana Pérez entre con `demo1234`: toma la cookie `XSRF-TOKEN`, la devuelve en `X-XSRF-TOKEN` y guarda la cookie de sesión, como el navegador. Además, que tenga el teléfono verificado y la cuenta sin bloquear, porque si no el alta da 403 |
 | Georef | Que el backend devuelva sugerencias para Belgrano 450, en Bernal. Sin Internet es un **aviso**, no una falla |
 | Alta del reclamo | `POST /api/reclamos` con la sesión de Ana Pérez y la sugerencia elegida: responde 201 |
 | Prioridad con IA | Que el origen sea `IA`, o `CATEGORIA` si la IA sugirió menos. `RESPALDO` es una falla: la IA no contestó |
@@ -131,4 +135,6 @@ CI no tiene la clave de Gemini.
 | El backend nunca llega a `healthy` | Falta memoria, o MySQL no arrancó | `docker compose logs backend`; subir la memoria de Docker Desktop |
 | Prioridad "por categoría (la IA no respondió)" | Falta `GEMINI_API_KEY`, la clave es inválida o se agotó la cuota | `docker compose logs servicio-prioridad`. Plan B: `PRIORIDAD_IA_PROVEEDOR=simulado` en `.env` y `docker compose up -d servicio-prioridad`; el motivo aclara que no es IA |
 | "El mapa no responde" | La computadora no tiene Internet o Georef está caído | Mostrar el alta sin ubicación: es el comportamiento previsto |
+| El alta responde `429 LIMITE_EXCEDIDO` | Se crearon más de `RECLAMOS_USO_RECLAMOS_POR_DIA` reclamos con la misma cuenta en 24 horas (20 en Compose) | Subir el valor en `.env` y `docker compose up -d backend`, o usar a Bruno Díaz |
+| El bot de Telegram no contesta | Falta el token o el modo sigue en `simulado`, o la computadora no tiene Internet | `docker compose logs backend`. Plan B: modo `simulado` |
 | No llegan correos | El consumidor o Mailpit no están levantados | `docker compose ps` y `docker compose logs servicio-notificaciones` |

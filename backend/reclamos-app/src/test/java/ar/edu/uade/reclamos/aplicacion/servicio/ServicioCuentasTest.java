@@ -4,6 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ar.edu.uade.reclamos.aplicacion.DoblesEnMemoria;
+import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
+import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
+import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException;
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
@@ -53,5 +56,22 @@ class ServicioCuentasTest {
         assertThatThrownBy(() -> cuentas.registrarCiudadano("33444555", "Laura", "Martínez", "laura@example.org",
                 "ñ".repeat(40))).isInstanceOf(DatosInvalidosException.class);
         assertThat(usuarios.guardados).isEmpty();
+    }
+
+    @Test
+    void soloElAdministradorBloqueaYSoloCuentasDeCiudadanos() {
+        EscenarioAplicacion e = new EscenarioAplicacion();
+        DoblesEnMemoria.Usuarios todos = new DoblesEnMemoria.Usuarios(e.ciudadano, e.agente, e.administrador);
+        ServicioCuentas servicio = new ServicioCuentas(todos, contrasenas);
+
+        assertThat(servicio.cambiarBloqueo(e.administrador.getId(), e.ciudadano.getId(), true).isBloqueado()).isTrue();
+        assertThat(servicio.cambiarBloqueo(e.administrador.getId(), e.ciudadano.getId(), false).isBloqueado()).isFalse();
+        assertThatThrownBy(() -> servicio.cambiarBloqueo(e.agente.getId(), e.ciudadano.getId(), true))
+                .isInstanceOf(AccesoDenegadoException.class);
+        assertThatThrownBy(() -> servicio.cambiarBloqueo(e.administrador.getId(), e.agente.getId(), true))
+                .isInstanceOf(ReglaNegocioException.class);
+        assertThatThrownBy(() -> servicio.cambiarBloqueo(e.administrador.getId(), 99L, true))
+                .isInstanceOf(RecursoNoEncontradoException.class);
+        assertThat(e.ciudadano.isBloqueado()).isFalse();
     }
 }
