@@ -224,6 +224,14 @@ export async function verificarDemo(config, informar = () => {}) {
     }
     return [OK, `JPEG de ${bytes.length} bytes, servido con la sesión de la ciudadana`]
   })
+  await paso(anotar, 'Tablero público', async () => {
+    const tablero = await http.json(config.backendUrl + '/api/dashboard/publico')
+    if (!(tablero.creadosEnPeriodo >= 1)) {
+      return [FALLA, `no cuenta el reclamo recién creado (creadosEnPeriodo: ${tablero.creadosEnPeriodo})`]
+    }
+    const atendidos = tablero.porcentajeAtendidos === null ? 'sin casos' : `${tablero.porcentajeAtendidos} %`
+    return [OK, `${tablero.creadosEnPeriodo} creados del ${tablero.desde} al ${tablero.hasta}; atendidos: ${atendidos}`]
+  })
 
   // 4. Mensajería: la outbox publica cada 2 s y el consumidor manda el correo.
   await paso(anotar, 'Correo por RabbitMQ', async () => {

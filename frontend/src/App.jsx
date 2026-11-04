@@ -10,6 +10,7 @@ import FormularioReclamo from './componentes/FormularioReclamo.jsx'
 import Ingreso from './componentes/Ingreso.jsx'
 import ListaReclamos from './componentes/ListaReclamos.jsx'
 import PanelAdministracion from './componentes/PanelAdministracion.jsx'
+import Tablero, { TableroPublico } from './componentes/Tablero.jsx'
 import VerificacionTelefono from './componentes/VerificacionTelefono.jsx'
 import { useCarga } from './hooks/useCarga.js'
 
@@ -33,6 +34,7 @@ function pestanasPara(rol) {
     pestanas.push({ id: 'administracion', texto: 'Administración' })
   }
   pestanas.push({ id: 'avisos', texto: 'Avisos' })
+  pestanas.push({ id: 'tablero', texto: 'Tablero' })
   return pestanas
 }
 
@@ -51,6 +53,7 @@ export default function App() {
     [],
   )
   const [vista, setVista] = useState({ nombre: 'reclamos' })
+  const [verTableroPublico, setVerTableroPublico] = useState(false)
 
   useEffect(() => {
     let vigente = true
@@ -125,6 +128,21 @@ export default function App() {
         {(catalogos.cargando || sesion.estado === 'cargando') && <p className="estado-carga">Cargando…</p>}
 
         {sesion.estado === 'sin-sesion' && <Ingreso aviso={sesion.aviso} onIngreso={entrar} />}
+
+        {sesion.estado === 'sin-sesion' && catalogos.datos && (
+          <div className="ingreso-tablero">
+            <button type="button" className="enlace" onClick={() => setVerTableroPublico((visible) => !visible)}>
+              {verTableroPublico ? 'Ocultar el tablero público' : 'Ver el tablero público, sin iniciar sesión'}
+            </button>
+            {verTableroPublico && (
+              <TableroPublico barrios={catalogos.datos.barrios} categorias={catalogos.datos.categorias} />
+            )}
+          </div>
+        )}
+
+        {usuario && vista.nombre === 'tablero' && (
+          <Tablero usuario={usuario} barrios={catalogos.datos.barrios} categorias={catalogos.datos.categorias} />
+        )}
 
         {usuario && vista.nombre === 'reclamos' && (
           <>

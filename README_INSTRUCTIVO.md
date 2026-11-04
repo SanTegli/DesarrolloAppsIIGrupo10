@@ -628,6 +628,26 @@ Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/apoyo" -Method Del
 
 Apoyar dos veces deja un solo apoyo; Ana no puede apoyar su propio reclamo (`409`); un agente, tampoco (`403`). Quien apoya no puede ver el detalle del reclamo (`403`), pero sí la foto mientras siga abierto, porque es la de la tarjeta. Los parámetros `radio` (hasta 200 metros) y `limite` (hasta 5) son opcionales.
 
+### Probar los tableros
+
+En la interfaz, la pestaña **Tablero** está para todos los roles:
+
+- **Ciudadanos:** el tablero público.
+- **Agentes y administradores:** primero el de gestión. Cada agente ve solo su área; Elena, todas.
+
+Sin iniciar sesión, la pantalla de ingreso tiene **Ver el tablero público**.
+
+Por API:
+
+```powershell
+Invoke-RestMethod "http://localhost:8080/api/dashboard/publico"
+Invoke-RestMethod "http://localhost:8080/api/dashboard/publico?desde=2026-10-01&hasta=2026-10-31&barrioId=2"
+$elena = Entrar "elena@example.org"
+Invoke-RestMethod "http://localhost:8080/api/dashboard/gestion" -WebSession $elena.Sesion | ConvertTo-Json -Depth 5
+```
+
+El público no pide sesión y no tiene datos de personas. El de gestión con la sesión de Ana responde `403`. Si no hay reclamos para calcular un porcentaje, viene `null` y la interfaz muestra "sin casos". Los vencidos se calculan por fecha: un reclamo que pasó su fecha límite cuenta aunque la tarea de vencimientos todavía no lo haya marcado.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -637,6 +657,8 @@ Apoyar dos veces deja un solo apoyo; Ana no puede apoyar su propio reclamo (`409
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
 | GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle; cualquier ciudadano ve la de un posible duplicado abierto. |
 | GET | `/api/reclamos/candidatos-duplicados` | Reclamos abiertos de la categoría cerca del punto (`categoriaId`, `latitud`, `longitud`; opcionales `radio` y `limite`), sin datos del autor. |
+| GET | `/api/dashboard/publico` | Tablero público, sin sesión: creados en el período (`desde`, `hasta`) y pendientes, resueltos y cerrados de hoy, con filtros `barrioId` y `categoriaId`. |
+| GET | `/api/dashboard/gestion` | Tablero de gestión: pendientes, vencidos, sin asignar y tabla por área y barrio. Agentes (su área) y administradores. |
 | POST / DELETE | `/api/reclamos/{numero}/apoyo` | Apoyar o retirar el apoyo a un reclamo de otro vecino. Idempotentes. Solo ciudadanos. |
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |

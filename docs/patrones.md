@@ -273,6 +273,7 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Adapter y capa anticorrupción | 15 | `ClienteTelegram` | El JSON de la Bot API no sale de una clase, y el token tampoco |
 | Chain of Responsibility (propia) | 15 | `ControlDeUso`: `TelefonoVerificado` → `CuentaNoBloqueada` → `LimiteDiarioDeReclamos` | Cada control de uso corta con su error o pasa al siguiente; sumar uno no toca `ReclamoService` |
 | Adapter | 16 | `AlmacenFotos`: `AlmacenFotosLocal` | El caso de uso no sabe dónde se guarda la foto; otro almacén (Firebase Storage, S3) sería otra clase |
+| Lado de lectura separado (Domain Reporting, CQRS) | 18 | `ConsultasTablero`: `ConsultasTableroJpa` | Las métricas no recorren reclamos por el Repository: la base cuenta y agrupa, y vuelven proyecciones planas |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -523,3 +524,22 @@ interfaz porque el archivo y la base no comparten transacción.
 - **Código:** `reclamos-app/…/aplicacion/foto/`
 - **Tests:** `AlmacenFotosLocalTest` (con un directorio temporal), `ProcesadorFotosTest` y
   `FotosIntegrationTest`
+
+## Lado de lectura para los tableros (Domain Reporting, CQRS)
+
+**Problema.** Los tableros necesitan cuántos reclamos hay por estado, por área y barrio, y cuántos vencieron.
+Pedirle a `ReclamoRepository` todos los reclamos y contarlos en Java funciona con pocos datos, pero carga
+cada agregado con su historial y sus relaciones solo para sumar. La Clase 5 lo marca como antipatrón: los
+reportes son el lado de lectura y no deben pasar por las entidades ni por los repositorios del dominio.
+
+**Solución.** Un puerto propio para leer, `ConsultasTablero`, separado del Repository de escritura. Devuelve
+proyecciones (`ConteoPorEstado`, `FilaPendientes`), no entidades. `ConsultasTableroJpa` lo implementa con JPQL
+agregado y expresiones `select new`: la base hace el `count`, el `sum(case …)` y el `group by`.
+`ServicioTablero` solo valida los filtros, decide qué ve cada rol y calcula los porcentajes.
+
+Es la versión mínima de CQRS que pide el alcance: el mismo esquema y la misma base para leer y escribir, pero
+caminos separados. Pasar a una tabla proyectada desde los eventos sería otra implementación del puerto.
+
+- **Código:** `reclamos-dominio/…/dominio/reporte/`, `reclamos-persistencia/…/adaptador/ConsultasTableroJpa.java`,
+  `reclamos-app/…/aplicacion/tablero/`
+- **Tests:** `ConsultasTableroJpaTest` (contado a mano), `ServicioTableroTest` y `TableroIntegrationTest`

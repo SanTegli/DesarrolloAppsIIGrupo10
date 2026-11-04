@@ -46,7 +46,7 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
     expect(await screen.findByRole('button', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos', 'Crear reclamo', 'Avisos'])
+    expect(pestanas()).toEqual(['Reclamos', 'Crear reclamo', 'Avisos', 'Tablero'])
     expect(screen.getByText('Ana Pérez, Ciudadano')).toBeInTheDocument()
     const login = llamadas.find((llamada) => llamada.ruta === '/api/auth/login')
     expect(login).toMatchObject({
@@ -63,14 +63,14 @@ describe('App', () => {
     const { unmount } = render(<App />)
 
     expect(await screen.findByRole('heading', { name: 'Reclamos de mi área' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos', 'Avisos'])
+    expect(pestanas()).toEqual(['Reclamos', 'Avisos', 'Tablero'])
     expect(await screen.findByText('Tu área no tiene reclamos asignados.')).toBeInTheDocument()
     unmount()
 
     simularApi({ ...conSesion(elena), 'GET /api/reclamos': [] })
     render(<App />)
     expect(await screen.findByRole('heading', { name: 'Todos los reclamos' })).toBeInTheDocument()
-    expect(pestanas()).toEqual(['Reclamos', 'Administración', 'Avisos'])
+    expect(pestanas()).toEqual(['Reclamos', 'Administración', 'Avisos', 'Tablero'])
   })
 
   it('un login fallido muestra el error y deja la pantalla de ingreso', async () => {

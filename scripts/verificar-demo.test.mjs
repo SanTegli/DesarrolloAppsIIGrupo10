@@ -151,6 +151,14 @@ before(async () => {
         ? responder(res, 200, Buffer.from(escenario.altas.at(-1).foto), 'image/jpeg')
         : responder(res, 404, { status: 404, codigo: 'RECURSO_NO_ENCONTRADO' })
     }
+    if (ruta === '/backend/api/dashboard/publico') {
+      return responder(res, 200, {
+        desde: '2026-10-05',
+        hasta: '2026-11-03',
+        creadosEnPeriodo: escenario.altas.length,
+        porcentajeAtendidos: null,
+      })
+    }
     if (ruta === '/cobertura/ws/cobertura.wsdl') {
       return responder(res, 200, '<wsdl:operation name="ConsultarCobertura"/>', 'text/xml')
     }
@@ -209,6 +217,7 @@ describe('verificarDemo', () => {
     assert.equal(alta.tipoReclamo, 'application/json')
     assert.deepEqual([alta.foto[0], alta.foto[1]], [0xff, 0xd8], 'el alta lleva la foto JPEG')
     assert.match(resultados.find((r) => r.paso === 'Foto').detalle, /JPEG de \d+ bytes/)
+    assert.match(resultados.find((r) => r.paso === 'Tablero público').detalle, /1 creados.*sin casos/)
     assert.match(resultados.find((r) => r.paso === 'Correo por RabbitMQ').detalle, /lo recibimos/)
   })
 

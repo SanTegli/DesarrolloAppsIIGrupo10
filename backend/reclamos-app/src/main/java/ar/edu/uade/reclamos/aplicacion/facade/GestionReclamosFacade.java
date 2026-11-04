@@ -3,10 +3,14 @@ package ar.edu.uade.reclamos.aplicacion.facade;
 import ar.edu.uade.reclamos.aplicacion.foto.FotoSubida;
 import ar.edu.uade.reclamos.aplicacion.foto.ServicioFotos;
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
+import ar.edu.uade.reclamos.aplicacion.tablero.ServicioTablero;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroGestion;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroPublico;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
 import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.dominio.modelo.*;
+import java.time.LocalDate;
 import java.util.List;
 import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Set;
@@ -24,11 +28,14 @@ public class GestionReclamosFacade {
     private final ServicioFotos fotos;
     private final ServicioDuplicados duplicados;
     private final ServicioApoyos apoyos;
+    private final ServicioTablero tablero;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
                                   ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones,
                                   ServicioCuentas cuentas, ServicioVerificacionTelefono verificacion,
-                                  ServicioFotos fotos, ServicioDuplicados duplicados, ServicioApoyos apoyos) {
+                                  ServicioFotos fotos, ServicioDuplicados duplicados, ServicioApoyos apoyos,
+                                  ServicioTablero tablero) {
+        this.tablero = tablero;
         this.fotos = fotos;
         this.duplicados = duplicados;
         this.apoyos = apoyos;
@@ -121,6 +128,16 @@ public class GestionReclamosFacade {
 
     public EstadoApoyo retirarApoyo(Long usuarioId, String numero) {
         return apoyos.retirar(usuarioId, numero);
+    }
+
+    /** Tablero público: no necesita sesión ni tiene datos personales. */
+    public TableroPublico tableroPublico(LocalDate desde, LocalDate hasta, Long barrioId, Long categoriaId) {
+        return tablero.publico(desde, hasta, barrioId, categoriaId);
+    }
+
+    /** Tablero de gestión: agentes (su área) y administradores (todas). */
+    public TableroGestion tableroGestion(Long usuarioId) {
+        return tablero.gestion(usuarioId);
     }
 
     /** Cuántos vecinos apoyan el reclamo. */

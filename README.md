@@ -283,3 +283,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 15 | `feature/15-verificacion-reaperturas` | Teléfono verificado por Telegram (un número, una cuenta) con modo simulado, límites de uso, bloqueo de cuentas por el administrador y reaperturas con motivo, una vez y dentro de 7 días |
 | 16 | `feature/16-foto` | Foto obligatoria en el alta (multipart): JPEG o PNG validados por contenido, re-codificados sin EXIF, guardados en un volumen y servidos con los permisos del detalle |
 | 17 | `feature/17-duplicados-apoyos` | Posibles duplicados en el alta (misma categoría, a menos de 50 m, con Haversine) y apoyos únicos por ciudadano, sin datos del autor |
+| 18 | `feature/18-dashboards` | Tablero público (sin sesión ni datos personales) y de gestión (vencidos por fecha y tabla por área y barrio), con consultas agregadas en un puerto de lectura propio |

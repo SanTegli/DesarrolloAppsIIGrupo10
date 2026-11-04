@@ -14,7 +14,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 67 tests: capa de API, etiquetas y componentes
+npm test             # 74 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
@@ -167,6 +167,16 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | CP61 | Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos | `ApoyosYCercaniaRepositoryJpaTest.unCiudadanoNoApoyaDosVecesElMismoReclamo`, `GestionReclamosFacadeTest.unDobleClicQueChocaConLaRestriccionUnicaDevuelveElEstadoActual` | Solo por API: dos `POST /api/reclamos/{numero}/apoyo` seguidos dejan `cantidadApoyos: 1` |
 | CP62 | Reglas del apoyo: no el propio, no un agente, no sin teléfono verificado ni con la cuenta bloqueada | `reglasDelApoyo`, `unaCuentaBloqueadaNoApoya`, `ApoyoTest` | La tarjeta de un reclamo propio dice "Es un reclamo tuyo." y no tiene botón |
 
+### Segunda Parte: tableros
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP63 | El tablero público coincide con los totales contados a mano, sin sesión y sin datos personales | `TableroIntegrationTest.elTableroPublicoNoPideSesionYCoincideConLaCuentaAMano`, `ConsultasTableroJpaTest` | En la pantalla de ingreso, **Ver el tablero público**. Contar a mano los reclamos de la base y comparar |
+| CP64 | Filtros de barrio, categoría y período; "sin casos" cuando no hay denominador | `losFiltrosDeBarrioCategoriaYPeriodo`, `ServicioTableroTest.sinCasosNoHayPorcentaje`, `Tablero.test.jsx` | Elegir un barrio sin reclamos: "Atendidos: sin casos" |
+| CP65 | El tablero de gestión: vencidos por fecha, sin asignar y la tabla por área y barrio | `elAdministradorVeTodasLasAreasConVencidosPorFechaYSinAsignar`, `ConsultasTableroJpaTest.agrupaPendientesYVencidosPorAreaYBarrioSegunLaFecha` | Como Elena, pestaña **Tablero** |
+| CP66 | Cada agente ve solo su área; un ciudadano no ve la gestión | `cadaAgenteVeSoloSuAreaYLosCiudadanosNoLoVen` | Como Carla, **Tablero** muestra solo Alumbrado. Solo por API: `GET /api/dashboard/gestion` con la sesión de Ana responde `403` |
+| CP67 | Período inválido o filtro inexistente: `400` o `404` | `losParametrosInvalidosResponden400O404`, `ServicioTableroTest.elPeriodoTieneQueSerValido` | Solo por API: `desde` posterior a `hasta` responde `400` |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -208,6 +218,7 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
 - [ ] Capturas del alta con foto, del formato rechazado y del detalle con la foto contra el backend real (CP53 y CP54), y del contenido de `/data/fotos` (CP56).
 - [ ] Capturas del posible duplicado en el alta, del aviso de apoyo y del detalle con el contador contra el backend real (CP58 y CP60).
+- [ ] Capturas de los dos tableros contra el backend real, con la cuenta a mano de la semilla al lado (CP63 y CP65).
 - [ ] Captura de la verificación con el bot real de Telegram: el chat con el bot y la pantalla que pasa al formulario (CP49).
 - [ ] Capturas de la verificación simulada, el número repetido, el panel de cuentas y la reapertura contra el backend real (CP47, CP48, CP51 y CP52).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
