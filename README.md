@@ -281,3 +281,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 13 | `feature/13-integracion-demo` | Compose con orden de arranque, chequeos de salud y memoria acotada; verificación de punta a punta en el CI; diagrama de componentes UML, secuencia completa, guion de demo y matriz de fallos |
 | 14 | `feature/14-login` | Login con sesión del servidor y CSRF (Spring Security), registro de ciudadanos, contraseñas con BCrypt y pantalla de ingreso; se elimina `X-Usuario-Id` |
 | 15 | `feature/15-verificacion-reaperturas` | Teléfono verificado por Telegram (un número, una cuenta) con modo simulado, límites de uso, bloqueo de cuentas por el administrador y reaperturas con motivo, una vez y dentro de 7 días |
+| 16 | `feature/16-foto` | Foto obligatoria en el alta (multipart): JPEG o PNG validados por contenido, re-codificados sin EXIF, guardados en un volumen y servidos con los permisos del detalle |

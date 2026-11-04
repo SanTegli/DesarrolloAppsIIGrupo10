@@ -272,6 +272,7 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Adapter | 15 | `CanalVerificacion`: `CanalTelegram`, `CanalSimulado` | Verificar el teléfono por Telegram o sin conexión, sin que el servicio sepa cuál |
 | Adapter y capa anticorrupción | 15 | `ClienteTelegram` | El JSON de la Bot API no sale de una clase, y el token tampoco |
 | Chain of Responsibility (propia) | 15 | `ControlDeUso`: `TelefonoVerificado` → `CuentaNoBloqueada` → `LimiteDiarioDeReclamos` | Cada control de uso corta con su error o pasa al siguiente; sumar uno no toca `ReclamoService` |
+| Adapter | 16 | `AlmacenFotos`: `AlmacenFotosLocal` | El caso de uso no sabe dónde se guarda la foto; otro almacén (Firebase Storage, S3) sería otra clase |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -507,3 +508,18 @@ de Telegram salen como `Mensaje` y `Contacto`, y ningún error deja ver la URL, 
 
 - **Código:** `reclamos-app/…/aplicacion/verificacion/`
 - **Tests:** `ServicioVerificacionTelefonoTest`, `BotTelegramTest` (con `MockRestServiceServer`)
+
+## Adapter en el almacén de fotos
+
+**Problema.** La foto del reclamo se guarda hoy en un directorio (un volumen de Docker). Mañana podría ir a
+Firebase Storage, como se vio en la Clase 10, o a S3. El alta no tendría que cambiar por eso, y los tests
+necesitan revisar qué archivos quedan sin depender de un servicio externo.
+
+**Solución.** `ServicioFotos` habla con la interfaz `AlmacenFotos` (guardar pendiente, confirmar, descartar y
+leer). `AlmacenFotosLocal` la implementa con archivos y `ConfiguracionFotos` la elige. Otro almacén sería
+otra clase con los mismos cuatro métodos. El guardado en dos pasos (pendiente y confirmada) es parte de la
+interfaz porque el archivo y la base no comparten transacción.
+
+- **Código:** `reclamos-app/…/aplicacion/foto/`
+- **Tests:** `AlmacenFotosLocalTest` (con un directorio temporal), `ProcesadorFotosTest` y
+  `FotosIntegrationTest`

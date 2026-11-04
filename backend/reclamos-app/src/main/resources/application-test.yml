@@ -13,3 +13,6 @@ spring:
 reclamos:
   vencimientos:
     habilitado: false
+  # Las fotos de los tests van a un directorio temporal, no al del proyecto.
+  fotos:
+    directorio: ${java.io.tmpdir}/reclamos-fotos-test

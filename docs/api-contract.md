@@ -65,6 +65,7 @@ Todos los errores tienen la misma forma:
 | 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo mientras se procesaba esta; hay que volver a cargarlo | Bloqueo optimista de JPA |
+| 413 | `ARCHIVO_DEMASIADO_GRANDE` | La foto pesa más de 5 MB o mide más de 4000 píxeles de lado | `ArchivoDemasiadoGrandeException` o el límite de Spring |
 | 429 | `LIMITE_EXCEDIDO` | Se superó un límite de uso: reclamos por día o códigos de verificación por hora | `LimiteExcedidoException` |
 | 405 | `METODO_NO_PERMITIDO` | El recurso no admite ese método HTTP | Error de Spring |
 | 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | El cuerpo no es `application/json` | Error de Spring |
@@ -90,6 +91,7 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
     "direccionNormalizada": null,
     "proveedor": null
   },
+  "foto": "/api/reclamos/REC-4F2A91BC/foto",
   "estado": "ASIGNADO",
   "prioridad": "MEDIA",
   "origenPrioridad": "CATEGORIA",
@@ -125,6 +127,8 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
 
 - `ubicacion.estado` es `CONFIRMADA` cuando el ciudadano eligió una sugerencia del geocodificador, con
   coordenadas, dirección normalizada y proveedor; si no, `PENDIENTE` y los demás campos en `null`.
+- `foto` es la ruta de la foto del problema ([`GET /api/reclamos/{numero}/foto`](#get-apireclamosnumerofoto--foto-del-reclamo)).
+  Es `null` en los reclamos creados antes de que la foto fuera obligatoria.
 - `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
   no respondió y se usó la de la categoría). `motivoPrioridad` la explica. Es `null` cuando la prioridad es
   la de la categoría sin otro análisis; con `reclamos.prioridad.estrategia: ia`, si la IA sugirió menos que
@@ -167,6 +171,22 @@ Lo devuelve el listado. Es el reclamo sin `historial` y sin `descripcion` comple
 Solo `CIUDADANO`, con el **teléfono verificado** y la cuenta sin bloquear. El reclamo queda a nombre del
 usuario de la sesión. Hasta `reclamos.uso.reclamos-por-dia` reclamos (5 por defecto) en las últimas 24 horas.
 
+**Desde el PR 16 el alta es `multipart/form-data`, con la foto obligatoria.** Lleva dos partes:
+
+| Parte | Tipo | Contenido |
+| --- | --- | --- |
+| `reclamo` | `application/json` | El JSON de abajo, el mismo de antes |
+| `foto` | `image/jpeg` o `image/png` | La foto del problema: hasta 5 MB y 4000 × 4000 píxeles |
+
+```bash
+curl -b cookies.txt -H "X-XSRF-TOKEN: $TOKEN" \
+  -F 'reclamo=<reclamo.json;type=application/json' \
+  -F 'foto=@farol.jpg;type=image/jpeg' \
+  http://localhost:8080/api/reclamos
+```
+
+El JSON de la parte `reclamo`:
+
 ```json
 {
   "categoriaId": 1,
@@ -191,16 +211,47 @@ usuario de la sesión. Hasta `reclamos.uso.reclamos-por-dia` reclamos (5 por def
 
 Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y el objeto Reclamo.
 
+**La foto:**
+
+- El formato se reconoce por el contenido, no por el nombre ni por el tipo que declara el navegador: un
+  `.txt` renombrado a `.jpg` responde `400`. GIF, WebP o HEIC también responden `400`.
+- Se **re-codifica a JPEG**. Eso borra los metadatos (EXIF): la ubicación del GPS, el modelo del teléfono y
+  la fecha no se guardan. Un PNG transparente queda sobre fondo blanco.
+- Se guarda con un nombre aleatorio que no dice nada del reclamo ni del autor.
+- No se gira según la orientación del EXIF ni se ocultan caras o patentes: ver los límites en
+  [arquitectura](arquitectura.md#foto-del-reclamo).
+- No viaja a la IA ni a RabbitMQ.
+
+**Otros resultados del alta:**
+
 - Si un área activa atiende la categoría y tiene jurisdicción sobre el barrio, el reclamo vuelve
   `ASIGNADO` con esa área.
 - Si ninguna lo cubre, vuelve `INGRESADO` con `area: null`. Sigue siendo `201`.
 
-Errores: `400` datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de
-Quilmes.`), `403 ACCESO_DENEGADO` el usuario no es ciudadano, `403 TELEFONO_NO_VERIFICADO`,
-`403 CUENTA_BLOQUEADA`, `404` usuario, barrio o categoría inexistente, `429 LIMITE_EXCEDIDO` límite diario.
+Errores:
+
+- `400`:
+  - Datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de Quilmes.`).
+  - Sin foto (`El reclamo necesita una foto del problema.`).
+  - Un archivo que no es JPEG ni PNG.
+- `403 ACCESO_DENEGADO`: el usuario no es ciudadano.
+- `403 TELEFONO_NO_VERIFICADO` y `403 CUENTA_BLOQUEADA`.
+- `404`: usuario, barrio o categoría inexistente.
+- `413 ARCHIVO_DEMASIADO_GRANDE`: la foto pesa más de 5 MB o mide más de 4000 píxeles de lado.
+- `415`: el alta llega como JSON solo, sin multipart.
+- `429 LIMITE_EXCEDIDO`: límite diario.
 
 Los controles de uso se aplican en este orden, y responde el primero que falla: teléfono verificado, cuenta
 sin bloquear, límite diario.
+
+### `GET /api/reclamos/{numero}/foto` — foto del reclamo
+
+La foto como `image/jpeg`, sin metadatos. **Mismos permisos que el detalle:** el ciudadano dueño, los
+agentes del área asignada y los administradores. Se puede usar directo en un `<img>`, porque el navegador
+manda la cookie de sesión. Responde con `Cache-Control: private, max-age=3600`.
+
+Errores: `401` sin sesión; `403` el reclamo no es del usuario ni de su área; `404` el reclamo no existe o no
+tiene foto (es anterior a la foto obligatoria).
 
 ### `GET /api/reclamos/{numero}` — consultar un reclamo
 

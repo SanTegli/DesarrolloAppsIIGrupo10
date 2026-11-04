@@ -14,12 +14,20 @@ spring:
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
     publisher-confirm-type: correlated   # un mensaje cuenta como publicado cuando el broker lo confirma
+  # Alta con foto (PR 16): el contenedor corta antes de leer un archivo de más de 5 MB.
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
   # El backend usa Spring Web Services solo como cliente (CoberturaSoap): no publica servicios SOAP.
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.webservices.WebServicesAutoConfiguration
 
 server:
   port: 8080
+  # Tomcat lee hasta 10 MB de un pedido rechazado por tamaño, así responde 413 en vez de cortar la conexión.
+  tomcat:
+    max-swallow-size: 10MB
   servlet:
     # Sesión del login: la cookie JSESSIONID es HttpOnly (JavaScript no la lee) y SameSite=Lax (otro sitio no
     # la manda en un POST). Sin actividad, la sesión vence a los 30 minutos.
@@ -74,6 +82,12 @@ reclamos:
     token: ${TELEGRAM_BOT_TOKEN:}
     usuario-bot: ${TELEGRAM_BOT_USUARIO:}
     intervalo-ms: 2000
+  # Foto del reclamo (PR 16): JPEG o PNG, re-codificada a JPEG sin metadatos. En Compose, el volumen /data/fotos.
+  fotos:
+    directorio: ${RECLAMOS_FOTOS_DIRECTORIO:datos/fotos}
+    tamano-maximo: 5MB
+    lado-maximo: 4000
+    calidad: 0.85
   # Avisos por correo: outbox + RabbitMQ + servicio-notificaciones. Apagada sin broker; Compose la enciende.
   mensajeria:
     habilitada: false

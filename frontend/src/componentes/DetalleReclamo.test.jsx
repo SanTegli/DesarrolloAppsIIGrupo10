@@ -51,6 +51,21 @@ describe('DetalleReclamo', () => {
     expect(screen.getByText('Belgrano 450, Bernal')).toBeInTheDocument()
   })
 
+  it('muestra la foto del reclamo con enlace para verla completa', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: reclamo() })
+
+    const foto = await screen.findByRole('img', { name: 'Foto del problema' })
+    expect(foto).toHaveAttribute('src', '/api/reclamos/REC-4F2A91BC/foto')
+    expect(foto.closest('a')).toHaveAttribute('href', '/api/reclamos/REC-4F2A91BC/foto')
+  })
+
+  it('un reclamo anterior a la foto obligatoria lo dice', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: reclamo({ foto: null }) })
+
+    expect(await screen.findByText('Este reclamo no tiene foto.')).toBeInTheDocument()
+    expect(screen.queryByRole('img')).not.toBeInTheDocument()
+  })
+
   it('con la ubicación pendiente avisa que no está en el mapa', async () => {
     mostrar(ana, { [`GET ${RUTA}`]: reclamo() })
 

@@ -57,7 +57,7 @@ flowchart LR
 | Contenedor | Imagen | Puerto publicado | Qué contiene |
 | --- | --- | --- | --- |
 | `reclamos-frontend` | `nginx:1.27-alpine`, construida desde `frontend/Dockerfile` | 5173 | Interfaz React compilada y proxy de `/api` |
-| `reclamos-backend` | `eclipse-temurin:21-jre`, construida desde `backend/Dockerfile` | 8080 | `reclamos-app.jar`, que incluye los cuatro módulos Maven |
+| `reclamos-backend` | `eclipse-temurin:21-jre`, construida desde `backend/Dockerfile` | 8080 | `reclamos-app.jar`, que incluye los cuatro módulos Maven. Las fotos de los reclamos quedan en el volumen `reclamos-fotos` (`/data/fotos`) |
 | `reclamos-mysql` | `mysql:8.4` | 3306 | Base de datos, con los datos en un volumen |
 | `servicio-cobertura` | `eclipse-temurin:21-jre`, construida desde `servicios/servicio-cobertura/Dockerfile` | 8081 | Servicio SOAP de cobertura; el WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` |
 | `servicio-prioridad` | `eclipse-temurin:21-jre`, construida desde `servicios/servicio-prioridad/Dockerfile` | 8082 | Servicio de prioridad con IA (REST 2); Swagger UI en `http://localhost:8082/swagger-ui.html` |
@@ -142,6 +142,10 @@ contenedor está en el perfil `verificacion`, así que `docker compose up` no lo
 | `JAVA_TOOL_OPTIONS` | `docker-compose.yml`, en cada servicio Java | Tope de heap y recolector serial (ver «Arranque, salud y memoria») |
 | `server.servlet.session.*` | `application.yml` del backend | Sesión del login: vence a los 30 minutos sin uso; cookie `JSESSIONID` `HttpOnly` y `SameSite=Lax` |
 | `springdoc.swagger-ui.csrf.enabled` | `application.yml` del backend | Swagger UI manda el token CSRF, así se puede probar con el login |
+| `reclamos.fotos.directorio` | `application.yml` (`datos/fotos`); `RECLAMOS_FOTOS_DIRECTORIO` en Compose (`/data/fotos`, volumen `reclamos-fotos`) | Dónde se guardan las fotos de los reclamos. En los tests, un directorio temporal |
+| `reclamos.fotos.tamano-maximo`, `lado-maximo`, `calidad` | `application.yml` | 5 MB, 4000 píxeles de lado y calidad 0,85 del JPEG re-codificado |
+| `spring.servlet.multipart.*`, `server.tomcat.max-swallow-size` | `application.yml` del backend | El contenedor corta en 5 MB por archivo y responde 413 en lugar de cortar la conexión |
+| `client_max_body_size` | `frontend/nginx.conf` | nginx deja pasar hasta 6 MB a `/api`; por defecto corta en 1 MB |
 | `reclamos.uso.*` | `application.yml`; `RECLAMOS_USO_RECLAMOS_POR_DIA` en Compose | Reclamos por día (5; Compose lo sube a 20 para la demo), códigos de verificación por hora (3) y vigencia del código (10 minutos) |
 | `reclamos.reaperturas.*` | `application.yml` | Máximo de reaperturas (1) y plazo desde la última resolución (7 días) |
 | `RECLAMOS_TELEGRAM_MODO` | `.env`, leído por Compose; contenedor del backend | `simulado` (por defecto, sin bot) o `telegram` |

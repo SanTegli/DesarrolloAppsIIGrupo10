@@ -386,30 +386,54 @@ Invoke-RestMethod http://localhost:8080/api/reclamos -WebSession $ana.Sesion
 
 `CrearReclamoRequest` lleva `categoriaId`, `barrioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
 
+Desde el PR 16 el alta lleva **foto obligatoria** y va como `multipart/form-data`: la parte `reclamo` con el JSON (tipo `application/json`) y la parte `foto` (JPEG o PNG, hasta 5 MB). `Invoke-RestMethod -Form` no deja poner el tipo de la parte `reclamo`, así que esta función arma el formulario con `HttpClient` y usa las cookies de la sesión de `Entrar`. Hay una foto de ejemplo en `docs/evidencias/fotos/farol-ejemplo.jpg`.
+
 ```powershell
-$body = @{
+Add-Type -AssemblyName System.Net.Http
+
+function CrearReclamo($usuario, $reclamo, $rutaFoto) {
+    $manejador = [System.Net.Http.HttpClientHandler]::new()
+    $manejador.CookieContainer = $usuario.Sesion.Cookies
+    $cliente = [System.Net.Http.HttpClient]::new($manejador)
+    $cliente.DefaultRequestHeaders.Add("X-XSRF-TOKEN", $usuario.Csrf["X-XSRF-TOKEN"])
+    $formulario = [System.Net.Http.MultipartFormDataContent]::new()
+    $json = [System.Net.Http.StringContent]::new(($reclamo | ConvertTo-Json -Depth 5),
+        [System.Text.Encoding]::UTF8, "application/json")
+    $formulario.Add($json, "reclamo")
+    $foto = [System.Net.Http.ByteArrayContent]::new([System.IO.File]::ReadAllBytes((Resolve-Path $rutaFoto)))
+    $foto.Headers.ContentType = [System.Net.Http.Headers.MediaTypeHeaderValue]::Parse("image/jpeg")
+    $formulario.Add($foto, "foto", [System.IO.Path]::GetFileName($rutaFoto))
+    $respuesta = $cliente.PostAsync("http://localhost:8080/api/reclamos", $formulario).Result
+    $texto = $respuesta.Content.ReadAsStringAsync().Result
+    if (-not $respuesta.IsSuccessStatusCode) { throw "HTTP $([int]$respuesta.StatusCode): $texto" }
+    return $texto | ConvertFrom-Json
+}
+```
+
+Desde la raíz del repositorio:
+
+```powershell
+$reclamo = @{
     categoriaId = 1
     barrioId = 2
     descripcion = "Farol apagado frente a la plaza"
     direccion = "Belgrano 450"
-} | ConvertTo-Json
-
-$creado = Invoke-RestMethod `
-    -Uri "http://localhost:8080/api/reclamos" `
-    -Method Post -WebSession $ana.Sesion -Headers $ana.Csrf `
-    -ContentType "application/json; charset=utf-8" `
-    -Body ([System.Text.Encoding]::UTF8.GetBytes($body))
+}
+$creado = CrearReclamo $ana $reclamo "docs\evidencias\fotos\farol-ejemplo.jpg"
 
 $creado | ConvertTo-Json -Depth 10
 $numero = $creado.numero
 
 Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero" -WebSession $ana.Sesion | ConvertTo-Json -Depth 10
 Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/notificaciones" -WebSession $ana.Sesion | ConvertTo-Json -Depth 10
+Invoke-WebRequest "http://localhost:8080/api/reclamos/$numero/foto" -WebSession $ana.Sesion -OutFile foto-servida.jpg
 ```
+
+`foto-servida.jpg` es la foto re-codificada a JPEG, sin los datos EXIF (ubicación del GPS, modelo del teléfono). La ve quien puede ver el detalle: con la sesión de Bruno Díaz responde `403`. Con un archivo que no es JPEG ni PNG, el alta responde `400`; con más de 5 MB, `413`; enviado como JSON solo, como antes del PR 16, `415`.
 
 El POST responde **201 Created**, con `Location: /api/reclamos/{numero}`. Con la semilla y las Strategies predeterminadas, queda `ASIGNADO` a Alumbrado, prioridad `MEDIA`, agente `null`, dos registros de historial y tres notificaciones `INTERNO`: ingreso y asignación para el ciudadano, y el aviso de asignación para la agente de Alumbrado. El número real es generado; reutilizar `$numero`, sin copiar uno ficticio.
 
-Sin `-Headers $ana.Csrf`, el POST responde `403 CSRF_INVALIDO`: es la protección que evita que otro sitio cree reclamos con la sesión del vecino.
+Sin el encabezado `X-XSRF-TOKEN`, el POST responde `403 CSRF_INVALIDO`: es la protección que evita que otro sitio cree reclamos con la sesión del vecino.
 
 Para probar falta de cobertura, usar categoría 1 y barrio 3: queda `INGRESADO`, `area: null`, un historial y una notificación de ingreso; también responde 201. El administrador puede asignarlo manualmente.
 
@@ -587,9 +611,10 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 
 | Método | Ruta | Uso |
 | --- | --- | --- |
-| POST | `/api/reclamos` | Crear como ciudadano. |
+| POST | `/api/reclamos` | Crear como ciudadano: `multipart/form-data` con las partes `reclamo` (JSON) y `foto` (JPEG o PNG, hasta 5 MB). |
 | GET | `/api/reclamos` | Listar según rol; filtro `estado` para todos, `areaId` y `ciudadanoId` solo administrador. |
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
+| GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle. |
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
 | GET | `/api/reclamos/{numero}/notificaciones` | Consultar avisos del reclamo con los mismos permisos del detalle. |
@@ -620,12 +645,13 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 | 403 | `ACCESO_DENEGADO` | Rol no habilitado, reclamo de otro ciudadano/área o filtros administrativos sin permiso. |
 | 403 | `TELEFONO_NO_VERIFICADO` | Un ciudadano sin teléfono verificado intenta crear o reabrir. |
 | 403 | `CUENTA_BLOQUEADA` | Un ciudadano bloqueado intenta crear, reabrir o verificar el teléfono. |
+| 413 | `ARCHIVO_DEMASIADO_GRANDE` | La foto pesa más de 5 MB o mide más de 4000 píxeles de lado. |
 | 429 | `LIMITE_EXCEDIDO` | Más de 5 reclamos en 24 horas o más de 3 códigos de verificación en una hora. |
 | 404 | `RECURSO_NO_ENCONTRADO` | Usuario, reclamo, categoría, barrio, área o ruta inexistente. |
 | 409 | `REGLA_NEGOCIO` | Transición inexistente, ciudadano inactivo al crear, área inactiva o igual a la actual al asignar, reapertura fuera de límite o número verificado en otra cuenta. |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo al mismo tiempo; volver a cargarlo. |
 | 405 | `METODO_NO_PERMITIDO` | Método HTTP no admitido por el recurso. |
-| 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | Tipo de contenido no soportado; enviar JSON en las escrituras. |
+| 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | Tipo de contenido no soportado: el alta va como `multipart/form-data` y las demás escrituras en JSON. |
 | 500 | `ERROR_INTERNO` | Fallo inesperado; revisar los logs del backend. |
 
 `ErrorResponse` contiene `status`, `codigo`, `mensaje`, `detalles`, `ruta` y `fecha`. Las validaciones pueden incluir un detalle por campo; otros errores normalmente devuelven `detalles: []`. Al cambiar estados se verifica primero que la transición exista: puede prevalecer 409 sobre 403. Un filtro administrativo con ID inexistente devuelve un listado vacío, no necesariamente 404.

@@ -35,6 +35,17 @@ export const RECLAMO_DE_PRUEBA = {
     'Verificación de la demo: el farol de la esquina está apagado hace tres noches y la cuadra queda a oscuras.',
 }
 
+// Foto del alta (PR 16): un JPEG de 32 × 24 píxeles, dibujado para la demo (un farol de noche).
+export const FOTO_DE_PRUEBA = Buffer.from(
+  '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAA0JCgsKCA0LCgsODg0PEyAVExISEyccHhcgLikxMC4pLSwzOko+MzZGNywtQFdBRkxO' +
+    'UlNSMj5aYVpQYEpRUk//2wBDAQ4ODhMREyYVFSZPNS01T09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09PT09P' +
+    'T09PT09PT0//wAARCAAYACADASIAAhEBAxEB/8QAGQABAAMBAQAAAAAAAAAAAAAAAAIFBgME/8QAKBAAAQMCBAQHAAAAAAAAAAAA' +
+    'AQACAxEhBBIxYRORofAUI0FTgpLh/8QAFgEBAQEAAAAAAAAAAAAAAAAAAQIA/8QAGhEBAAIDAQAAAAAAAAAAAAAAAAERAgNBE//a' +
+    'AAwDAQACEQMRAD8AxGRT8NKdIn/Uq4EUbsIDHhoiAyjnmzg61aCt/wBK98TcO98Qw0nCmA1aw1JpfX5JndXD5srkTJsr0Fr4QyOK' +
+    'IZYjmL2gEnY+pU5X4eQOc7DzZi2lngDSmgCqdlcTGNuPGdUedJp15oJn2rNJv3VEUkEz7Vmk37qnGf70mvTmiLM//9k=',
+  'base64',
+)
+
 const COLA_AVISOS = 'notificaciones.email'
 const COLA_ERRORES = 'notificaciones.email.dlq'
 const EXCHANGE = 'reclamos.eventos'
@@ -173,11 +184,16 @@ export async function verificarDemo(config, informar = () => {}) {
         direccionNormalizada: sugerencia.direccionNormalizada,
       }
     }
+    // Desde el PR 16 el alta es multipart: el JSON en la parte "reclamo" y la foto. Sin Content-Type a mano:
+    // fetch lo arma con el separador.
+    const formulario = new FormData()
+    formulario.append('reclamo', new Blob([JSON.stringify(cuerpo)], { type: 'application/json' }))
+    formulario.append('foto', new Blob([FOTO_DE_PRUEBA], { type: 'image/jpeg' }), 'farol.jpg')
     try {
       reclamo = await http.json(config.backendUrl + '/api/reclamos', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
-        body: JSON.stringify(cuerpo),
+        headers: { 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
+        body: formulario,
         esperado: 201,
       })
     } catch (error) {
@@ -197,6 +213,17 @@ export async function verificarDemo(config, informar = () => {}) {
   await paso(anotar, 'Prioridad con IA', async () => revisarPrioridad(reclamo))
   await paso(anotar, 'Área por SOAP', async () => revisarArea(reclamo))
   await paso(anotar, 'Ubicación', async () => revisarUbicacion(reclamo, sugerencia))
+  await paso(anotar, 'Foto', async () => {
+    if (!reclamo.foto) {
+      return [FALLA, 'el reclamo no tiene foto: el alta no la guardó']
+    }
+    const respuesta = await http.binario(config.backendUrl + reclamo.foto)
+    const [tipo, bytes] = respuesta
+    if (!tipo.startsWith('image/jpeg') || bytes[0] !== 0xff || bytes[1] !== 0xd8) {
+      return [FALLA, `la foto no volvió como JPEG (${tipo})`]
+    }
+    return [OK, `JPEG de ${bytes.length} bytes, servido con la sesión de la ciudadana`]
+  })
 
   // 4. Mensajería: la outbox publica cada 2 s y el consumidor manda el correo.
   await paso(anotar, 'Correo por RabbitMQ', async () => {
@@ -339,6 +366,10 @@ function clienteHttp(config) {
     rabbit,
     tokenCsrf: () => cookies.get('XSRF-TOKEN'),
     texto: async (url, opciones) => (await pedir(url, opciones)).text(),
+    binario: async (url, opciones) => {
+      const respuesta = await pedir(url, opciones)
+      return [respuesta.headers.get('content-type') ?? '', new Uint8Array(await respuesta.arrayBuffer())]
+    },
     json: async (url, opciones) => (await pedir(url, opciones)).json(),
   }
 }

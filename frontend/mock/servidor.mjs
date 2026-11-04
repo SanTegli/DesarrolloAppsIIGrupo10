@@ -6,6 +6,8 @@
 // X-XSRF-TOKEN). Los siete usuarios de la semilla entran con la contraseña demo1234.
 // La verificación del teléfono funciona siempre en modo simulado (sin Telegram); Ana y Bruno ya lo tienen
 // verificado. Límites como en el backend: 5 reclamos por día, 3 códigos por hora y una reapertura en 7 días.
+// El alta es multipart con la foto obligatoria (JPEG o PNG, hasta 5 MB). A diferencia del backend, la foto se
+// guarda tal cual, en memoria: no se re-codifica ni se le borran los metadatos.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -60,6 +62,9 @@ const codigos = []
 const sesiones = new Map()
 const reclamos = []
 const notificaciones = []
+// número de reclamo -> { bytes, tipo }
+const fotos = new Map()
+const MAXIMO_FOTO = 5 * 1024 * 1024
 
 // Respuestas fijas en lugar de Georef: "Belgrano" devuelve dos opciones, "caido" simula Georef sin responder
 // y cualquier otra dirección, ninguna. Las coordenadas son las que devolvió Georef para Belgrano 450.
@@ -334,6 +339,7 @@ function detalle(usuario, reclamo) {
     ...resumen(reclamo),
     descripcion: reclamo.descripcion,
     ubicacion: reclamo.ubicacion,
+    foto: fotos.has(reclamo.numero) ? `/api/reclamos/${reclamo.numero}/foto` : null,
     origenPrioridad: reclamo.origenPrioridad,
     motivoPrioridad: reclamo.motivoPrioridad,
     agente: referenciaUsuario(usuarios.find((u) => u.id === reclamo.agenteId)),
@@ -529,6 +535,54 @@ function listar(usuario, consulta) {
     .map(resumen)
 }
 
+// Alta multipart: la parte "reclamo" (JSON) y la parte "foto". El formato se reconoce por los primeros bytes.
+async function leerAlta(peticion) {
+  const tipo = peticion.headers['content-type'] ?? ''
+  if (!tipo.startsWith('multipart/form-data')) {
+    throw new ErrorHttp(415, 'TIPO_CONTENIDO_NO_SOPORTADO', 'El tipo de contenido enviado no está soportado para este recurso.')
+  }
+  const trozos = []
+  let total = 0
+  for await (const trozo of peticion) {
+    total += trozo.length
+    if (total > MAXIMO_FOTO + 1024 * 1024) {
+      throw new ErrorHttp(413, 'ARCHIVO_DEMASIADO_GRANDE', 'La foto pesa demasiado. Sacala con menos resolución o recortala.')
+    }
+    trozos.push(trozo)
+  }
+  let formulario
+  try {
+    formulario = await new Request('http://local/', {
+      method: 'POST',
+      headers: { 'content-type': tipo },
+      body: Buffer.concat(trozos),
+    }).formData()
+  } catch {
+    throw invalido('El formulario con la foto no se pudo leer.')
+  }
+  const parteReclamo = formulario.get('reclamo')
+  let cuerpo
+  try {
+    cuerpo = JSON.parse(typeof parteReclamo === 'string' ? parteReclamo : await parteReclamo.text())
+  } catch {
+    throw invalido('Faltan datos obligatorios o su formato es invalido.')
+  }
+  const archivo = formulario.get('foto')
+  if (!archivo || typeof archivo === 'string') throw invalido('El reclamo necesita una foto del problema.')
+  const bytes = Buffer.from(await archivo.arrayBuffer())
+  if (bytes.length === 0) throw invalido('La foto está vacía.')
+  if (bytes.length > MAXIMO_FOTO) {
+    throw new ErrorHttp(413, 'ARCHIVO_DEMASIADO_GRANDE', 'La foto pesa más de 5 MB. Sacala con menos resolución o recortala.')
+  }
+  const esJpeg = bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+  const esPng = bytes.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (!esJpeg && !esPng) {
+    const otraImagen = bytes.subarray(0, 4).toString('latin1').startsWith('GIF8') || (bytes[0] === 0x42 && bytes[1] === 0x4d)
+    throw invalido(otraImagen ? 'La foto tiene que ser JPEG o PNG.' : 'El archivo no es una imagen JPEG o PNG válida.')
+  }
+  return { cuerpo, foto: { bytes, tipo: esJpeg ? 'image/jpeg' : 'image/png' } }
+}
+
 async function leerCuerpo(peticion) {
   let texto = ''
   for await (const parte of peticion) texto += parte
@@ -609,10 +663,18 @@ async function atender(peticion, contexto) {
     const usuario = usuarioDe(contexto)
     if (partes.length === 2 && metodo === 'GET') return [200, listar(usuario, url.searchParams)]
     if (partes.length === 2 && metodo === 'POST') {
-      const reclamo = crear(usuario, await leerCuerpo(peticion))
+      const { cuerpo, foto } = await leerAlta(peticion)
+      const reclamo = crear(usuario, cuerpo)
+      fotos.set(reclamo.numero, foto)
       return [201, detalle(usuario, reclamo), { Location: `/api/reclamos/${reclamo.numero}` }]
     }
     if (partes.length === 3 && metodo === 'GET') return [200, detalle(usuario, reclamoVisible(usuario, partes[2]))]
+    if (partes.length === 4 && metodo === 'GET' && partes[3] === 'foto') {
+      const reclamo = reclamoVisible(usuario, partes[2])
+      const foto = fotos.get(reclamo.numero)
+      if (!foto) throw new ErrorHttp(404, 'RECURSO_NO_ENCONTRADO', `El reclamo ${reclamo.numero} no tiene foto.`)
+      return [200, foto.bytes, { 'Content-Type': foto.tipo, 'Cache-Control': 'private, max-age=3600' }]
+    }
     if (partes.length === 4 && metodo === 'GET' && partes[3] === 'notificaciones') {
       const reclamo = reclamoVisible(usuario, partes[2])
       const lista = notificaciones
@@ -673,6 +735,9 @@ createServer(async (peticion, respuesta) => {
   if (status === 204) {
     respuesta.writeHead(status, encabezados)
     respuesta.end()
+  } else if (Buffer.isBuffer(cuerpo)) {
+    respuesta.writeHead(status, encabezados)
+    respuesta.end(cuerpo)
   } else {
     respuesta.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8', ...encabezados })
     respuesta.end(JSON.stringify(cuerpo))

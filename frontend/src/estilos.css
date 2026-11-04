@@ -649,3 +649,66 @@ td .secundario {
 .codigo-verificacion .formulario {
   width: 100%;
 }
+
+/* Foto del reclamo */
+.campo-foto {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campo-foto .ayuda-campo {
+  margin: 0;
+}
+
+input[type='file'] {
+  font: inherit;
+  color: var(--tinta);
+  padding: 8px 10px;
+  border: 1px dashed #8e9a94;
+  border-radius: var(--radio);
+  background: var(--superficie);
+  width: 100%;
+}
+
+input[type='file']::file-selector-button {
+  font: inherit;
+  font-weight: 600;
+  margin-right: 12px;
+  padding: 6px 12px;
+  border: 1px solid var(--primario);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--primario);
+  cursor: pointer;
+}
+
+.error-campo {
+  color: var(--peligro);
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.vista-previa {
+  max-width: 240px;
+  max-height: 180px;
+  border-radius: var(--radio);
+  border: 1px solid var(--borde);
+  object-fit: cover;
+}
+
+.foto-reclamo {
+  display: inline-block;
+  margin: 4px 0 8px;
+}
+
+.foto-reclamo img {
+  display: block;
+  max-width: 100%;
+  width: 360px;
+  max-height: 270px;
+  object-fit: cover;
+  border-radius: var(--radio);
+  border: 1px solid var(--borde);
+  background: var(--fondo);
+}

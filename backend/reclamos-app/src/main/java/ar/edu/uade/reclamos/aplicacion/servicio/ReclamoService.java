@@ -80,6 +80,17 @@ public class ReclamoService {
     @Transactional
     public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
                          Ubicacion ubicacion) {
+        return crear(usuarioId, categoriaId, barrioId, descripcion, direccion, ubicacion, null);
+    }
+
+    /**
+     * Alta con la foto ya validada y guardada como pendiente por {@code ServicioFotos}.
+     *
+     * @param referenciaFoto la referencia en el almacén de fotos; {@code null} solo desde los tests de servicio
+     */
+    @Transactional
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+                         Ubicacion ubicacion, String referenciaFoto) {
         Ciudadano ciudadano = permisos.validarCreacion(usuario(usuarioId));
         controles.antesDeCrear(ciudadano, ahora());
         Categoria categoria = categorias.buscarPorId(categoriaId)
@@ -88,6 +99,9 @@ public class ReclamoService {
                 .orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
         Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
         reclamo.registrarUbicacion(ubicacion);
+        if (referenciaFoto != null) {
+            reclamo.registrarFoto(referenciaFoto);
+        }
         PrioridadCalculada calculada = prioridad.calcular(reclamo);
         reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
         asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());

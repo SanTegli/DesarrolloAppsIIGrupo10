@@ -105,6 +105,8 @@
       <basic name="origenPrioridad"><column name="origen_prioridad" nullable="true" length="16"/><enumerated>STRING</enumerated></basic>
       <basic name="motivoPrioridad"><column name="motivo_prioridad" nullable="true" length="300"/></basic>
       <basic name="asignacionPendiente"><column name="asignacion_pendiente" nullable="false"/></basic>
+      <!-- PR 16: referencia al archivo en el almacén de fotos; nula en los reclamos anteriores. -->
+      <basic name="foto"><column name="foto" nullable="true" length="64"/></basic>
       <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
       <basic name="fechaLimite"><column name="fecha_limite" nullable="false"/></basic>
       <!-- Bloqueo optimista: una copia desactualizada del reclamo no pisa el cambio de otra operación. -->

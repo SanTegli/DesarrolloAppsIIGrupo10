@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Fotos.alta;
 import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -160,11 +161,9 @@ class AsignacionPorSoapIntegrationTest {
     }
 
     private ResultActions crearReclamo() throws Exception {
-        return mvc.perform(post("/api/reclamos").with(como(ciudadano))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+        return mvc.perform(alta("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Pozo en la calle",
-                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)));
+                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)).with(como(ciudadano)));
     }
 
     private static HttpServer iniciarServidorSoap() {

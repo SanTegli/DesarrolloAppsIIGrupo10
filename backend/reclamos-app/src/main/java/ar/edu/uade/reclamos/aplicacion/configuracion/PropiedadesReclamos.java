@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.aplicacion.configuracion;
 
 import java.time.Duration;
+import org.springframework.util.unit.DataSize;
 import java.util.Map;
 import java.util.Optional;
 import org.springframework.boot.context.properties.ConfigurationProperties;
@@ -16,7 +17,8 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                                   @DefaultValue Vencimientos vencimientos, @DefaultValue Cobertura cobertura,
                                   @DefaultValue Geocodificacion geocodificacion,
                                   @DefaultValue Mensajeria mensajeria, @DefaultValue Uso uso,
-                                  @DefaultValue Reaperturas reaperturas, @DefaultValue Telegram telegram) {
+                                  @DefaultValue Reaperturas reaperturas, @DefaultValue Telegram telegram,
+                                  @DefaultValue Fotos fotos) {
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -238,6 +240,34 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
         public String toString() {
             return "Telegram[modo=" + modo + ", usuarioBot=" + usuarioBot + ", token="
                     + (token == null || token.isBlank() ? "sin definir" : "****") + "]";
+        }
+    }
+
+    /**
+     * Foto del reclamo (PR 16).
+     *
+     * @param directorio   dónde se guardan las fotos; en Compose, el volumen {@code /data/fotos}
+     * @param tamanoMaximo peso máximo del archivo subido
+     * @param ladoMaximo   ancho y alto máximos en píxeles, para no decodificar imágenes gigantes
+     * @param calidad      calidad del JPEG re-codificado, entre 0 y 1
+     */
+    public record Fotos(@DefaultValue("datos/fotos") String directorio,
+                        @DefaultValue("5MB") DataSize tamanoMaximo,
+                        @DefaultValue("4000") int ladoMaximo,
+                        @DefaultValue("0.85") float calidad) {
+        public Fotos {
+            if (directorio == null || directorio.isBlank()) {
+                throw new IllegalArgumentException("reclamos.fotos.directorio no puede estar vacío");
+            }
+            if (tamanoMaximo == null || tamanoMaximo.toBytes() <= 0) {
+                throw new IllegalArgumentException("reclamos.fotos.tamano-maximo debe ser mayor que cero");
+            }
+            if (ladoMaximo < 1) {
+                throw new IllegalArgumentException("reclamos.fotos.lado-maximo debe ser mayor que cero");
+            }
+            if (calidad <= 0 || calidad > 1) {
+                throw new IllegalArgumentException("reclamos.fotos.calidad debe estar entre 0 y 1");
+            }
         }
     }
 

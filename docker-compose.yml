@@ -152,8 +152,12 @@ services:
       TELEGRAM_BOT_USUARIO: ${TELEGRAM_BOT_USUARIO:-}
       # La demo crea varios reclamos seguidos con la misma cuenta: se sube el límite diario (5 por defecto).
       RECLAMOS_USO_RECLAMOS_POR_DIA: ${RECLAMOS_USO_RECLAMOS_POR_DIA:-20}
+      # Fotos de los reclamos (PR 16): en un volumen, así sobreviven a recrear el contenedor.
+      RECLAMOS_FOTOS_DIRECTORIO: /data/fotos
       JAVA_TOOL_OPTIONS: -Xmx512m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires
+    volumes:
+      - reclamos-fotos:/data/fotos
     ports:
       - "8080:8080"
     # Sano cuando Spring Boot ya abrió el puerto. La imagen no trae curl: bash prueba la conexión.
@@ -198,5 +202,6 @@ services:
 
 volumes:
   reclamos-mysql-data:
+  reclamos-fotos:
   reclamos-rabbitmq-data:
   notificaciones-datos:

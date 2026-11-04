@@ -44,13 +44,18 @@ class OpenApiTest {
                 "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
                 "/api/auth/logout", "/api/verificacion-telefono", "/api/verificacion-telefono/simulada",
-                "/api/usuarios/{id}/bloqueo");
+                "/api/usuarios/{id}/bloqueo", "/api/reclamos/{numero}/foto");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();
         assertThat(contrato.at("/components/schemas/CrearReclamoRequest/properties").has("ubicacion")).isTrue();
         assertThat(contrato.at("/components/schemas/SugerenciasUbicacionResponse/properties").has("disponible"))
                 .isTrue();
+
+        // Desde el PR 16 el alta es multipart, con la parte reclamo en JSON y la foto.
+        assertThat(contrato.at("/paths/~1api~1reclamos/post/requestBody/content").has("multipart/form-data"))
+                .isTrue();
+        assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("foto")).isTrue();
 
         JsonNode cambiarEstado = contrato.at("/paths/~1api~1reclamos~1{numero}~1estado/patch");
         for (String codigo : List.of("200", "400", "401", "403", "404", "409", "500")) {

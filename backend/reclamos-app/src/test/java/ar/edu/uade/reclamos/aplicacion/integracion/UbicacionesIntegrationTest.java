@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Fotos.alta;
 import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
@@ -193,11 +194,9 @@ class UbicacionesIntegrationTest {
     }
 
     private ResultActions crear(String ubicacion) throws Exception {
-        return mvc.perform(post("/api/reclamos").with(como(ciudadano))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("""
+        return mvc.perform(alta("""
                         {"categoriaId": %d, "barrioId": %d, "descripcion": "Pozo en la calle",
-                         "direccion": "Belgrano 450"%s}""".formatted(categoria, barrio, ubicacion)));
+                         "direccion": "Belgrano 450"%s}""".formatted(categoria, barrio, ubicacion)).with(como(ciudadano)));
     }
 
     private static HttpServer iniciarServidor() {
