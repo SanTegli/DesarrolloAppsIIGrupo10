@@ -10,6 +10,7 @@
 // guarda tal cual, en memoria: no se re-codifica ni se le borran los metadatos.
 // Posibles duplicados y apoyos (PR 17): al arrancar hay un reclamo de Bruno sobre un farol en Belgrano 450,
 // Bernal, ubicado en el mapa. Si Ana reclama lo mismo eligiendo esa dirección, aparece como posible duplicado.
+// Tableros (PR 18): GET /api/dashboard/publico (sin sesión) y /api/dashboard/gestion.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -301,6 +302,84 @@ function cambiarApoyo(usuario, numero, apoyar) {
   }
   if (!apoyar) apoyos.delete(clave)
   return { numero, cantidadApoyos: cantidadApoyos(numero), apoyado: apoyos.has(clave) }
+}
+
+// Tableros (PR 18), con las mismas reglas que ServicioTablero.
+const PENDIENTES = ['INGRESADO', 'ASIGNADO', 'EN_PROCESO']
+const porcentaje = (parte, total) => (total === 0 ? null : Math.round((parte * 1000) / total) / 10)
+const sumarDias = (dia, dias) => new Date(Date.parse(`${dia}T00:00:00Z`) + dias * 86400000).toISOString().slice(0, 10)
+
+function tableroPublico(consulta) {
+  const fecha = /^\d{4}-\d{2}-\d{2}$/
+  const hoy = ahora().slice(0, 10)
+  const hasta = consulta.get('hasta') || hoy
+  const desde = consulta.get('desde') || sumarDias(hasta, -29)
+  if (!fecha.test(desde) || !fecha.test(hasta)) throw invalido('Los parametros recibidos no son validos.')
+  if (desde > hasta) throw invalido('La fecha desde no puede ser posterior a la fecha hasta.')
+  if (sumarDias(desde, 365) < hasta) throw invalido('El período puede tener como máximo 366 días.')
+  const barrioId = consulta.get('barrioId') ? Number(consulta.get('barrioId')) : null
+  const categoriaId = consulta.get('categoriaId') ? Number(consulta.get('categoriaId')) : null
+  if (barrioId) buscar(barrios, barrioId, 'barrio')
+  if (categoriaId) buscar(categorias, categoriaId, 'categoría')
+  const filtrados = reclamos.filter(
+    (r) => (!barrioId || r.barrioId === barrioId) && (!categoriaId || r.categoriaId === categoriaId),
+  )
+  const hay = (...estados) => filtrados.filter((r) => estados.includes(r.estado)).length
+  const pendientes = hay(...PENDIENTES)
+  const resueltos = hay('RESUELTO')
+  const cerrados = hay('CERRADO')
+  const finExclusivo = sumarDias(hasta, 1)
+  return {
+    desde,
+    hasta,
+    barrioId,
+    categoriaId,
+    creadosEnPeriodo: filtrados.filter((r) => r.fechaCreacion >= desde && r.fechaCreacion < finExclusivo).length,
+    pendientes,
+    resueltos,
+    cerrados,
+    rechazados: hay('RECHAZADO'),
+    cancelados: hay('CANCELADO'),
+    porcentajeAtendidos: porcentaje(resueltos + cerrados, pendientes + resueltos + cerrados),
+  }
+}
+
+function tableroGestion(usuario) {
+  if (usuario.rol === 'CIUDADANO') throw denegado('El tablero de gestión es solo para agentes y administradores.')
+  const momento = ahora()
+  const areaId = usuario.rol === 'AGENTE_MUNICIPAL' ? usuario.areaId : null
+  const filas = new Map()
+  for (const r of reclamos) {
+    if (!PENDIENTES.includes(r.estado) || (areaId && r.areaId !== areaId)) continue
+    const clave = `${r.areaId ?? '-'}|${r.barrioId}`
+    const fila = filas.get(clave) ?? {
+      area: referencia(areas.find((a) => a.id === r.areaId)),
+      barrio: referencia(barrios.find((b) => b.id === r.barrioId)),
+      pendientes: 0,
+      vencidos: 0,
+    }
+    fila.pendientes += 1
+    if (r.fechaLimite < momento) fila.vencidos += 1
+    filas.set(clave, fila)
+  }
+  const lista = [...filas.values()].sort(
+    (a, b) =>
+      b.vencidos - a.vencidos ||
+      b.pendientes - a.pendientes ||
+      (a.area?.nombre ?? '').localeCompare(b.area?.nombre ?? '') ||
+      a.barrio.nombre.localeCompare(b.barrio.nombre),
+  )
+  const pendientes = lista.reduce((total, fila) => total + fila.pendientes, 0)
+  const vencidos = lista.reduce((total, fila) => total + fila.vencidos, 0)
+  return {
+    fecha: momento,
+    area: areaId ? referencia(areas.find((a) => a.id === areaId)) : null,
+    pendientes,
+    vencidos,
+    sinAsignar: areaId ? null : lista.filter((fila) => !fila.area).reduce((total, fila) => total + fila.pendientes, 0),
+    porcentajeVencidos: porcentaje(vencidos, pendientes),
+    filas: lista,
+  }
 }
 
 // Reaperturas: se cuentan en el historial, como Reclamo.getCantidadReaperturas.
@@ -712,6 +791,11 @@ async function atender(peticion, contexto) {
 
   if (partes[1] === 'usuarios' && partes.length === 4 && partes[3] === 'bloqueo' && metodo === 'PATCH') {
     return [200, cambiarBloqueo(usuarioDe(contexto), Number(partes[2]), await leerCuerpo(peticion))]
+  }
+
+  if (metodo === 'GET' && partes[1] === 'dashboard' && partes.length === 3) {
+    if (partes[2] === 'publico') return [200, tableroPublico(url.searchParams)]
+    if (partes[2] === 'gestion') return [200, tableroGestion(usuarioDe(contexto))]
   }
 
   if (metodo === 'GET' && partes[1] === 'ubicaciones' && partes[2] === 'sugerencias' && partes.length === 3) {

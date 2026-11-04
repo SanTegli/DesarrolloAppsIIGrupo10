@@ -512,6 +512,74 @@ viejo. Cada usuario ve solo los suyos; no hay filtros.
 
 Sin avisos devuelve `[]`. Sin sesión, `401`.
 
+## Tableros
+
+Cifras de reclamos, sin datos de personas. Salen de consultas agregadas en la base: ningún reclamo se carga
+completo ([arquitectura](arquitectura.md#tableros)).
+
+### `GET /api/dashboard/publico` — tablero público
+
+**No necesita sesión.** Parámetros opcionales:
+
+| Parámetro | Regla |
+| --- | --- |
+| `desde`, `hasta` | Días `AAAA-MM-DD`, los dos incluidos. Sin ellos, los últimos 30 días hasta hoy. Hasta 366 días |
+| `barrioId`, `categoriaId` | Filtran todas las cifras; tienen que existir |
+
+```json
+{
+  "desde": "2026-10-05",
+  "hasta": "2026-11-03",
+  "barrioId": null,
+  "categoriaId": null,
+  "creadosEnPeriodo": 5,
+  "pendientes": 3,
+  "resueltos": 1,
+  "cerrados": 1,
+  "rechazados": 0,
+  "cancelados": 1,
+  "porcentajeAtendidos": 40.0
+}
+```
+
+- `creadosEnPeriodo` cuenta los reclamos creados entre `desde` y `hasta`.
+- `pendientes` (`INGRESADO`, `ASIGNADO` o `EN_PROCESO`), `resueltos`, `cerrados`, `rechazados` y `cancelados`
+  son los de **hoy**, de cualquier fecha de creación.
+- `porcentajeAtendidos` es resueltos más cerrados sobre pendientes, resueltos y cerrados, con un decimal. Los
+  cancelados y rechazados no cuentan. **Es `null` si no hay ninguno**: la interfaz muestra "sin casos", no un
+  porcentaje.
+
+Errores: `400` fechas mal escritas, `desde` posterior a `hasta` o período de más de 366 días; `404` barrio o
+categoría inexistente.
+
+### `GET /api/dashboard/gestion` — tablero de gestión
+
+Solo `ADMINISTRADOR` (todas las áreas) y `AGENTE_MUNICIPAL` (la suya). Un ciudadano recibe `403`; sin sesión,
+`401`.
+
+```json
+{
+  "fecha": "2026-11-03T15:00:00",
+  "area": null,
+  "pendientes": 3,
+  "vencidos": 2,
+  "sinAsignar": 1,
+  "porcentajeVencidos": 66.7,
+  "filas": [
+    { "area": { "id": 1, "nombre": "Alumbrado" }, "barrio": { "id": 2, "nombre": "Bernal" }, "pendientes": 2, "vencidos": 1 },
+    { "area": null, "barrio": { "id": 2, "nombre": "Bernal" }, "pendientes": 1, "vencidos": 1 }
+  ]
+}
+```
+
+- `vencidos` se calcula **por fecha**: pendientes cuya fecha límite ya pasó, aunque la tarea de vencimientos
+  todavía no los haya marcado.
+- `sinAsignar` son los pendientes sin área (`INGRESADO`). Es `null` para un agente.
+- `area` es el área del agente; `null` para el administrador.
+- `filas` agrupa por área y barrio, primero las que tienen más vencidos. `area: null` es la fila de los que
+  todavía no tienen área.
+- `porcentajeVencidos` es `null` sin pendientes ("sin casos").
+
 ## Consultas de apoyo
 
 Las categorías, los barrios y las áreas son públicos: la interfaz los pide antes del login.

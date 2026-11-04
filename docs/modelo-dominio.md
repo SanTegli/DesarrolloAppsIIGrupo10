@@ -222,6 +222,10 @@ habilitada, además salen por correo a través de la outbox.
 | Solo un reclamo abierto y con la ubicación confirmada aparece como posible duplicado | `Reclamo.puedeSerDuplicado` |
 | Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad | Constructor de `Apoyo` |
 
+Los tableros (PR 18) no usan estas clases para contar: leen por el puerto `ConsultasTablero` (paquete
+`dominio.reporte`), que devuelve proyecciones planas (`ConteoPorEstado`, `FilaPendientes`). Ver
+[patrones](patrones.md#lado-de-lectura-para-los-tableros-domain-reporting-cqrs).
+
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
 
 ## Tablas

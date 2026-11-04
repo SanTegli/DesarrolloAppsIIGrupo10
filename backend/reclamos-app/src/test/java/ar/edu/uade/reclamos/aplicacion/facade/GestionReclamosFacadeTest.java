@@ -6,6 +6,9 @@ import ar.edu.uade.reclamos.aplicacion.EscenarioAplicacion;
 import ar.edu.uade.reclamos.aplicacion.foto.FotoSubida;
 import ar.edu.uade.reclamos.aplicacion.foto.ServicioFotos;
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
+import ar.edu.uade.reclamos.aplicacion.tablero.ServicioTablero;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroGestion;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroPublico;
 import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
 import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
@@ -29,8 +32,9 @@ class GestionReclamosFacadeTest {
     private final ServicioFotos fotos = mock(ServicioFotos.class);
     private final ServicioDuplicados duplicados = mock(ServicioDuplicados.class);
     private final ServicioApoyos apoyos = mock(ServicioApoyos.class);
+    private final ServicioTablero tablero = mock(ServicioTablero.class);
     private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
-            ubicaciones, cuentas, verificacion, fotos, duplicados, apoyos);
+            ubicaciones, cuentas, verificacion, fotos, duplicados, apoyos, tablero);
     private final FotoSubida foto = new FotoSubida(new byte[] {1, 2, 3});
 
     @Test
@@ -137,6 +141,21 @@ class GestionReclamosFacadeTest {
         when(apoyos.estado(1L, "REC-12345678")).thenReturn(estado);
 
         assertThat(facade.apoyar(1L, "REC-12345678")).isSameAs(estado);
+    }
+
+    @Test
+    void losTablerosDeleganEnSuServicio() {
+        var desde = java.time.LocalDate.of(2026, 10, 1);
+        var hasta = java.time.LocalDate.of(2026, 10, 31);
+        var publico = new TableroPublico(desde, hasta, 2L, null, 5, 3, 1, 1, 0, 0, 40.0);
+        var gestion = new TableroGestion(java.time.LocalDateTime.of(2026, 11, 1, 10, 0), null, null, 0, 0, 0L, null,
+                List.of());
+        when(tablero.publico(desde, hasta, 2L, null)).thenReturn(publico);
+        when(tablero.gestion(7L)).thenReturn(gestion);
+
+        assertThat(facade.tableroPublico(desde, hasta, 2L, null)).isSameAs(publico);
+        assertThat(facade.tableroGestion(7L)).isSameAs(gestion);
+        verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 
     @Test

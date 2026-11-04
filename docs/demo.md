@@ -59,6 +59,7 @@ contenedor en el paso «Memoria de cada contenedor».
 | 12 | Entrar como Ana, abrir el reclamo resuelto y **Reabrir** con el motivo "Sigue apagado". Que Carla lo resuelva otra vez | La segunda vez, el botón **Reabrir** ya no aparece: solo **Confirmar solución** | Reaperturas con límite (dominio) |
 | 13 | **Crear una cuenta** nueva e ir a **Crear reclamo** | Pide verificar el teléfono. Con el bot: código, enlace a Telegram y "Compartir mi teléfono". Sin bot: el número en un formulario. Repetir con el número de otra cuenta: "Ese número ya está verificado en otra cuenta" | **Segunda API externa** (Telegram), Adapter |
 | 14 | Entrar como **Elena Ruiz** → **Administración** → **Cuentas de ciudadanos** → **Bloquear** la cuenta nueva | Esa cuenta entra y ve sus reclamos, pero **Crear reclamo** muestra el aviso de cuenta bloqueada | Chain of Responsibility de los controles de uso |
+| 15 | Como Elena, pestaña **Tablero** | Tablero de gestión: pendientes, vencidos con su porcentaje, sin asignar y la tabla por área y barrio. Debajo, el público con filtros. Salir y, en la pantalla de ingreso, **Ver el tablero público**: las mismas cifras sin sesión | Lado de lectura separado (Domain Reporting, Clase 5) |
 
 Para el paso 5: la IA puede subir la prioridad de la categoría pero nunca bajarla. Si sugiere una menor, el
 detalle dice "por categoría" y el motivo lo explica. Si dice "por categoría (la IA no respondió)", el servicio
@@ -120,6 +121,7 @@ correr desde la máquina: `node scripts/verificar-demo.mjs`.
 | Georef | Que el backend devuelva sugerencias para Belgrano 450, en Bernal. Sin Internet es un **aviso**, no una falla |
 | Alta del reclamo | `POST /api/reclamos` multipart con la sesión de Ana Pérez, la sugerencia elegida y una foto JPEG chica que viene en el script: responde 201 |
 | Foto | Que `GET /api/reclamos/{numero}/foto` devuelva un JPEG con la sesión de Ana |
+| Tablero público | Que `GET /api/dashboard/publico` cuente al menos el reclamo recién creado |
 | Prioridad con IA | Que el origen sea `IA`, o `CATEGORIA` si la IA sugirió menos. `RESPALDO` es una falla: la IA no contestó |
 | Área por SOAP | Que quede asignado a un área y sin la asignación pendiente |
 | Ubicación | Que quede `CONFIRMADA` con las coordenadas elegidas |

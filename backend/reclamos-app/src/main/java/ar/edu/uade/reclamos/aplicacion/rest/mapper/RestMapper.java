@@ -2,6 +2,8 @@ package ar.edu.uade.reclamos.aplicacion.rest.mapper;
 
 import ar.edu.uade.reclamos.aplicacion.rest.dto.*;
 import ar.edu.uade.reclamos.aplicacion.servicio.CandidatoDuplicado;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroGestion;
+import ar.edu.uade.reclamos.aplicacion.tablero.TableroPublico;
 import ar.edu.uade.reclamos.aplicacion.servicio.EstadoApoyo;
 import ar.edu.uade.reclamos.aplicacion.servicio.SugerenciasUbicacion;
 import ar.edu.uade.reclamos.aplicacion.servicio.UbicacionElegida;
@@ -33,6 +35,24 @@ public class RestMapper {
                 reclamo.getDescripcion(), reclamo.getUbicacion().getDireccionNormalizada(), rutaFoto(reclamo),
                 Math.round(candidato.distanciaMetros()), candidato.apoyos(), candidato.apoyadoPorMi(),
                 candidato.propio());
+    }
+
+    public TableroPublicoResponse tableroPublico(TableroPublico tablero) {
+        return new TableroPublicoResponse(tablero.desde(), tablero.hasta(), tablero.barrioId(),
+                tablero.categoriaId(), tablero.creadosEnPeriodo(), tablero.pendientes(), tablero.resueltos(),
+                tablero.cerrados(), tablero.rechazados(), tablero.cancelados(), tablero.porcentajeAtendidos());
+    }
+
+    public TableroGestionResponse tableroGestion(TableroGestion tablero) {
+        return new TableroGestionResponse(tablero.fecha(),
+                tablero.areaId() == null ? null : new ReferenciaResponse(tablero.areaId(), tablero.area()),
+                tablero.pendientes(), tablero.vencidos(), tablero.sinAsignar(), tablero.porcentajeVencidos(),
+                tablero.filas().stream()
+                        .map(fila -> new FilaTableroResponse(
+                                fila.areaId() == null ? null : new ReferenciaResponse(fila.areaId(), fila.area()),
+                                new ReferenciaResponse(fila.barrioId(), fila.barrio()), fila.pendientes(),
+                                fila.vencidos()))
+                        .toList());
     }
 
     public ApoyoResponse apoyo(EstadoApoyo estado) {

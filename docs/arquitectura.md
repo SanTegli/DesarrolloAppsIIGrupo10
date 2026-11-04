@@ -298,6 +298,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | Teléfono verificado (segunda API externa) | `CanalVerificacion` | **Hecho (PR 15)**: `CanalTelegram`, `BotTelegram` y `ServicioVerificacionTelefono`; ver abajo | — |
 | Foto del reclamo | `AlmacenFotos` | **Hecho (PR 16)**: `ServicioFotos`, `ProcesadorFotos` y `AlmacenFotosLocal` (volumen); ver abajo | — |
 | Duplicados y apoyos | `ServicioDuplicados`, `ServicioApoyos` | **Hecho (PR 17)**: candidatos cercanos con Haversine y apoyos únicos; ver abajo | — |
+| Tableros | `ConsultasTablero` (lado de lectura) | **Hecho (PR 18)**: `ConsultasTableroJpa` y `ServicioTablero`; ver abajo | — |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
@@ -650,6 +651,42 @@ patentes. El detalle completo sigue siendo solo del autor, del área y de la adm
 **La búsqueda es una ayuda, no una regla.** Si falla, el alta sigue. La API no impide crear un reclamo
 parecido: decide el vecino. La vinculación de dos reclamos ya creados quedó fuera del alcance.
 
+### Tableros
+
+Dos tableros, con tarjetas y una tabla:
+
+- **Público:** sin sesión y sin datos de personas. Muestra los creados en el período y cuántos hay hoy pendientes,
+  resueltos y cerrados, con filtro de barrio y categoría.
+- **Gestión:** para el municipio. Muestra pendientes, vencidos por fecha, sin asignar y una tabla por área y
+  barrio. Cada agente ve solo su área.
+
+**Lado de lectura separado (Domain Reporting, CQRS: Clase 5).** Las métricas no pasan por el agregado ni por
+`ReclamoRepository`. Recorrer reclamos con el Repository para contarlos es el antipatrón que marca la clase:
+cargaría cada reclamo con su historial y sus relaciones. En su lugar hay un puerto propio, `ConsultasTablero`
+(en el dominio, paquete `reporte`), que devuelve proyecciones planas. `ConsultasTableroJpa` lo implementa
+con JPQL agregado (`count`, `sum(case …)`, `group by`) y expresiones `select new`, así la base cuenta y agrupa.
+
+```mermaid
+flowchart LR
+  UI[React: pestaña Tablero] --> TC[TableroController]
+  TC --> F[GestionReclamosFacade]
+  F --> ST[ServicioTablero<br/>período, rol y porcentajes]
+  ST --> CT[[ConsultasTablero<br/>puerto de lectura]]
+  CT -.implementa.- CJ[ConsultasTableroJpa<br/>JPQL agregado]
+  CJ --> DB[(MySQL)]
+  ST -. usuarios, barrios, categorías .-> R[[Repositories]]
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `ConsultasTablero` | Tres consultas: creados en un período, cuántos hay por estado y pendientes y vencidos por área y barrio |
+| `ConsultasTableroJpa` | JPQL con proyecciones (`ConteoPorEstado`, `FilaPendientes`); los filtros opcionales se agregan solo si vienen |
+| `ServicioTablero` | Período por defecto (30 días) y máximo (366), qué ve cada rol y los porcentajes. Si el denominador es cero, el porcentaje es `null`: "sin casos" |
+
+No hace falta un modelo de lectura aparte ni tablas denormalizadas: con los volúmenes de un municipio, las
+consultas agregadas sobre `reclamos` alcanzan. Si crecieran, el puerto permite cambiar la implementación por
+una tabla proyectada desde los eventos de dominio sin tocar el servicio ni la interfaz.
+
 ## Límites conocidos
 
 - **Correo de laboratorio.** Con la mensajería habilitada, los avisos salen por correo, pero a Mailpit, que
@@ -674,6 +711,8 @@ parecido: decide el vecino. La vinculación de dos reclamos ya creados quedó fu
   aparece como candidato. Tampoco se comparan textos ni fotos.
 - **Apoyos sin aviso.** El autor ve cuántos vecinos apoyan su reclamo en el detalle, pero no recibe un aviso
   cuando alguien lo apoya.
+- **Tableros sin historia.** El público dice cuántos reclamos hay hoy en cada estado, no cuántos había en una
+  fecha pasada. Tampoco hay gráficos ni mapas: tarjetas y una tabla.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.
 - **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.

@@ -812,3 +812,83 @@ input[type='file']::file-selector-button {
     height: 160px;
   }
 }
+
+/* Tableros (PR 18) */
+.tablero {
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.filtros-tablero {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.filtros-tablero label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+input[type='date'] {
+  font: inherit;
+  color: var(--tinta);
+  background: var(--superficie);
+  border: 1px solid #8e9a94;
+  border-radius: var(--radio);
+  padding: 7px 10px;
+  width: 100%;
+}
+
+.cifras {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.cifra {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+}
+
+.cifra-titulo {
+  color: var(--tinta-suave);
+  font-size: 0.875rem;
+}
+
+.cifra-valor {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.cifra-detalle {
+  color: var(--tinta-suave);
+  font-size: 0.8125rem;
+}
+
+th.numero,
+td.numero {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+td.vencidos {
+  color: var(--peligro);
+  font-weight: 600;
+}
+
+.ingreso-tablero {
+  margin-top: 24px;
+}

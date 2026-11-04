@@ -48,6 +48,8 @@ public class ConfiguracionSeguridad {
                 .authorizeHttpRequests(rutas -> rutas
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/registro").permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/categorias", "/api/barrios", "/api/areas").permitAll()
+                        // Tablero público (PR 18): solo cifras, sin datos personales.
+                        .requestMatchers(HttpMethod.GET, "/api/dashboard/publico").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**",
                                 "/v3/api-docs.yaml", "/error").permitAll()
                         .requestMatchers("/api/**").authenticated()
