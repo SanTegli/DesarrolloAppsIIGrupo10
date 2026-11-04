@@ -27,8 +27,10 @@ class GestionReclamosFacadeTest {
     private final ServicioCuentas cuentas = mock(ServicioCuentas.class);
     private final ServicioVerificacionTelefono verificacion = mock(ServicioVerificacionTelefono.class);
     private final ServicioFotos fotos = mock(ServicioFotos.class);
+    private final ServicioDuplicados duplicados = mock(ServicioDuplicados.class);
+    private final ServicioApoyos apoyos = mock(ServicioApoyos.class);
     private final GestionReclamosFacade facade = new GestionReclamosFacade(escritura, consultas, catalogos,
-            ubicaciones, cuentas, verificacion, fotos);
+            ubicaciones, cuentas, verificacion, fotos, duplicados, apoyos);
     private final FotoSubida foto = new FotoSubida(new byte[] {1, 2, 3});
 
     @Test
@@ -95,20 +97,46 @@ class GestionReclamosFacadeTest {
     void laFotoSeLeeConLosPermisosDelDetalle() {
         reclamo.registrarFoto("0123456789abcdef0123456789abcdef.jpg");
         byte[] jpeg = {(byte) 0xFF, (byte) 0xD8};
-        when(consultas.buscarPorNumero(1L, reclamo.getNumero())).thenReturn(reclamo);
+        when(consultas.buscarParaFoto(1L, reclamo.getNumero())).thenReturn(reclamo);
         when(fotos.leer("0123456789abcdef0123456789abcdef.jpg")).thenReturn(Optional.of(jpeg));
 
         assertThat(facade.foto(1L, reclamo.getNumero())).isSameAs(jpeg);
-        verify(consultas).buscarPorNumero(1L, reclamo.getNumero());
+        verify(consultas).buscarParaFoto(1L, reclamo.getNumero());
     }
 
     @Test
     void unReclamoSinFotoDa404() {
-        when(consultas.buscarPorNumero(1L, reclamo.getNumero())).thenReturn(reclamo);
+        when(consultas.buscarParaFoto(1L, reclamo.getNumero())).thenReturn(reclamo);
 
         assertThatThrownBy(() -> facade.foto(1L, reclamo.getNumero()))
                 .isInstanceOf(RecursoNoEncontradoException.class).hasMessageContaining("no tiene foto");
         verifyNoInteractions(fotos);
+    }
+
+    @Test
+    void candidatosYApoyosDeleganEnSusServicios() {
+        var candidatos = List.of(new CandidatoDuplicado(reclamo, 12.5, 2, false, false));
+        var estado = new EstadoApoyo("REC-12345678", 3, true);
+        when(duplicados.candidatos(1L, 2L, -34.7, -58.3, null, null)).thenReturn(candidatos);
+        when(apoyos.apoyar(1L, "REC-12345678")).thenReturn(estado);
+        when(apoyos.retirar(1L, "REC-12345678")).thenReturn(estado);
+        when(apoyos.cantidad(reclamo)).thenReturn(3L);
+
+        assertThat(facade.candidatosDuplicados(1L, 2L, -34.7, -58.3, null, null)).isSameAs(candidatos);
+        assertThat(facade.apoyar(1L, "REC-12345678")).isSameAs(estado);
+        assertThat(facade.retirarApoyo(1L, "REC-12345678")).isSameAs(estado);
+        assertThat(facade.cantidadApoyos(reclamo)).isEqualTo(3L);
+        verifyNoMoreInteractions(escritura, consultas, catalogos);
+    }
+
+    @Test
+    void unDobleClicQueChocaConLaRestriccionUnicaDevuelveElEstadoActual() {
+        var estado = new EstadoApoyo("REC-12345678", 1, true);
+        when(apoyos.apoyar(1L, "REC-12345678"))
+                .thenThrow(new org.springframework.dao.DataIntegrityViolationException("uk_apoyos_ciudadano_reclamo"));
+        when(apoyos.estado(1L, "REC-12345678")).thenReturn(estado);
+
+        assertThat(facade.apoyar(1L, "REC-12345678")).isSameAs(estado);
     }
 
     @Test

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { crearReclamo } from '../api/reclamos.js'
+import { buscarDuplicados, crearReclamo } from '../api/reclamos.js'
 import { sugerirUbicaciones } from '../api/ubicaciones.js'
 import { enlaceMapa } from '../dominio/etiquetas.js'
 import { AvisoError } from './Aviso.jsx'
+import CandidatosDuplicados from './CandidatosDuplicados.jsx'
 
 const MAXIMO_DESCRIPCION = 1000
 const MAXIMO_DIRECCION = 200
@@ -17,8 +18,10 @@ export const MAXIMO_FOTO = 5 * 1024 * 1024
  * La dirección se puede buscar en el mapa: si hay varias interpretaciones, el ciudadano elige una. Es
  * opcional: sin elegir, el reclamo se crea igual y la ubicación queda pendiente.
  * La foto es obligatoria: es la prueba del problema.
+ * Si el ciudadano marcó el punto en el mapa, antes de crear se buscan reclamos abiertos parecidos a pocos
+ * metros: si es el mismo problema, lo apoya en lugar de crear otro.
  */
-export default function FormularioReclamo({ categorias, barrios, onCreado }) {
+export default function FormularioReclamo({ categorias, barrios, onCreado, onApoyado = () => {} }) {
   const [categoriaId, setCategoriaId] = useState('')
   const [barrioId, setBarrioId] = useState('')
   const [descripcion, setDescripcion] = useState('')
@@ -31,6 +34,9 @@ export default function FormularioReclamo({ categorias, barrios, onCreado }) {
   const [foto, setFoto] = useState(null)
   const [errorFoto, setErrorFoto] = useState('')
   const vistaPrevia = useVistaPrevia(foto)
+  // Posibles duplicados para una categoría y un punto; "revisada" es la combinación que el vecino ya descartó.
+  const [duplicados, setDuplicados] = useState(null)
+  const [revisada, setRevisada] = useState(null)
 
   function elegirFoto(evento) {
     const archivo = evento.target.files?.[0] ?? null
@@ -72,6 +78,10 @@ export default function FormularioReclamo({ categorias, barrios, onCreado }) {
     }
   }
 
+  const sugerencia = elegida === NINGUNA ? null : busqueda?.sugerencias?.[Number(elegida)]
+  const clave = sugerencia ? `${categoriaId}|${sugerencia.latitud}|${sugerencia.longitud}` : null
+  const candidatosVisibles = duplicados && duplicados.clave === clave ? duplicados.candidatos : null
+
   async function enviar(evento) {
     evento.preventDefault()
     if (!foto) {
@@ -80,7 +90,39 @@ export default function FormularioReclamo({ categorias, barrios, onCreado }) {
     }
     setError(null)
     setEnviando(true)
-    const sugerencia = elegida === NINGUNA ? null : busqueda?.sugerencias?.[Number(elegida)]
+    if (clave && clave !== revisada) {
+      const candidatos = await candidatosPara(sugerencia)
+      if (candidatos.length > 0) {
+        setDuplicados({ clave, candidatos })
+        setEnviando(false)
+        return
+      }
+    }
+    await crear()
+  }
+
+  // Si la búsqueda de duplicados falla, no frena el alta: es una ayuda, no un requisito.
+  async function candidatosPara(punto) {
+    try {
+      return await buscarDuplicados({
+        categoriaId: Number(categoriaId),
+        latitud: punto.latitud,
+        longitud: punto.longitud,
+      })
+    } catch {
+      return []
+    }
+  }
+
+  async function continuar() {
+    setRevisada(clave)
+    setDuplicados(null)
+    setError(null)
+    setEnviando(true)
+    await crear()
+  }
+
+  async function crear() {
     try {
       const reclamo = await crearReclamo({
         categoriaId: Number(categoriaId),
@@ -207,8 +249,18 @@ export default function FormularioReclamo({ categorias, barrios, onCreado }) {
         {vistaPrevia && <img className="vista-previa" src={vistaPrevia} alt="Vista previa de la foto elegida" />}
       </div>
 
+      {candidatosVisibles && (
+        <CandidatosDuplicados
+          key={clave}
+          candidatos={candidatosVisibles}
+          onApoyado={onApoyado}
+          onContinuar={continuar}
+          enviando={enviando}
+        />
+      )}
+
       <div className="acciones">
-        <button type="submit" className="boton-primario" disabled={enviando}>
+        <button type="submit" className="boton-primario" disabled={enviando || candidatosVisibles !== null}>
           {enviando ? 'Creando…' : 'Crear reclamo'}
         </button>
       </div>

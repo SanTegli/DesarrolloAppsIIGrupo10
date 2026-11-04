@@ -59,6 +59,12 @@ describe('DetalleReclamo', () => {
     expect(foto.closest('a')).toHaveAttribute('href', '/api/reclamos/REC-4F2A91BC/foto')
   })
 
+  it('muestra cuántos vecinos apoyan el reclamo', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: reclamo({ cantidadApoyos: 3 }) })
+
+    expect(await screen.findByText('3 vecinos apoyan este reclamo: les pasa lo mismo.')).toBeInTheDocument()
+  })
+
   it('un reclamo anterior a la foto obligatoria lo dice', async () => {
     mostrar(ana, { [`GET ${RUTA}`]: reclamo({ foto: null }) })
 

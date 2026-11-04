@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { listarAreas, listarBarrios, listarCategorias } from './api/catalogos.js'
 import { alVencerSesion } from './api/cliente.js'
 import { cerrarSesion, usuarioActual } from './api/sesion.js'
-import { AvisoError } from './componentes/Aviso.jsx'
+import { AvisoError, AvisoExito } from './componentes/Aviso.jsx'
 import BandejaAvisos from './componentes/BandejaAvisos.jsx'
 import DetalleReclamo from './componentes/DetalleReclamo.jsx'
 import Encabezado from './componentes/Encabezado.jsx'
@@ -129,6 +129,7 @@ export default function App() {
         {usuario && vista.nombre === 'reclamos' && (
           <>
             <h2>{TITULOS_LISTADO[usuario.rol]}</h2>
+            <AvisoExito>{vista.aviso}</AvisoExito>
             <ListaReclamos
               key={usuario.id}
               usuario={usuario}
@@ -156,6 +157,12 @@ export default function App() {
           <FormularioReclamo
             categorias={catalogos.datos.categorias}
             barrios={catalogos.datos.barrios}
+            onApoyado={(numero) =>
+              setVista({
+                nombre: 'reclamos',
+                aviso: `Sumaste tu apoyo al reclamo ${numero}. No se creó un reclamo nuevo.`,
+              })
+            }
             onCreado={(reclamo) =>
               abrir(
                 reclamo.numero,

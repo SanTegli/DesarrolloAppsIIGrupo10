@@ -39,6 +39,13 @@ classDiagram
     +verificarTelefono(String, LocalDateTime)
     +tieneTelefonoVerificado() boolean
   }
+  class Apoyo {
+    -LocalDateTime fecha
+  }
+  class Distancia {
+    <<utilidad>>
+    +metros(double, double, double, double)$ double
+  }
   class CodigoVerificacion {
     -String codigo
     -LocalDateTime fechaCreacion
@@ -98,6 +105,7 @@ classDiagram
     +cambiarEstado(EstadoReclamo, Usuario, String, LocalDateTime, PoliticaReapertura)
     +getCantidadReaperturas() int
     +puedeReabrir(LocalDateTime, PoliticaReapertura) boolean
+    +puedeSerDuplicado() boolean
     +marcarVencido(LocalDateTime) boolean
     +definirPrioridad(Prioridad, OrigenPrioridad, String)
     +registrarUbicacion(Ubicacion)
@@ -150,6 +158,8 @@ classDiagram
   Entidad <|-- AreaMunicipal
   Usuario <|-- Ciudadano
   CodigoVerificacion "*" --> "1" Ciudadano
+  Apoyo "*" --> "1" Ciudadano
+  Apoyo "*" --> "1" Reclamo
   Reclamo ..> PoliticaReapertura
   Usuario <|-- AgenteMunicipal
   Usuario <|-- Administrador
@@ -209,6 +219,8 @@ habilitada, además salen por correo a través de la outbox.
 | Un teléfono se guarda en E.164, de 8 a 15 dígitos, y se muestra enmascarado | `Telefono.normalizar` y `enmascarar` |
 | Un código de verificación se usa una sola vez y antes de vencer | `CodigoVerificacion.usar` |
 | Un reclamo guarda la referencia a su foto una sola vez; no se reemplaza | `Reclamo.registrarFoto` |
+| Solo un reclamo abierto y con la ubicación confirmada aparece como posible duplicado | `Reclamo.puedeSerDuplicado` |
+| Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad | Constructor de `Apoyo` |
 
 El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-del-reclamo).
 
@@ -235,6 +247,8 @@ erDiagram
   reclamos ||--o{ notificaciones : genera
   usuarios ||--o{ notificaciones : "destinatario_id"
   usuarios ||--o{ codigos_verificacion : "ciudadano_id"
+  usuarios ||--o{ apoyos : "ciudadano_id"
+  reclamos ||--o{ apoyos : "reclamo_id"
 
   usuarios {
     bigint id PK
@@ -317,6 +331,12 @@ erDiagram
     datetime fecha_envio
     bigint reclamo_id FK
     bigint destinatario_id FK
+  }
+  apoyos {
+    bigint id PK
+    datetime fecha
+    bigint ciudadano_id FK "único junto con reclamo_id"
+    bigint reclamo_id FK
   }
   codigos_verificacion {
     bigint id PK

@@ -4,7 +4,7 @@ import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import java.time.LocalDateTime;
 
 /**
- * Las dos cadenas de controles que usa {@code ReclamoService}: antes de crear un reclamo y antes de reabrirlo.
+ * Las dos cadenas de controles: antes de crear un reclamo, y antes de reabrirlo o apoyarlo.
  * Los agentes y administradores no pasan por acá.
  */
 public record ControlesDeUso(ControlDeUso alCrear, ControlDeUso alReabrir) {
@@ -31,5 +31,10 @@ public record ControlesDeUso(ControlDeUso alCrear, ControlDeUso alReabrir) {
         if (alReabrir != null) {
             alReabrir.verificar(ciudadano, ahora);
         }
+    }
+
+    /** Apoyar pide lo mismo que reabrir: teléfono verificado y cuenta sin bloquear. */
+    public void antesDeApoyar(Ciudadano ciudadano, LocalDateTime ahora) {
+        antesDeReabrir(ciudadano, ahora);
     }
 }

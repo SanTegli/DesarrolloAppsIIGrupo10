@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.persistencia.adaptador;
 
 import ar.edu.uade.reclamos.dominio.modelo.EstadoReclamo;
+import ar.edu.uade.reclamos.dominio.modelo.EstadoUbicacion;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import ar.edu.uade.reclamos.persistencia.jpa.ReclamoJpaRepository;
@@ -59,6 +60,14 @@ public class ReclamoRepositoryJpa implements ReclamoRepository {
     public List<Reclamo> buscarVencidosSinMarcar(LocalDateTime ahora) {
         return cargar(jpa.findByVencidoFalseAndEstadoInAndFechaLimiteBeforeOrderByFechaCreacionDescIdDesc(
                 List.of(EstadoReclamo.INGRESADO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO), ahora));
+    }
+
+    @Override
+    public List<Reclamo> buscarAbiertosConUbicacionEn(Long categoriaId, double latitudMinima, double latitudMaxima,
+                                                      double longitudMinima, double longitudMaxima) {
+        return cargar(jpa.buscarEnRecuadro(categoriaId,
+                List.of(EstadoReclamo.INGRESADO, EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO),
+                EstadoUbicacion.CONFIRMADA, latitudMinima, latitudMaxima, longitudMinima, longitudMaxima));
     }
 
     private List<Reclamo> cargar(List<Reclamo> reclamos) {

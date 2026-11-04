@@ -607,6 +607,27 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 
 **Reaperturas.** Un reclamo resuelto se reabre una sola vez, dentro de los 7 días y con un motivo en la observación. La segunda vez que se resuelve, la interfaz ya no ofrece **Reabrir**; por API, responde `409`.
 
+### Probar duplicados y apoyos
+
+Necesita reclamos con la ubicación marcada en el mapa: sin coordenadas no hay cercanía.
+
+1. Como Ana Pérez, crear un reclamo de **Luminaria rota** en **Bernal**, dirección "Belgrano 450", tocar **Buscar en el mapa** y elegir la sugerencia de Bernal Oeste.
+2. Salir y entrar como Bruno Díaz. Hacer lo mismo: misma categoría, misma dirección y misma sugerencia. Al tocar **Crear reclamo** aparece **¿Es alguno de estos?** con el reclamo de Ana, su foto y la distancia, sin su nombre.
+3. **Es el mismo: apoyar** no crea un reclamo: vuelve a **Mis reclamos** con el aviso. En el detalle de Ana aparece "1 vecino apoya este reclamo". **Es otro problema: continuar** crea el reclamo de Bruno igual.
+
+Con la API simulada (`npm run mock`) ya hay un reclamo de Bruno en Belgrano 450, Bernal: alcanza con el paso 1 como Ana.
+
+Por API, con las sesiones de `Entrar`:
+
+```powershell
+$bruno = Entrar "bruno@example.org"
+Invoke-RestMethod "http://localhost:8080/api/reclamos/candidatos-duplicados?categoriaId=1&latitud=-34.73614578&longitud=-58.3228998575" -WebSession $bruno.Sesion | ConvertTo-Json -Depth 5
+Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/apoyo" -Method Post -WebSession $bruno.Sesion -Headers $bruno.Csrf
+Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/apoyo" -Method Delete -WebSession $bruno.Sesion -Headers $bruno.Csrf
+```
+
+Apoyar dos veces deja un solo apoyo; Ana no puede apoyar su propio reclamo (`409`); un agente, tampoco (`403`). Quien apoya no puede ver el detalle del reclamo (`403`), pero sí la foto mientras siga abierto, porque es la de la tarjeta. Los parámetros `radio` (hasta 200 metros) y `limite` (hasta 5) son opcionales.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -614,7 +635,9 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 | POST | `/api/reclamos` | Crear como ciudadano: `multipart/form-data` con las partes `reclamo` (JSON) y `foto` (JPEG o PNG, hasta 5 MB). |
 | GET | `/api/reclamos` | Listar según rol; filtro `estado` para todos, `areaId` y `ciudadanoId` solo administrador. |
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
-| GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle. |
+| GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle; cualquier ciudadano ve la de un posible duplicado abierto. |
+| GET | `/api/reclamos/candidatos-duplicados` | Reclamos abiertos de la categoría cerca del punto (`categoriaId`, `latitud`, `longitud`; opcionales `radio` y `limite`), sin datos del autor. |
+| POST / DELETE | `/api/reclamos/{numero}/apoyo` | Apoyar o retirar el apoyo a un reclamo de otro vecino. Idempotentes. Solo ciudadanos. |
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
 | GET | `/api/reclamos/{numero}/notificaciones` | Consultar avisos del reclamo con los mismos permisos del detalle. |

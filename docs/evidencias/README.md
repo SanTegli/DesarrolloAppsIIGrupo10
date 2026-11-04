@@ -14,7 +14,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 59 tests: capa de API, etiquetas y componentes
+npm test             # 67 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
@@ -157,6 +157,16 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | CP56 | Si el alta falla, no queda la foto en el disco | `FotosIntegrationTest.siElAltaFallaDespuesDeGuardarLaFotoElArchivoSeBorra`, `GestionReclamosFacadeTest`, `AlmacenFotosLocalTest` | Crear como Carla (agente): `403`. El volumen `reclamos-fotos` no suma archivos (`docker compose exec backend ls /data/fotos`) |
 | CP57 | Los reclamos anteriores a la foto siguen funcionando | `FotosIntegrationTest.unReclamoAnteriorALaFotoNoTieneFoto`, `DetalleReclamo.test.jsx` | Un reclamo creado antes del PR 16 muestra "Este reclamo no tiene foto." |
 
+### Segunda Parte: posibles duplicados y apoyos
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP58 | Un reclamo abierto de la misma categoría a menos de 50 m aparece como posible duplicado, sin datos del autor | `DuplicadosYApoyosIntegrationTest.encuentraElReclamoAbiertoDeLaMismaCategoriaAPocosMetrosSinDatosDelAutor`, `DistanciaTest`, `CandidatosDuplicados.test.jsx` | Como Bruno, crear Luminaria rota en Belgrano 450, Bernal, eligiendo esa sugerencia: aparece el reclamo de Ana con su foto y sin su nombre |
+| CP59 | Otra categoría, más de 50 m, sin ubicación o un reclamo resuelto no aparecen | `otraCategoriaMasDeCincuentaMetrosOSinUbicacionNoSonCandidatos`, `unReclamoResueltoNoSeApoyaNiApareceYSuFotoVuelveASerPrivada`, `ApoyosYCercaniaRepositoryJpaTest` | Elegir Bache en la misma dirección: se crea directo |
+| CP60 | Apoyar y retirar son idempotentes; apoyar no da acceso al detalle ni cambia la prioridad | `apoyarYRetirarSonIdempotentesYNoDanAccesoAlDetalle` | **Es el mismo: apoyar**: el autor ve "1 vecino apoya este reclamo". Solo por API: el detalle con la sesión de quien apoyó responde `403` |
+| CP61 | Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos | `ApoyosYCercaniaRepositoryJpaTest.unCiudadanoNoApoyaDosVecesElMismoReclamo`, `GestionReclamosFacadeTest.unDobleClicQueChocaConLaRestriccionUnicaDevuelveElEstadoActual` | Solo por API: dos `POST /api/reclamos/{numero}/apoyo` seguidos dejan `cantidadApoyos: 1` |
+| CP62 | Reglas del apoyo: no el propio, no un agente, no sin teléfono verificado ni con la cuenta bloqueada | `reglasDelApoyo`, `unaCuentaBloqueadaNoApoya`, `ApoyoTest` | La tarjeta de un reclamo propio dice "Es un reclamo tuyo." y no tiene botón |
+
 ## Capturas de la interfaz
 
 Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
@@ -197,6 +207,7 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Rehacer las capturas de `interfaz/`: todavía muestran el selector de usuario que el login del PR 14 reemplazó.
 - [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
 - [ ] Capturas del alta con foto, del formato rechazado y del detalle con la foto contra el backend real (CP53 y CP54), y del contenido de `/data/fotos` (CP56).
+- [ ] Capturas del posible duplicado en el alta, del aviso de apoyo y del detalle con el contador contra el backend real (CP58 y CP60).
 - [ ] Captura de la verificación con el bot real de Telegram: el chat con el bot y la pantalla que pasa al formulario (CP49).
 - [ ] Capturas de la verificación simulada, el número repetido, el panel de cuentas y la reapertura contra el backend real (CP47, CP48, CP51 y CP52).
 - [ ] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).

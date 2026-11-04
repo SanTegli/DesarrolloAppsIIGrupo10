@@ -70,6 +70,21 @@ public class ConsultaReclamosService {
         return reclamo;
     }
 
+    /**
+     * Para servir la foto: los mismos permisos que el detalle y, además, cualquier ciudadano puede ver la foto
+     * de un reclamo que hoy aparecería como posible duplicado (abierto y ubicado en el mapa). Sin eso, las
+     * tarjetas de duplicados del alta no podrían mostrarla. No da acceso al detalle.
+     */
+    public Reclamo buscarParaFoto(Long usuarioId, String numero) {
+        Usuario usuario = usuario(usuarioId);
+        Reclamo reclamo = reclamo(numero);
+        if (!permisos.puedeConsultar(usuario, reclamo)
+                && !(usuario instanceof Ciudadano && reclamo.puedeSerDuplicado())) {
+            permisos.validarConsulta(usuario, reclamo);
+        }
+        return reclamo;
+    }
+
     public List<Notificacion> consultarNotificaciones(Long usuarioId, String numero) {
         buscarPorNumero(usuarioId, numero);
         return notificaciones.buscarPorReclamo(numero);

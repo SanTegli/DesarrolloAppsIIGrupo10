@@ -95,6 +95,20 @@ public final class DoblesEnMemoria {
         }
 
         @Override
+        public List<Reclamo> buscarAbiertosConUbicacionEn(Long categoriaId, double latitudMinima,
+                                                          double latitudMaxima, double longitudMinima,
+                                                          double longitudMaxima) {
+            return guardados.stream()
+                    .filter(r -> r.getCategoria().getId().equals(categoriaId))
+                    .filter(Reclamo::puedeSerDuplicado)
+                    .filter(r -> r.getUbicacion().getLatitud() >= latitudMinima
+                            && r.getUbicacion().getLatitud() <= latitudMaxima
+                            && r.getUbicacion().getLongitud() >= longitudMinima
+                            && r.getUbicacion().getLongitud() <= longitudMaxima)
+                    .toList();
+        }
+
+        @Override
         public List<Reclamo> buscarVencidosSinMarcar(LocalDateTime ahora) {
             return guardados.stream()
                     .filter(r -> !r.isVencido() && r.getEstado().estaPendienteDeResolucion()
