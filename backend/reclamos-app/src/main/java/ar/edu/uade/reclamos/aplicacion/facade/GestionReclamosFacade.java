@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.aplicacion.facade;
 
 import ar.edu.uade.reclamos.aplicacion.servicio.*;
+import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
+import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import java.util.List;
 import java.util.Set;
@@ -14,15 +16,31 @@ public class GestionReclamosFacade {
     private final ConsultaCatalogosService catalogos;
     private final ServicioUbicaciones ubicaciones;
     private final ServicioCuentas cuentas;
+    private final ServicioVerificacionTelefono verificacion;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
                                   ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones,
-                                  ServicioCuentas cuentas) {
+                                  ServicioCuentas cuentas, ServicioVerificacionTelefono verificacion) {
         this.escritura = escritura;
         this.consultas = consultas;
         this.catalogos = catalogos;
         this.ubicaciones = ubicaciones;
         this.cuentas = cuentas;
+        this.verificacion = verificacion;
+    }
+
+    /** Código para verificar el teléfono del ciudadano por el canal configurado (Telegram o simulado). */
+    public CodigoEmitido iniciarVerificacionTelefono(Long usuarioId) {
+        return verificacion.iniciar(usuarioId);
+    }
+
+    /** Solo en modo simulado: confirma el código propio con un número escrito a mano. */
+    public Usuario confirmarVerificacionSimulada(Long usuarioId, String codigo, String telefono) {
+        return verificacion.confirmarSimulado(usuarioId, codigo, telefono);
+    }
+
+    public Usuario cambiarBloqueo(Long actorId, Long usuarioId, boolean bloqueado) {
+        return cuentas.cambiarBloqueo(actorId, usuarioId, bloqueado);
     }
 
     /** Registro de un ciudadano con email y contraseña. */

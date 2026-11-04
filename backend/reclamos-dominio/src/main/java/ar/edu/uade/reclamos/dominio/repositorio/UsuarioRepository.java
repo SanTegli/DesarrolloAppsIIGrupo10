@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.dominio.repositorio;
 
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import java.util.List;
 import java.util.Optional;
@@ -16,6 +17,9 @@ public interface UsuarioRepository {
 
     /** Busca por email sin distinguir mayúsculas: es el nombre de usuario para entrar al sistema. */
     Optional<Usuario> buscarPorEmail(String email);
+
+    /** El ciudadano que tiene verificado ese teléfono, en formato internacional. Un número, una cuenta. */
+    Optional<Ciudadano> buscarPorTelefonoVerificado(String telefono);
 
     List<Usuario> buscarTodos();
 

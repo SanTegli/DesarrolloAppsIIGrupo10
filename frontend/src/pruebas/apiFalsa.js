@@ -43,9 +43,9 @@ export const SIN_SESION = {
 }
 
 export const USUARIOS = [
-  { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO', area: null },
-  { id: 3, nombreCompleto: 'Carla Gómez', rol: 'AGENTE_MUNICIPAL', area: { id: 1, nombre: 'Alumbrado' } },
-  { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', area: null },
+  { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO', area: null, telefonoVerificado: '+54 •••••••0001', bloqueado: false },
+  { id: 3, nombreCompleto: 'Carla Gómez', rol: 'AGENTE_MUNICIPAL', area: { id: 1, nombre: 'Alumbrado' }, telefonoVerificado: null, bloqueado: false },
+  { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', area: null, telefonoVerificado: null, bloqueado: false },
 ]
 
 export const AREAS = [

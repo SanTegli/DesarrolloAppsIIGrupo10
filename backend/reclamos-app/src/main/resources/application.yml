@@ -60,6 +60,20 @@ reclamos:
     origen: local                # local (la base del backend) | soap (servicio-cobertura)
     url: http://localhost:8081/ws
     tiempo-limite: 2s            # si el SOAP no contesta a tiempo, el reclamo queda con la asignación pendiente
+  # Límites de uso de los ciudadanos (PR 15).
+  uso:
+    reclamos-por-dia: ${RECLAMOS_USO_RECLAMOS_POR_DIA:5}
+    codigos-por-hora: 3
+    vigencia-codigo: 10m
+  reaperturas:
+    maximo: 1                    # reaperturas directas por reclamo
+    plazo: 7d                    # desde la última resolución
+  # Verificación del teléfono. simulado: sin bot, un endpoint confirma el código. telegram: necesita el bot.
+  telegram:
+    modo: ${RECLAMOS_TELEGRAM_MODO:simulado}
+    token: ${TELEGRAM_BOT_TOKEN:}
+    usuario-bot: ${TELEGRAM_BOT_USUARIO:}
+    intervalo-ms: 2000
   # Avisos por correo: outbox + RabbitMQ + servicio-notificaciones. Apagada sin broker; Compose la enciende.
   mensajeria:
     habilitada: false

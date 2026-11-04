@@ -1,6 +1,7 @@
 package ar.edu.uade.reclamos.persistencia.jpa;
 
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import java.util.List;
 import java.util.Optional;
@@ -12,6 +13,9 @@ import org.springframework.data.repository.query.Param;
 public interface UsuarioJpaRepository extends JpaRepository<Usuario, Long> {
     Optional<Usuario> findByDni(String dni);
     Optional<Usuario> findFirstByEmailIgnoreCaseOrderByIdAsc(String email);
+
+    @Query("select c from Ciudadano c where c.telefonoVerificado = :telefono")
+    Optional<Ciudadano> buscarPorTelefonoVerificado(@Param("telefono") String telefono);
     List<Usuario> findAllByOrderByIdAsc();
 
     @Query("select a from AgenteMunicipal a where a.activo = true and a.area.id = :areaId order by a.id")

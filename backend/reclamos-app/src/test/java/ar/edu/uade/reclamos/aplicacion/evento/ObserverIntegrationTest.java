@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.evento;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
@@ -66,8 +67,8 @@ class ObserverIntegrationTest {
                 candidata.agregarBarrio(barrio);
                 areas.guardar(candidata);
             }
-            Usuario ciudadano = usuarios.guardar(new Ciudadano(dni(), "Ana", "Observer", "ana@test.org", null));
-            Usuario otroCiudadano = usuarios.guardar(new Ciudadano(dni(), "Luis", "Observer", "luis@test.org", null));
+            Usuario ciudadano = usuarios.guardar(verificado(new Ciudadano(dni(), "Ana", "Observer", "ana@test.org", null)));
+            Usuario otroCiudadano = usuarios.guardar(verificado(new Ciudadano(dni(), "Luis", "Observer", "luis@test.org", null)));
             Usuario agente = usuarios.guardar(new AgenteMunicipal(dni(), "Carla", "Observer", "carla@test.org", null, area));
             Usuario otroAgente = usuarios.guardar(new AgenteMunicipal(dni(), "Diego", "Observer", "diego@test.org", null, otraArea));
             Usuario administrador = usuarios.guardar(new Administrador(dni(), "Elena", "Observer", "elena@test.org", null));

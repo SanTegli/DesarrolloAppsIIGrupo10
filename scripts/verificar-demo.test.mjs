@@ -32,6 +32,10 @@ function escenarioNormal() {
     mensajesEnErrores: 0,
     contrasena: 'demo1234',
     altas: [],
+    telefonoVerificado: '+54 •••••••0001',
+    bloqueado: false,
+    reclamosDeHoy: 0,
+    limiteDiario: 20,
   }
 }
 
@@ -84,7 +88,14 @@ before(async () => {
         [`JSESSIONID=${SESION}; Path=/; HttpOnly`])
     }
     if (ruta === '/backend/api/auth/yo') {
-      return conSesion ? responder(res, 200, { id: 1, nombreCompleto: 'Ana Pérez', rol: 'CIUDADANO' }) : responder(res, 401, NO_AUTENTICADO)
+      const ana = {
+        id: 1,
+        nombreCompleto: 'Ana Pérez',
+        rol: 'CIUDADANO',
+        telefonoVerificado: escenario.telefonoVerificado,
+        bloqueado: escenario.bloqueado,
+      }
+      return conSesion ? responder(res, 200, ana) : responder(res, 401, NO_AUTENTICADO)
     }
     if (ruta === '/backend/api/ubicaciones/sugerencias') {
       return conSesion ? responder(res, 200, escenario.georef) : responder(res, 401, NO_AUTENTICADO)
@@ -93,6 +104,10 @@ before(async () => {
       if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
       if (req.headers['x-xsrf-token'] !== TOKEN) return responder(res, 403, { status: 403, codigo: 'CSRF_INVALIDO' })
       const cuerpo = JSON.parse(await leer(req))
+      if (escenario.reclamosDeHoy >= escenario.limiteDiario) {
+        return responder(res, 429, { status: 429, codigo: 'LIMITE_EXCEDIDO', mensaje: 'Ya creaste 20 reclamos en las últimas 24 horas.' })
+      }
+      escenario.reclamosDeHoy += 1
       escenario.altas.push({ cuerpo, usuarioId: req.headers['x-usuario-id'] })
       return responder(res, 201, {
         numero: NUMERO,
@@ -216,6 +231,26 @@ describe('verificarDemo', () => {
     assert.match(resultados.find((r) => r.paso === 'Login').detalle, /401/)
     assert.equal(estadoDe(resultados, 'Alta del reclamo'), FALLA)
     assert.equal(escenario.altas.length, 0)
+  })
+
+  test('si Ana no tiene el teléfono verificado, el login lo señala antes del alta', async () => {
+    escenario = { ...escenarioNormal(), telefonoVerificado: null }
+    const resultados = await verificarDemo(configuracion())
+
+    const login = resultados.find((r) => r.paso === 'Login')
+    assert.equal(login.estado, FALLA)
+    assert.match(login.detalle, /teléfono verificado/)
+  })
+
+  test('si se llegó al límite diario de reclamos, el alta falla y dice qué variable subir', async () => {
+    escenario = { ...escenarioNormal(), reclamosDeHoy: 20 }
+    const resultados = await verificarDemo(configuracion())
+
+    const alta = resultados.find((r) => r.paso === 'Alta del reclamo')
+    assert.equal(alta.estado, FALLA)
+    assert.match(alta.detalle, /429/)
+    assert.match(alta.detalle, /RECLAMOS_USO_RECLAMOS_POR_DIA/)
+    assert.equal(estadoDe(resultados, 'Revisión del reclamo'), FALLA)
   })
 
   test('con el backend apagado no se corta: marca las fallas y no intenta revisar el reclamo', async () => {

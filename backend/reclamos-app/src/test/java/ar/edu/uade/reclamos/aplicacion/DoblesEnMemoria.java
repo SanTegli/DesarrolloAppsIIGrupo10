@@ -12,6 +12,8 @@ import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import ar.edu.uade.reclamos.dominio.modelo.CodigoVerificacion;
 import ar.edu.uade.reclamos.dominio.modelo.Entidad;
 import ar.edu.uade.reclamos.dominio.modelo.Notificacion;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
@@ -19,6 +21,7 @@ import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
+import ar.edu.uade.reclamos.dominio.repositorio.CodigoVerificacionRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.NotificacionRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
@@ -84,6 +87,14 @@ public final class DoblesEnMemoria {
         }
 
         @Override
+        public long contarCreadosPorCiudadanoDesde(Long ciudadanoId, LocalDateTime desde) {
+            return guardados.stream()
+                    .filter(r -> r.getCiudadano().getId().equals(ciudadanoId))
+                    .filter(r -> !r.getFechaCreacion().isBefore(desde))
+                    .count();
+        }
+
+        @Override
         public List<Reclamo> buscarVencidosSinMarcar(LocalDateTime ahora) {
             return guardados.stream()
                     .filter(r -> !r.isVencido() && r.getEstado().estaPendienteDeResolucion()
@@ -144,6 +155,15 @@ public final class DoblesEnMemoria {
         @Override
         public Optional<Usuario> buscarPorDni(String dni) {
             return guardados.stream().filter(usuario -> usuario.getDni().equals(dni)).findFirst();
+        }
+
+        @Override
+        public Optional<Ciudadano> buscarPorTelefonoVerificado(String telefono) {
+            return guardados.stream()
+                    .filter(usuario -> usuario instanceof Ciudadano)
+                    .map(usuario -> (Ciudadano) usuario)
+                    .filter(ciudadano -> telefono != null && telefono.equals(ciudadano.getTelefonoVerificado()))
+                    .findFirst();
         }
 
         @Override
@@ -281,6 +301,28 @@ public final class DoblesEnMemoria {
 
         public List<String> nombres() {
             return publicados.stream().map(EventoDominio::nombre).toList();
+        }
+    }
+
+    public static class Codigos implements CodigoVerificacionRepository {
+        public final List<CodigoVerificacion> guardados = new ArrayList<>();
+
+        @Override
+        public CodigoVerificacion guardar(CodigoVerificacion codigo) {
+            return conId(codigo, guardados);
+        }
+
+        @Override
+        public Optional<CodigoVerificacion> buscarPorCodigo(String codigo) {
+            return guardados.stream().filter(c -> c.getCodigo().equals(codigo)).findFirst();
+        }
+
+        @Override
+        public long contarCreadosPorCiudadanoDesde(Long ciudadanoId, LocalDateTime desde) {
+            return guardados.stream()
+                    .filter(c -> c.getCiudadano().getId().equals(ciudadanoId))
+                    .filter(c -> !c.getFechaCreacion().isBefore(desde))
+                    .count();
         }
     }
 }

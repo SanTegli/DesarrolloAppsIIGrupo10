@@ -111,3 +111,10 @@ SELECT 'datos-dev-v1' WHERE NOT EXISTS (
 -- los usuarios sin contraseña: no pisa una que se haya cambiado.
 UPDATE usuarios SET hash_contrasena = '$2a$10$Fj7CGx6hDi2DyQSJv4Bat.Crnxp12nWpSIXthWYde6v/q.bYhjFjW'
 WHERE hash_contrasena IS NULL AND id BETWEEN 1 AND 7;
+
+-- Teléfono verificado (PR 15): Ana y Bruno ya lo tienen, así la demo funciona sin Telegram. Números ficticios.
+-- Como las contraseñas, completa también las bases anteriores y no pisa un número verificado después.
+UPDATE usuarios SET telefono_verificado = '+5491100000001', fecha_verificacion_telefono = '2026-01-01 00:00:00'
+WHERE id = 1 AND tipo = 'CIUDADANO' AND telefono_verificado IS NULL;
+UPDATE usuarios SET telefono_verificado = '+5491100000002', fecha_verificacion_telefono = '2026-01-01 00:00:00'
+WHERE id = 2 AND tipo = 'CIUDADANO' AND telefono_verificado IS NULL;

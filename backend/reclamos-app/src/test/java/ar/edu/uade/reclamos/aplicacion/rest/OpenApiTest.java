@@ -43,7 +43,8 @@ class OpenApiTest {
                 "/api/reclamos/{numero}/notificaciones", "/api/notificaciones", "/api/usuarios",
                 "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
-                "/api/auth/logout");
+                "/api/auth/logout", "/api/verificacion-telefono", "/api/verificacion-telefono/simulada",
+                "/api/usuarios/{id}/bloqueo");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();

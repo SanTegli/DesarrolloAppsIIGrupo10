@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.mensajeria;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -90,7 +91,7 @@ class OutboxIntegrationTest {
             alumbrado.agregarCategoria(luminaria);
             areas.guardar(alumbrado);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000"));
+                    verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000")));
             AgenteMunicipal carla = (AgenteMunicipal) usuarios.guardar(
                     new AgenteMunicipal("30333444", "Carla", "Gómez", "carla@example.org", null, alumbrado));
             barrio = bernal.getId();

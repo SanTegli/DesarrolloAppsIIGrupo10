@@ -21,12 +21,19 @@
       <basic name="email"><column name="email" nullable="false" length="254"/></basic>
       <basic name="telefono"><column name="telefono" nullable="true" length="30"/></basic>
       <basic name="activo"><column name="activo" nullable="false"/></basic>
+      <!-- Con valor por defecto: la semilla inserta usuarios sin nombrar esta columna. -->
+      <basic name="bloqueado"><column name="bloqueado" nullable="false" column-definition="boolean default false"/></basic>
       <!-- BCrypt. Nulo para los usuarios que no pueden entrar con contraseña. -->
       <basic name="hashContrasena"><column name="hash_contrasena" nullable="true" length="100"/></basic>
     </attributes>
   </entity>
   <entity class="Ciudadano" access="FIELD" metadata-complete="true">
     <discriminator-value>CIUDADANO</discriminator-value>
+    <attributes>
+      <!-- Un número, una cuenta: único. Nulo hasta que se verifica (y nulo en agentes y administradores). -->
+      <basic name="telefonoVerificado"><column name="telefono_verificado" nullable="true" length="20" unique="true"/></basic>
+      <basic name="fechaVerificacionTelefono"><column name="fecha_verificacion_telefono" nullable="true"/></basic>
+    </attributes>
   </entity>
   <entity class="Administrador" access="FIELD" metadata-complete="true">
     <discriminator-value>ADMINISTRADOR</discriminator-value>
@@ -150,6 +157,19 @@
       <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
       <basic name="fechaPublicacion"><column name="fecha_publicacion" nullable="true"/></basic>
       <basic name="ultimoError"><column name="ultimo_error" nullable="true" length="300"/></basic>
+    </attributes>
+  </entity>
+  <!-- Códigos de un solo uso para verificar el teléfono por Telegram. -->
+  <entity class="CodigoVerificacion" access="FIELD" metadata-complete="true">
+    <table name="codigos_verificacion">
+      <index name="idx_codigos_verificacion_ciudadano" column-list="ciudadano_id, fecha_creacion"/>
+    </table>
+    <attributes>
+      <basic name="codigo"><column name="codigo" nullable="false" length="8" unique="true"/></basic>
+      <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
+      <basic name="vence"><column name="vence" nullable="false"/></basic>
+      <basic name="fechaUso"><column name="fecha_uso" nullable="true"/></basic>
+      <many-to-one name="ciudadano" target-entity="Ciudadano" fetch="LAZY" optional="false"><join-column name="ciudadano_id" nullable="false"/></many-to-one>
     </attributes>
   </entity>
   <!-- Ubicación del reclamo, en columnas de la tabla reclamos. -->

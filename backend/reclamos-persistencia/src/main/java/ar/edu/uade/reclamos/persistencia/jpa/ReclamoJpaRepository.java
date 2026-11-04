@@ -25,6 +25,8 @@ public interface ReclamoJpaRepository extends JpaRepository<Reclamo, Long> {
 
     long countByAreaIdAndEstadoIn(Long areaId, Collection<EstadoReclamo> estados);
 
+    long countByCiudadanoIdAndFechaCreacionGreaterThanEqual(Long ciudadanoId, LocalDateTime desde);
+
     List<Reclamo> findByVencidoFalseAndEstadoInAndFechaLimiteBeforeOrderByFechaCreacionDescIdDesc(
             Collection<EstadoReclamo> estados, LocalDateTime ahora);
 }

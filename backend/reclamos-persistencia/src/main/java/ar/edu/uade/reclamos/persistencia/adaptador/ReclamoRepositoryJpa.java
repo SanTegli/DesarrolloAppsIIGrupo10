@@ -46,6 +46,11 @@ public class ReclamoRepositoryJpa implements ReclamoRepository {
     }
 
     @Override
+    public long contarCreadosPorCiudadanoDesde(Long ciudadanoId, LocalDateTime desde) {
+        return jpa.countByCiudadanoIdAndFechaCreacionGreaterThanEqual(ciudadanoId, desde);
+    }
+
+    @Override
     public long contarPendientesPorArea(Long areaId) {
         return jpa.countByAreaIdAndEstadoIn(areaId, List.of(EstadoReclamo.ASIGNADO, EstadoReclamo.EN_PROCESO));
     }

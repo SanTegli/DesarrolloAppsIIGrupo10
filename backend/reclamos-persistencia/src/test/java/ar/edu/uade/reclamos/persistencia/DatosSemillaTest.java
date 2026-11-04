@@ -72,5 +72,8 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(reclamos.buscarTodos()).isEmpty();
         assertThat(usuarios.buscarTodos()).allMatch(Usuario::tieneContrasena);
         assertThat(usuarios.buscarPorEmail("ana@example.org")).isPresent();
+        assertThat(usuarios.buscarPorTelefonoVerificado("+5491100000001").orElseThrow().getId()).isEqualTo(1L);
+        assertThat(usuarios.buscarPorTelefonoVerificado("+5491100000002").orElseThrow().getId()).isEqualTo(2L);
+        assertThat(usuarios.buscarTodos()).noneMatch(Usuario::isBloqueado);
     }
 }

@@ -99,7 +99,14 @@ export async function verificarDemo(config, informar = () => {}) {
       body: JSON.stringify({ email: RECLAMO_DE_PRUEBA.correoCiudadano, contrasena: RECLAMO_DE_PRUEBA.contrasena }),
     })
     const yo = await http.json(config.backendUrl + '/api/auth/yo')
-    return [OK, `sesión iniciada como ${yo.nombreCompleto} (${yo.rol})`]
+    // Desde el PR 15, crear un reclamo exige el teléfono verificado y la cuenta sin bloquear.
+    if (yo.bloqueado) {
+      return [FALLA, `${yo.nombreCompleto} tiene la cuenta bloqueada: desbloqueala desde Administración`]
+    }
+    if (!yo.telefonoVerificado) {
+      return [FALLA, `${yo.nombreCompleto} no tiene el teléfono verificado: la semilla (datos-dev.sql) lo completa`]
+    }
+    return [OK, `sesión iniciada como ${yo.nombreCompleto} (${yo.rol}), teléfono ${yo.telefonoVerificado}`]
   })
   await paso(anotar, 'Servicio de cobertura (SOAP)', async () => {
     const wsdl = await http.texto(config.coberturaUrl + '/ws/cobertura.wsdl')
@@ -166,12 +173,19 @@ export async function verificarDemo(config, informar = () => {}) {
         direccionNormalizada: sugerencia.direccionNormalizada,
       }
     }
-    reclamo = await http.json(config.backendUrl + '/api/reclamos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
-      body: JSON.stringify(cuerpo),
-      esperado: 201,
-    })
+    try {
+      reclamo = await http.json(config.backendUrl + '/api/reclamos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-XSRF-TOKEN': http.tokenCsrf() ?? '' },
+        body: JSON.stringify(cuerpo),
+        esperado: 201,
+      })
+    } catch (error) {
+      if (error.message.includes('LIMITE_EXCEDIDO')) {
+        return [FALLA, `${error.message}. Subí RECLAMOS_USO_RECLAMOS_POR_DIA en .env o esperá 24 horas`]
+      }
+      throw error
+    }
     return [OK, `${reclamo.numero}, estado ${reclamo.estado}`]
   })
 

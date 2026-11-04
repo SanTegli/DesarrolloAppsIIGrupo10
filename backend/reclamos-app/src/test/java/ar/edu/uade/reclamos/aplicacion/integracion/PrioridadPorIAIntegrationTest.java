@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -101,7 +102,7 @@ class PrioridadPorIAIntegrationTest {
             alumbrado.agregarCategoria(luminaria);
             areas.guardar(alumbrado);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000"));
+                    verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000")));
             barrio = bernal.getId();
             categoria = luminaria.getId();
             ciudadano = ana.getId();

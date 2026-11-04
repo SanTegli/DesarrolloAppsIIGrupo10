@@ -33,4 +33,7 @@ public interface ReclamoRepository {
      * cuya fecha límite es anterior a {@code ahora}.
      */
     List<Reclamo> buscarVencidosSinMarcar(LocalDateTime ahora);
+
+    /** Cuántos reclamos presentó el ciudadano desde {@code desde}. Lo usa el límite diario de reclamos. */
+    long contarCreadosPorCiudadanoDesde(Long ciudadanoId, LocalDateTime desde);
 }

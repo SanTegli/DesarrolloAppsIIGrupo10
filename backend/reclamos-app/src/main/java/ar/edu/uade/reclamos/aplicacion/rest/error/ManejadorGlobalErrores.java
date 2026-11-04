@@ -44,6 +44,16 @@ public class ManejadorGlobalErrores {
         return respuesta(403, "ACCESO_DENEGADO", error.getMessage(), List.of(), request);
     }
 
+    @ExceptionHandler(UsoRestringidoException.class)
+    public ResponseEntity<ErrorResponse> usoRestringido(UsoRestringidoException error, HttpServletRequest request) {
+        return respuesta(403, error.getCodigo(), error.getMessage(), List.of(), request);
+    }
+
+    @ExceptionHandler(LimiteExcedidoException.class)
+    public ResponseEntity<ErrorResponse> limiteExcedido(LimiteExcedidoException error, HttpServletRequest request) {
+        return respuesta(429, "LIMITE_EXCEDIDO", error.getMessage(), List.of(), request);
+    }
+
     @ExceptionHandler(CredencialesInvalidasException.class)
     public ResponseEntity<ErrorResponse> credencialesInvalidas(CredencialesInvalidasException error,
                                                                HttpServletRequest request) {

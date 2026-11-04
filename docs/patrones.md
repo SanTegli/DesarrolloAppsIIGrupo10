@@ -269,6 +269,9 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Consumidor idempotente | 12 | `ProcesadorAvisos`, tabla `mensajes_procesados` | Un mensaje repetido no manda dos correos |
 | Adapter | 12 | `BrokerRabbit` | La outbox habla con `BrokerMensajes`; RabbitMQ queda detrás |
 | Chain of Responsibility (de Spring Security) | 14 | Cadena de filtros que arma `ConfiguracionSeguridad` | CSRF, sesión, autorización y logout se resuelven cada uno en su filtro, antes de llegar al controlador |
+| Adapter | 15 | `CanalVerificacion`: `CanalTelegram`, `CanalSimulado` | Verificar el teléfono por Telegram o sin conexión, sin que el servicio sepa cuál |
+| Adapter y capa anticorrupción | 15 | `ClienteTelegram` | El JSON de la Bot API no sale de una clase, y el token tampoco |
+| Chain of Responsibility (propia) | 15 | `ControlDeUso`: `TelefonoVerificado` → `CuentaNoBloqueada` → `LimiteDiarioDeReclamos` | Cada control de uso corta con su error o pasa al siguiente; sumar uno no toca `ReclamoService` |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 
@@ -462,3 +465,45 @@ de la API.
 - **Código:** `reclamos-app/…/aplicacion/seguridad/`
 - **Tests:** `AutenticacionIntegrationTest` y, en `RestIntegrationTest`, `todasLasRutasDeReclamosExigenSesion`
   y `unPostOPatchConSesionPeroSinTokenCsrfEs403YNoCambiaNada`
+
+## Chain of Responsibility propia: controles de uso
+
+**Problema.** Antes de crear un reclamo hay que revisar varias cosas del ciudadano: que tenga el teléfono
+verificado, que la cuenta no esté bloqueada y que no haya pasado el límite diario. Al reabrir, solo las dos
+primeras. Escritas como `if` en `ReclamoService`, cada control nuevo (por ejemplo, el de duplicados del
+PR 17) lo agrandaría, y el orden quedaría mezclado con el resto del alta.
+
+**Solución.** Cada control es un eslabón (`ControlDeUso`) que revisa una cosa y, si está bien, le pasa el
+ciudadano al siguiente. El primero que falla corta con su excepción. `ControlesDeUso` arma las dos cadenas y
+`ReclamoService` solo llama a `antesDeCrear` o a `antesDeReabrir`.
+
+```mermaid
+flowchart LR
+  A[ReclamoService.crear] --> T[TelefonoVerificado]
+  T -- sin teléfono --> E1[403 TELEFONO_NO_VERIFICADO]
+  T --> B[CuentaNoBloqueada]
+  B -- bloqueada --> E2[403 CUENTA_BLOQUEADA]
+  B --> L[LimiteDiarioDeReclamos]
+  L -- 5 en 24 h --> E3[429 LIMITE_EXCEDIDO]
+  L --> OK[sigue el alta]
+```
+
+A diferencia de la cadena de filtros del PR 14, que la aporta Spring Security, esta es código propio. El
+orden importa y es parte del contrato: a un ciudadano sin teléfono no se le informa el límite diario.
+
+- **Código:** `reclamos-app/…/aplicacion/control/`
+- **Tests:** `ControlesDeUsoTest` y `VerificacionYReaperturasIntegrationTest`
+
+## Adapter en la verificación del teléfono
+
+**Problema.** El teléfono se verifica con el bot de Telegram, pero para desarrollar, correr los tests y dar
+la demo sin conexión hace falta otro canal. El servicio no tendría que saber cuál se usa.
+
+**Solución.** `ServicioVerificacionTelefono` habla con `CanalVerificacion` (`nombre()` y `enlace(codigo)`).
+`CanalTelegram` arma el enlace `t.me/<bot>?start=<codigo>`; `CanalSimulado` no tiene enlace y habilita la
+confirmación desde la interfaz. `ConfiguracionVerificacion` elige uno con `reclamos.telegram.modo`, y solo en
+modo `telegram` crea el `BotTelegram`. `ClienteTelegram` es además capa anticorrupción: las actualizaciones
+de Telegram salen como `Mensaje` y `Contacto`, y ningún error deja ver la URL, que lleva el token.
+
+- **Código:** `reclamos-app/…/aplicacion/verificacion/`
+- **Tests:** `ServicioVerificacionTelefonoTest`, `BotTelegramTest` (con `MockRestServiceServer`)

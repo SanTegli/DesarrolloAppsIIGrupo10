@@ -5,15 +5,21 @@ import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import ar.edu.uade.reclamos.dominio.repositorio.*;
+import java.time.Clock;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Transactional(readOnly = true)
 public class ConsultaReclamosService {
+    private final Clock reloj;
+    private final PoliticaReapertura reaperturas;
     private final UsuarioRepository usuarios;
     private final ReclamoRepository reclamos;
     private final NotificacionRepository notificaciones;
@@ -21,6 +27,17 @@ public class ConsultaReclamosService {
 
     public ConsultaReclamosService(UsuarioRepository usuarios, ReclamoRepository reclamos,
                                     NotificacionRepository notificaciones, PermisosReclamo permisos) {
+        this(usuarios, reclamos, notificaciones, permisos, Clock.systemDefaultZone(),
+                PoliticaReapertura.PREDETERMINADA);
+    }
+
+    /** @param reaperturas para no ofrecer "reabrir" cuando el reclamo ya no se puede reabrir */
+    @Autowired
+    public ConsultaReclamosService(UsuarioRepository usuarios, ReclamoRepository reclamos,
+                                    NotificacionRepository notificaciones, PermisosReclamo permisos, Clock reloj,
+                                    PoliticaReapertura reaperturas) {
+        this.reloj = reloj;
+        this.reaperturas = reaperturas;
         this.usuarios = usuarios;
         this.reclamos = reclamos;
         this.notificaciones = notificaciones;
@@ -68,7 +85,15 @@ public class ConsultaReclamosService {
         Usuario usuario = usuario(usuarioId);
         Reclamo reclamo = reclamo(numero);
         permisos.validarConsulta(usuario, reclamo);
-        return permisos.accionesDisponibles(usuario, reclamo);
+        Set<EstadoReclamo> acciones = permisos.accionesDisponibles(usuario, reclamo);
+        if (acciones.contains(EstadoReclamo.EN_PROCESO) && reclamo.getEstado() == EstadoReclamo.RESUELTO
+                && !reclamo.puedeReabrir(LocalDateTime.now(reloj), reaperturas)) {
+            // Ya se reabrió o pasó el plazo: la interfaz no muestra el botón de reabrir.
+            EnumSet<EstadoReclamo> sinReabrir = EnumSet.copyOf(acciones);
+            sinReabrir.remove(EstadoReclamo.EN_PROCESO);
+            return sinReabrir;
+        }
+        return acciones;
     }
 
     private Usuario usuario(Long id) {

@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
@@ -45,9 +46,9 @@ class ConsultaReclamosServiceIntegrationTest {
                 areas.guardar(area);
             }
             Ciudadano ciudadano1 = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("80111222", "Ana", "Consultas", "ana@test.org", null));
+                    verificado(new Ciudadano("80111222", "Ana", "Consultas", "ana@test.org", null)));
             Ciudadano ciudadano2 = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("80222333", "Luis", "Consultas", "luis@test.org", null));
+                    verificado(new Ciudadano("80222333", "Luis", "Consultas", "luis@test.org", null)));
             AgenteMunicipal agente1 = (AgenteMunicipal) usuarios.guardar(
                     new AgenteMunicipal("80333444", "Carla", "Consultas", "carla@test.org", null, area1));
             AgenteMunicipal agente2 = (AgenteMunicipal) usuarios.guardar(

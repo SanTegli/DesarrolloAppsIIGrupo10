@@ -116,6 +116,9 @@ Editar `.env` en un editor de texto y definir las credenciales locales antes de 
 | `OPENAI_API_KEY` | Solo si se usa `openai`; vacía en la plantilla. |
 | `RABBITMQ_USER` | Usuario de RabbitMQ en el modo demo; plantilla: `reclamos`. |
 | `RABBITMQ_PASSWORD` | Contraseña local de RabbitMQ; plantilla: `reclamos_dev`. Si falta en un `.env` viejo, Compose usa ese mismo valor. |
+| `RECLAMOS_TELEGRAM_MODO` | Verificación del teléfono: `simulado` (plantilla, sin bot) o `telegram`. Ver «Probar la verificación del teléfono», en la sección 10. |
+| `TELEGRAM_BOT_TOKEN` | Token del bot que da @BotFather, vacío en la plantilla. Solo con el modo `telegram`. **Nunca se commitea.** |
+| `TELEGRAM_BOT_USUARIO` | Usuario del bot sin `@` (por ejemplo, `ReclamosQuilmesBot`). Solo con el modo `telegram`. |
 
 **`.env` no debe subirse a Git** y está excluido por `.gitignore`. Docker Compose carga automáticamente el `.env` de la raíz. Spring Boot ejecutado directamente desde PowerShell **no necesariamente lee `.env`**; este proyecto obtiene las variables desde el entorno del proceso.
 
@@ -337,7 +340,7 @@ Las cuatro áreas están activas. Las relaciones se guardan en `area_barrio` y `
 | 6 | Gabriela Paz | `gabriela@example.org` | AGENTE_MUNICIPAL | Mantenimiento Vial |
 | 7 | Elena Ruiz | `elena@example.org` | ADMINISTRADOR | — |
 
-Los siete entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
+Los siete entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. Ana y Bruno ya tienen el teléfono verificado, con los números ficticios `+5491100000001` y `+5491100000002`, para poder crear reclamos sin pasar por la verificación. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
 
 No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v1`** al completar la semilla. El script se invoca en cada arranque de `dev`, pero sus inserciones quedan condicionadas a la ausencia del marcador: la semilla se aplica **una sola vez por base** y las modificaciones posteriores no se restauran en cada reinicio.
 
@@ -553,6 +556,33 @@ Con `docker compose start rabbitmq`, en menos de un minuto el estado pasa a `PUB
 
 Los mensajes no llevan DNI, teléfono ni la descripción del reclamo: solo el número, el estado, el nombre y el correo del destinatario y el texto del aviso. El contrato está en `docs/contratos/mensajes.md`.
 
+### Probar la verificación del teléfono
+
+Un ciudadano necesita el teléfono verificado para crear y reabrir reclamos, y cada número sirve para una sola cuenta. Hay dos modos, que se eligen con `RECLAMOS_TELEGRAM_MODO`:
+
+**Modo simulado (el predeterminado).** No hace falta nada. En la interfaz, **Crear una cuenta**, ir a **Crear reclamo**, tocar **Pedir código de verificación**, escribir un número con el código de país (`+54 9 11 5555-0000`) y **Confirmar teléfono**: aparece el formulario. Con el número de Ana (`+5491100000001`) responde "Ese número ya está verificado en otra cuenta."
+
+**Con el bot real de Telegram.**
+
+1. En Telegram, abrir **@BotFather**, mandar `/newbot` y elegir un nombre y un usuario terminado en `bot` (por ejemplo, `ReclamosQuilmesGrupo10Bot`). BotFather responde con el **token**.
+2. En `.env`: `RECLAMOS_TELEGRAM_MODO=telegram`, `TELEGRAM_BOT_TOKEN=` con el token y `TELEGRAM_BOT_USUARIO=` con el usuario, sin `@`. **El token no se pega en ningún otro lado**: quien lo tiene controla el bot. Si se filtra, `/revoke` en BotFather lo invalida.
+3. Reiniciar el backend (`docker compose up -d backend`, o volver a cargar `.env` y levantarlo a mano). El log dice `Verificación del teléfono: Telegram[modo=telegram, usuarioBot=<usuario>, token=****]`: el token nunca se muestra.
+4. En la interfaz, **Pedir código de verificación**: aparece el código y **abrir en Telegram**. En el celular, el enlace abre el bot; tocar **Iniciar** y después **Compartir mi teléfono**. El bot contesta "Listo" y la pantalla pasa sola al formulario en unos segundos.
+
+El bot consulta Telegram cada 2 segundos (no usa webhook, así que no hace falta una dirección pública). El teléfono nunca se muestra completo: la API lo devuelve como `+54 •••••••0000`.
+
+**Límites.** Hasta 3 códigos por hora y 5 reclamos por día por cuenta (`429 LIMITE_EXCEDIDO`). En el modo demo de Compose el límite diario sube a 20, para poder repetir el recorrido.
+
+**Bloqueo.** Como Elena Ruiz: **Administración** → **Cuentas de ciudadanos** → **Bloquear**. Esa cuenta sigue entrando y viendo sus reclamos, pero no puede crear, reabrir ni verificar el teléfono (`403 CUENTA_BLOQUEADA`). Por API:
+
+```powershell
+$elena = Entrar "elena@example.org"
+Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -WebSession $elena.Sesion `
+    -Headers $elena.Csrf -ContentType "application/json" -Body '{"bloqueado": true}'
+```
+
+**Reaperturas.** Un reclamo resuelto se reabre una sola vez, dentro de los 7 días y con un motivo en la observación. La segunda vez que se resuelve, la interfaz ya no ofrece **Reabrir**; por API, responde `409`.
+
 ## 11. Endpoints disponibles
 
 | Método | Ruta | Uso |
@@ -566,6 +596,9 @@ Los mensajes no llevan DNI, teléfono ni la descripción del reclamo: solo el n�
 | GET | `/api/notificaciones` | Bandeja de avisos del usuario de la sesión, del más nuevo al más viejo. |
 | GET | `/api/usuarios` | Listar usuarios. Solo administradores. |
 | GET | `/api/usuarios/{id}` | Consultar un usuario: el propio, o cualquiera si es administrador. |
+| PATCH | `/api/usuarios/{id}/bloqueo` | Bloquear o desbloquear la cuenta de un ciudadano (`{"bloqueado": true}`). Solo administradores. |
+| POST | `/api/verificacion-telefono` | Pedir un código para verificar el teléfono. Devuelve el código, el enlace al bot y el vencimiento. |
+| POST | `/api/verificacion-telefono/simulada` | Solo en modo simulado: confirmar el código propio con `codigo` y `telefono`. |
 | POST | `/api/auth/login` | Iniciar sesión con `email` y `contrasena`. Deja la cookie `JSESSIONID`. |
 | GET | `/api/auth/yo` | Usuario de la sesión; `401` sin sesión. |
 | POST | `/api/auth/registro` | Crear la cuenta de un ciudadano: `dni`, `nombre`, `apellido`, `email` y `contrasena`. |
@@ -585,8 +618,11 @@ Los mensajes no llevan DNI, teléfono ni la descripción del reclamo: solo el n�
 | --- | --- | --- |
 | 400 | `DATOS_INVALIDOS` | Falta encabezado/campo, IDs no positivos, JSON o enum inválido, longitud excesiva o intento de `ASIGNADO` por `/estado`. |
 | 403 | `ACCESO_DENEGADO` | Rol no habilitado, reclamo de otro ciudadano/área o filtros administrativos sin permiso. |
+| 403 | `TELEFONO_NO_VERIFICADO` | Un ciudadano sin teléfono verificado intenta crear o reabrir. |
+| 403 | `CUENTA_BLOQUEADA` | Un ciudadano bloqueado intenta crear, reabrir o verificar el teléfono. |
+| 429 | `LIMITE_EXCEDIDO` | Más de 5 reclamos en 24 horas o más de 3 códigos de verificación en una hora. |
 | 404 | `RECURSO_NO_ENCONTRADO` | Usuario, reclamo, categoría, barrio, área o ruta inexistente. |
-| 409 | `REGLA_NEGOCIO` | Transición inexistente, ciudadano inactivo al crear, área inactiva o igual a la actual al asignar. |
+| 409 | `REGLA_NEGOCIO` | Transición inexistente, ciudadano inactivo al crear, área inactiva o igual a la actual al asignar, reapertura fuera de límite o número verificado en otra cuenta. |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo al mismo tiempo; volver a cargarlo. |
 | 405 | `METODO_NO_PERMITIDO` | Método HTTP no admitido por el recurso. |
 | 415 | `TIPO_CONTENIDO_NO_SOPORTADO` | Tipo de contenido no soportado; enviar JSON en las escrituras. |

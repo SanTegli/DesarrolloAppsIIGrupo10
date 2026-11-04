@@ -1,6 +1,7 @@
+import CuentasCiudadanos from './CuentasCiudadanos.jsx'
 import ListaReclamos from './ListaReclamos.jsx'
 
-/** Vista del administrador: reclamos que esperan asignación manual y cobertura de cada área. */
+/** Vista del administrador: reclamos que esperan asignación manual, cobertura de cada área y cuentas de ciudadanos. */
 export default function PanelAdministracion({ usuario, areas, onAbrir }) {
   return (
     <div className="administracion">
@@ -39,6 +40,8 @@ export default function PanelAdministracion({ usuario, areas, onAbrir }) {
           </tbody>
         </table>
       </div>
+
+      <CuentasCiudadanos />
     </div>
   )
 }

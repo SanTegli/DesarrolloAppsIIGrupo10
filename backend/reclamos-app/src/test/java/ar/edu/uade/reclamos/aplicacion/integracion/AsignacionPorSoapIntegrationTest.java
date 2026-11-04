@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.integracion;
 
+import static ar.edu.uade.reclamos.aplicacion.Ciudadanos.verificado;
 import static ar.edu.uade.reclamos.aplicacion.Sesiones.como;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.nullValue;
@@ -103,7 +104,7 @@ class AsignacionPorSoapIntegrationTest {
             // Sin barrios ni categorías locales: con origen soap, la cobertura la decide el servicio.
             AreaMunicipal obras = areas.guardar(new AreaMunicipal("Obras Públicas", "obras@example.org", quilmes));
             Ciudadano ana = (Ciudadano) usuarios.guardar(
-                    new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null));
+                    verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null)));
             municipio = quilmes.getId();
             barrio = bernal.getId();
             categoria = bache.getId();

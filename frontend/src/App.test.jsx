@@ -264,6 +264,7 @@ describe('App', () => {
     const llamadas = simularApi({
       ...conSesion(elena),
       'GET /api/reclamos': (peticion) => (peticion.consulta.estado === 'INGRESADO' ? [reclamo({ estado: 'INGRESADO', area: null })] : []),
+      'GET /api/usuarios': USUARIOS,
     })
     const usuario = userEvent.setup()
     render(<App />)
