@@ -44,7 +44,8 @@ class OpenApiTest {
                 "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
                 "/api/auth/logout", "/api/verificacion-telefono", "/api/verificacion-telefono/simulada",
-                "/api/usuarios/{id}/bloqueo", "/api/reclamos/{numero}/foto");
+                "/api/usuarios/{id}/bloqueo", "/api/reclamos/{numero}/foto",
+                "/api/reclamos/candidatos-duplicados", "/api/reclamos/{numero}/apoyo");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();
@@ -56,6 +57,11 @@ class OpenApiTest {
         assertThat(contrato.at("/paths/~1api~1reclamos/post/requestBody/content").has("multipart/form-data"))
                 .isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("foto")).isTrue();
+        assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("cantidadApoyos")).isTrue();
+        // Las tarjetas de duplicados no llevan datos del autor.
+        JsonNode candidato = contrato.at("/components/schemas/CandidatoDuplicadoResponse/properties");
+        assertThat(candidato.has("distanciaMetros")).isTrue();
+        assertThat(candidato.has("ciudadano")).isFalse();
 
         JsonNode cambiarEstado = contrato.at("/paths/~1api~1reclamos~1{numero}~1estado/patch");
         for (String codigo : List.of("200", "400", "401", "403", "404", "409", "500")) {

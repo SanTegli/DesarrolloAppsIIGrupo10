@@ -92,6 +92,7 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
     "proveedor": null
   },
   "foto": "/api/reclamos/REC-4F2A91BC/foto",
+  "cantidadApoyos": 0,
   "estado": "ASIGNADO",
   "prioridad": "MEDIA",
   "origenPrioridad": "CATEGORIA",
@@ -129,6 +130,8 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
   coordenadas, dirección normalizada y proveedor; si no, `PENDIENTE` y los demás campos en `null`.
 - `foto` es la ruta de la foto del problema ([`GET /api/reclamos/{numero}/foto`](#get-apireclamosnumerofoto--foto-del-reclamo)).
   Es `null` en los reclamos creados antes de que la foto fuera obligatoria.
+- `cantidadApoyos` es cuántos vecinos apoyan el reclamo ([apoyos](#apoyos-y-posibles-duplicados)). No cambia la
+  prioridad.
 - `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
   no respondió y se usó la de la categoría). `motivoPrioridad` la explica. Es `null` cuando la prioridad es
   la de la categoría sin otro análisis; con `reclamos.prioridad.estrategia: ia`, si la IA sugirió menos que
@@ -247,11 +250,75 @@ sin bloquear, límite diario.
 ### `GET /api/reclamos/{numero}/foto` — foto del reclamo
 
 La foto como `image/jpeg`, sin metadatos. **Mismos permisos que el detalle:** el ciudadano dueño, los
-agentes del área asignada y los administradores. Se puede usar directo en un `<img>`, porque el navegador
+agentes del área asignada y los administradores. **Además, cualquier ciudadano** ve la foto de un reclamo
+que puede aparecer como posible duplicado (abierto y ubicado en el mapa): es la foto de las tarjetas del
+alta. Cuando el reclamo se resuelve, vuelve a ser solo del detalle. Se puede usar directo en un `<img>`, porque el navegador
 manda la cookie de sesión. Responde con `Cache-Control: private, max-age=3600`.
 
 Errores: `401` sin sesión; `403` el reclamo no es del usuario ni de su área; `404` el reclamo no existe o no
 tiene foto (es anterior a la foto obligatoria).
+
+## Apoyos y posibles duplicados
+
+Antes de crear un reclamo con la ubicación marcada en el mapa, la interfaz busca reclamos abiertos de la
+misma categoría a pocos metros. Si es el mismo problema, el vecino **lo apoya** en lugar de crear otro.
+
+### `GET /api/reclamos/candidatos-duplicados` — posibles duplicados
+
+| Parámetro | Regla |
+| --- | --- |
+| `categoriaId` | Obligatorio; debe existir |
+| `latitud`, `longitud` | Obligatorios: el punto elegido en el mapa |
+| `radio` | Opcional, en metros: por defecto 50, máximo 200 (`reclamos.duplicados.*`) |
+| `limite` | Opcional: por defecto y como máximo 5 |
+
+Devuelve reclamos `INGRESADO`, `ASIGNADO` o `EN_PROCESO` de la categoría, con la ubicación **confirmada**,
+dentro del radio, del más cercano al más lejano. La distancia se calcula con la fórmula de Haversine. Lo
+puede usar cualquier usuario con sesión.
+
+```json
+[
+  {
+    "numero": "REC-7C4046A4",
+    "estado": "ASIGNADO",
+    "fechaCreacion": "2026-11-03T17:34:00",
+    "descripcion": "El farol frente a la plaza está apagado hace dos noches y el poste quedó inclinado.",
+    "direccion": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires",
+    "foto": "/api/reclamos/REC-7C4046A4/foto",
+    "distanciaMetros": 13,
+    "cantidadApoyos": 0,
+    "apoyadoPorMi": false,
+    "propio": false
+  }
+]
+```
+
+**No lleva el nombre ni ningún dato del autor:** solo lo necesario para reconocer el problema. `propio` es
+`true` si lo creó quien consulta, y en ese caso no se puede apoyar.
+
+Errores: `400` latitud, longitud, radio o límite fuera de rango; `401` sin sesión; `404` categoría
+inexistente.
+
+### `POST` y `DELETE /api/reclamos/{numero}/apoyo` — apoyar o retirar el apoyo
+
+Solo `CIUDADANO`. Los dos son **idempotentes**: apoyar dos veces deja un solo apoyo, y retirar uno que no
+existe no cambia nada. Responden `200`:
+
+```json
+{ "numero": "REC-7C4046A4", "cantidadApoyos": 1, "apoyado": true }
+```
+
+| Regla | Respuesta |
+| --- | --- |
+| No es ciudadano | `403 ACCESO_DENEGADO` |
+| Sin teléfono verificado o con la cuenta bloqueada (solo para apoyar) | `403 TELEFONO_NO_VERIFICADO` o `403 CUENTA_BLOQUEADA` |
+| Es su propio reclamo | `409 REGLA_NEGOCIO` |
+| El reclamo ya no está abierto (para apoyar; retirar se puede siempre) | `409 REGLA_NEGOCIO` |
+| No existe el reclamo | `404` |
+
+Apoyar **no da permisos** sobre el reclamo (no ve el detalle ni le cambia el estado) y **no cambia la
+prioridad**. La base guarda un apoyo por ciudadano y reclamo (restricción única); si dos pedidos iguales
+llegan a la vez, el segundo responde el estado actual.
 
 ### `GET /api/reclamos/{numero}` — consultar un reclamo
 

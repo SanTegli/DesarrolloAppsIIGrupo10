@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.aplicacion.rest.mapper;
 
 import ar.edu.uade.reclamos.aplicacion.rest.dto.*;
+import ar.edu.uade.reclamos.aplicacion.servicio.CandidatoDuplicado;
+import ar.edu.uade.reclamos.aplicacion.servicio.EstadoApoyo;
 import ar.edu.uade.reclamos.aplicacion.servicio.SugerenciasUbicacion;
 import ar.edu.uade.reclamos.aplicacion.servicio.UbicacionElegida;
 import ar.edu.uade.reclamos.dominio.modelo.*;
@@ -10,16 +12,35 @@ import org.springframework.stereotype.Component;
 @Component
 public class RestMapper {
     public ReclamoResponse reclamo(Reclamo reclamo, Set<EstadoReclamo> acciones) {
+        return reclamo(reclamo, acciones, 0);
+    }
+
+    public ReclamoResponse reclamo(Reclamo reclamo, Set<EstadoReclamo> acciones, long cantidadApoyos) {
         return new ReclamoResponse(reclamo.getNumero(), reclamo.getDescripcion(), reclamo.getDireccion(),
                 ubicacion(reclamo.getUbicacion()),
-                reclamo.getFoto().map(referencia -> "/api/reclamos/" + reclamo.getNumero() + "/foto").orElse(null),
-                reclamo.getEstado(), reclamo.getPrioridad(),
+                rutaFoto(reclamo), cantidadApoyos, reclamo.getEstado(), reclamo.getPrioridad(),
                 reclamo.getOrigenPrioridad(), reclamo.getMotivoPrioridad(), reclamo.isVencido(),
                 reclamo.isAsignacionPendiente(), reclamo.getFechaCreacion(), reclamo.getFechaLimite(),
                 categoriaReferencia(reclamo.getCategoria()), barrioReferencia(reclamo.getBarrio()),
                 usuarioReferencia(reclamo.getCiudadano()), areaReferencia(reclamo.getArea()),
                 usuarioReferencia(reclamo.getAgente()), reclamo.getHistorial().stream().map(this::historial).toList(),
                 acciones);
+    }
+
+    public CandidatoDuplicadoResponse candidato(CandidatoDuplicado candidato) {
+        Reclamo reclamo = candidato.reclamo();
+        return new CandidatoDuplicadoResponse(reclamo.getNumero(), reclamo.getEstado(), reclamo.getFechaCreacion(),
+                reclamo.getDescripcion(), reclamo.getUbicacion().getDireccionNormalizada(), rutaFoto(reclamo),
+                Math.round(candidato.distanciaMetros()), candidato.apoyos(), candidato.apoyadoPorMi(),
+                candidato.propio());
+    }
+
+    public ApoyoResponse apoyo(EstadoApoyo estado) {
+        return new ApoyoResponse(estado.numero(), estado.apoyos(), estado.apoyado());
+    }
+
+    private static String rutaFoto(Reclamo reclamo) {
+        return reclamo.getFoto().map(referencia -> "/api/reclamos/" + reclamo.getNumero() + "/foto").orElse(null);
     }
 
     public ResumenReclamoResponse resumen(Reclamo reclamo) {

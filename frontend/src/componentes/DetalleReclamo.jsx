@@ -89,6 +89,13 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
         <div>
           <p className="descripcion">{reclamo.descripcion}</p>
           <FotoReclamo foto={reclamo.foto} />
+          {reclamo.cantidadApoyos > 0 && (
+            <p className="apoyos">
+              {reclamo.cantidadApoyos === 1
+                ? '1 vecino apoya este reclamo: le pasa lo mismo.'
+                : `${reclamo.cantidadApoyos} vecinos apoyan este reclamo: les pasa lo mismo.`}
+            </p>
+          )}
           <dl className="datos">
             <dt>Categoría</dt>
             <dd>{reclamo.categoria.nombre}</dd>

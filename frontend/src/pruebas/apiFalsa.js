@@ -111,6 +111,7 @@ export function reclamo(cambios = {}) {
     direccion: 'Belgrano 450',
     ubicacion: { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null },
     foto: '/api/reclamos/REC-4F2A91BC/foto',
+    cantidadApoyos: 0,
     estado: 'ASIGNADO',
     prioridad: 'MEDIA',
     origenPrioridad: 'CATEGORIA',

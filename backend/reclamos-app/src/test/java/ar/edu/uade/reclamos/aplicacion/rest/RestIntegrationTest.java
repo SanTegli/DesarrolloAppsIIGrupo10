@@ -135,7 +135,7 @@ class RestIntegrationTest {
         JsonNode dto = leer(resultado);
         assertThat(resultado.getResponse().getHeader("Location")).isEqualTo("/api/reclamos/" + dto.get("numero").asText());
         assertThat(dto.get("numero").asText()).matches("REC-[0-9A-F]{8}");
-        campos(dto, "numero", "descripcion", "direccion", "ubicacion", "foto", "estado", "prioridad", "origenPrioridad",
+        campos(dto, "numero", "descripcion", "direccion", "ubicacion", "foto", "cantidadApoyos", "estado", "prioridad", "origenPrioridad",
                 "motivoPrioridad", "vencido", "asignacionPendiente", "fechaCreacion", "fechaLimite", "categoria",
                 "barrio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
         campos(dto.get("ubicacion"), "estado", "latitud", "longitud", "direccionNormalizada", "proveedor");

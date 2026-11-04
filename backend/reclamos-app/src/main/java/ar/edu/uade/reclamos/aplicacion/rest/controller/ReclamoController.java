@@ -15,6 +15,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.Positive;
 import java.io.IOException;
 import java.net.URI;
@@ -79,6 +81,41 @@ public class ReclamoController {
                 .body(facade.foto(usuario.id(), numero));
     }
 
+    /**
+     * Posibles duplicados para el alta: reclamos abiertos de la misma categoría a pocos metros del punto
+     * elegido en el mapa. Sin nombre ni datos del autor.
+     */
+    @Operation(summary = "Reclamos abiertos parecidos cerca del punto elegido (posibles duplicados)")
+    @GetMapping("/candidatos-duplicados")
+    public List<CandidatoDuplicadoResponse> candidatosDuplicados(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @RequestParam @Positive Long categoriaId,
+            @RequestParam @DecimalMin("-90") @DecimalMax("90") double latitud,
+            @RequestParam @DecimalMin("-180") @DecimalMax("180") double longitud,
+            @Parameter(description = "Radio en metros; por defecto 50, máximo 200")
+            @RequestParam(required = false) @Positive Integer radio,
+            @Parameter(description = "Cantidad máxima; por defecto y como máximo 5")
+            @RequestParam(required = false) @Positive Integer limite) {
+        return facade.candidatosDuplicados(usuario.id(), categoriaId, latitud, longitud, radio, limite).stream()
+                .map(mapper::candidato).toList();
+    }
+
+    /** "A mí también me pasa". Idempotente: apoyar dos veces deja un solo apoyo. */
+    @Operation(summary = "Apoyar el reclamo de otro vecino (solo ciudadanos)")
+    @PostMapping("/{numero}/apoyo")
+    public ApoyoResponse apoyar(@Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+                                @PathVariable String numero) {
+        return mapper.apoyo(facade.apoyar(usuario.id(), numero));
+    }
+
+    /** Idempotente: si no lo apoyaba, no cambia nada. */
+    @Operation(summary = "Retirar el apoyo a un reclamo")
+    @DeleteMapping("/{numero}/apoyo")
+    public ApoyoResponse retirarApoyo(@Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+                                      @PathVariable String numero) {
+        return mapper.apoyo(facade.retirarApoyo(usuario.id(), numero));
+    }
+
     @Operation(summary = "Listar los reclamos que ve el usuario")
     @GetMapping
     public List<ResumenReclamoResponse> listar(
@@ -124,6 +161,7 @@ public class ReclamoController {
     }
 
     private ReclamoResponse respuesta(Long usuarioId, Reclamo reclamo) {
-        return mapper.reclamo(reclamo, facade.accionesDisponibles(usuarioId, reclamo.getNumero()));
+        return mapper.reclamo(reclamo, facade.accionesDisponibles(usuarioId, reclamo.getNumero()),
+                facade.cantidadApoyos(reclamo));
     }
 }

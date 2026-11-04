@@ -20,6 +20,24 @@ export function crearReclamo({ categoriaId, barrioId, descripcion, direccion, ub
   return pedir('/reclamos', { metodo: 'POST', formulario })
 }
 
+/**
+ * GET /api/reclamos/candidatos-duplicados. Reclamos abiertos de la categoría a pocos metros del punto elegido en
+ * el mapa, sin datos del autor. Sirve para no crear un reclamo repetido.
+ */
+export function buscarDuplicados({ categoriaId, latitud, longitud }) {
+  return pedir('/reclamos/candidatos-duplicados', { parametros: { categoriaId, latitud, longitud } })
+}
+
+/** POST /api/reclamos/{numero}/apoyo. "A mí también me pasa". Idempotente. */
+export function apoyar(numero) {
+  return pedir(`${ruta(numero)}/apoyo`, { metodo: 'POST' })
+}
+
+/** DELETE /api/reclamos/{numero}/apoyo. Idempotente. */
+export function retirarApoyo(numero) {
+  return pedir(`${ruta(numero)}/apoyo`, { metodo: 'DELETE' })
+}
+
 /** GET /api/reclamos. El backend decide qué reclamos ve el usuario de la sesión según su rol. */
 export function listarReclamos({ estado, areaId, ciudadanoId } = {}) {
   return pedir('/reclamos', { parametros: { estado, areaId, ciudadanoId } })

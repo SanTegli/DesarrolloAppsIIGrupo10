@@ -88,6 +88,11 @@ reclamos:
     tamano-maximo: 5MB
     lado-maximo: 4000
     calidad: 0.85
+  # Posibles duplicados en el alta (PR 17): reclamos abiertos de la misma categoría cerca del punto elegido.
+  duplicados:
+    radio-metros: 50
+    radio-maximo-metros: 200
+    maximo-candidatos: 5
   # Avisos por correo: outbox + RabbitMQ + servicio-notificaciones. Apagada sin broker; Compose la enciende.
   mensajeria:
     habilitada: false

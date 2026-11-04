@@ -282,6 +282,46 @@ describe('App', () => {
     expect(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' })).toBeEnabled()
   })
 
+  it('si el problema ya estaba reclamado cerca, el vecino lo apoya y vuelve a sus reclamos con el aviso', async () => {
+    const bernal = { direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste', latitud: -34.7361, longitud: -58.3229 }
+    simularApi({
+      ...conSesion(ana),
+      'GET /api/reclamos': [],
+      'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [bernal] },
+      'GET /api/reclamos/candidatos-duplicados': [
+        {
+          numero: 'REC-AAAA1111',
+          estado: 'EN_PROCESO',
+          fechaCreacion: '2026-11-01T09:30:00',
+          descripcion: 'El farol no prende',
+          direccion: bernal.direccionNormalizada,
+          foto: null,
+          distanciaMetros: 12,
+          cantidadApoyos: 0,
+          apoyadoPorMi: false,
+          propio: false,
+        },
+      ],
+      'POST /api/reclamos/REC-AAAA1111/apoyo': { numero: 'REC-AAAA1111', cantidadApoyos: 1, apoyado: true },
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
+    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
+    await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
+    await usuario.click(await screen.findByRole('radio', { name: bernal.direccionNormalizada }))
+    await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
+    await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Es el mismo: apoyar REC-AAAA1111' }))
+
+    expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Sumaste tu apoyo al reclamo REC-AAAA1111.')
+  })
+
   it('el administrador ve en Administración los reclamos sin asignar y la cobertura de las áreas', async () => {
     const llamadas = simularApi({
       ...conSesion(elena),

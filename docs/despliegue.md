@@ -146,6 +146,7 @@ contenedor está en el perfil `verificacion`, así que `docker compose up` no lo
 | `reclamos.fotos.tamano-maximo`, `lado-maximo`, `calidad` | `application.yml` | 5 MB, 4000 píxeles de lado y calidad 0,85 del JPEG re-codificado |
 | `spring.servlet.multipart.*`, `server.tomcat.max-swallow-size` | `application.yml` del backend | El contenedor corta en 5 MB por archivo y responde 413 en lugar de cortar la conexión |
 | `client_max_body_size` | `frontend/nginx.conf` | nginx deja pasar hasta 6 MB a `/api`; por defecto corta en 1 MB |
+| `reclamos.duplicados.*` | `application.yml` | Posibles duplicados: radio por defecto (50 m), radio máximo (200 m) y cantidad máxima de candidatos (5) |
 | `reclamos.uso.*` | `application.yml`; `RECLAMOS_USO_RECLAMOS_POR_DIA` en Compose | Reclamos por día (5; Compose lo sube a 20 para la demo), códigos de verificación por hora (3) y vigencia del código (10 minutos) |
 | `reclamos.reaperturas.*` | `application.yml` | Máximo de reaperturas (1) y plazo desde la última resolución (7 días) |
 | `RECLAMOS_TELEGRAM_MODO` | `.env`, leído por Compose; contenedor del backend | `simulado` (por defecto, sin bot) o `telegram` |

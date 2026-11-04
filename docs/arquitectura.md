@@ -297,6 +297,7 @@ El PR 8 dejó listos los puntos de entrada y cada integración llega en su PR. L
 | Mensajería | `ServicioNotificaciones` | **Hecho (PR 12)**: outbox, `PublicadorMensajes`, RabbitMQ y `servicio-notificaciones`; ver abajo | — |
 | Teléfono verificado (segunda API externa) | `CanalVerificacion` | **Hecho (PR 15)**: `CanalTelegram`, `BotTelegram` y `ServicioVerificacionTelefono`; ver abajo | — |
 | Foto del reclamo | `AlmacenFotos` | **Hecho (PR 16)**: `ServicioFotos`, `ProcesadorFotos` y `AlmacenFotosLocal` (volumen); ver abajo | — |
+| Duplicados y apoyos | `ServicioDuplicados`, `ServicioApoyos` | **Hecho (PR 17)**: candidatos cercanos con Haversine y apoyos únicos; ver abajo | — |
 
 `EstrategiaAsignacion` no cambia: sigue eligiendo entre las candidatas, que ahora entrega
 `CatalogoCobertura` en lugar del Repository.
@@ -601,6 +602,54 @@ como archivo estático ni con una URL pública: sin sesión, `401`.
 (`spring.servlet.multipart.max-file-size: 5MB`) y `ProcesadorFotos` (5 MB y 4000 px). Los dos primeros cortan
 antes de leer el archivo entero; el tercero vale aunque cambie el transporte.
 
+### Duplicados y apoyos
+
+Antes de crear un reclamo, si el ciudadano marcó el punto en el mapa, la interfaz pregunta por reclamos
+abiertos de la misma categoría a pocos metros. Si es el mismo problema, lo apoya; si no, sigue con el alta.
+Depende de la geocodificación del PR 11: sin coordenadas no hay cercanía.
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor C as Ciudadano
+  participant UI as React
+  participant RC as ReclamoController
+  participant SD as ServicioDuplicados
+  participant RR as ReclamoRepository
+  participant SA as ServicioApoyos
+
+  C->>UI: completa el alta, con el punto elegido en el mapa, y toca Crear
+  UI->>RC: GET /api/reclamos/candidatos-duplicados?categoriaId&latitud&longitud
+  RC->>SD: candidatos(…)
+  SD->>RR: abiertos de la categoría dentro del recuadro (± 50 m)
+  RR-->>SD: reclamos
+  Note over SD: Haversine exacto, ≤ 50 m, del más cercano, hasta 5
+  SD-->>UI: tarjetas sin datos del autor
+  alt "Es el mismo: apoyar"
+    UI->>RC: POST /api/reclamos/{numero}/apoyo
+    RC->>SA: apoyar (teléfono verificado, cuenta sin bloquear)
+    SA-->>UI: cantidadApoyos
+  else "Es otro problema: continuar"
+    UI->>RC: POST /api/reclamos (multipart)
+  end
+```
+
+| Pieza | Responsabilidad |
+| --- | --- |
+| `Distancia` (dominio) | Haversine y la conversión de metros a grados para el recuadro |
+| `ReclamoRepository.buscarAbiertosConUbicacionEn` | Primer filtro barato en la base: categoría, estado abierto, ubicación confirmada y un recuadro alrededor del punto |
+| `ServicioDuplicados` | Distancia exacta, radio (50 m, máximo 200) y cantidad (hasta 5). Marca los reclamos propios y los que ya apoya quien consulta |
+| `Apoyo` (dominio) | Nadie apoya su propio reclamo ni uno cerrado. No cambia la prioridad ni da permisos |
+| `ServicioApoyos` | Apoyar y retirar, idempotentes. Usa los mismos controles que reabrir: teléfono verificado y cuenta sin bloquear |
+| Restricción única `(ciudadano_id, reclamo_id)` | Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos. La fachada responde el estado actual si el segundo choca |
+
+**Privacidad.** Las tarjetas no muestran quién reclamó. La foto de un reclamo que puede aparecer como
+duplicado la puede ver cualquier ciudadano mientras siga abierto; por eso el alta pide evitar caras y
+patentes. El detalle completo sigue siendo solo del autor, del área y de la administración.
+
+**La búsqueda es una ayuda, no una regla.** Si falla, el alta sigue. La API no impide crear un reclamo
+parecido: decide el vecino. La vinculación de dos reclamos ya creados quedó fuera del alcance.
+
 ## Límites conocidos
 
 - **Correo de laboratorio.** Con la mensajería habilitada, los avisos salen por correo, pero a Mailpit, que
@@ -621,6 +670,10 @@ antes de leer el archivo entero; el tercero vale aunque cambie el transporte.
   ciudadano que las evite. Difuminarlas automáticamente necesitaría un modelo de detección, fuera del alcance.
 - **Fotos en un solo disco.** El almacén local no se replica: con dos instancias del backend haría falta un
   almacén compartido (otra implementación de `AlmacenFotos`). Un reclamo borrado de la base deja su foto.
+- **Duplicados solo con el punto en el mapa.** Un reclamo sin la ubicación confirmada no se compara ni
+  aparece como candidato. Tampoco se comparan textos ni fotos.
+- **Apoyos sin aviso.** El autor ve cuántos vecinos apoyan su reclamo en el detalle, pero no recibe un aviso
+  cuando alguien lo apoya.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.
 - **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.

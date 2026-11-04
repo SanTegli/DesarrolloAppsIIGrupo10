@@ -7,9 +7,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Set;
 
-/** @param foto ruta de la foto ({@code /api/reclamos/{numero}/foto}); {@code null} si el reclamo no tiene */
+/**
+ * @param foto           ruta de la foto ({@code /api/reclamos/{numero}/foto}); {@code null} si el reclamo no tiene
+ * @param cantidadApoyos cuántos vecinos apoyan el reclamo (PR 17)
+ */
 public record ReclamoResponse(String numero, String descripcion, String direccion, UbicacionResponse ubicacion,
-                              String foto,
+                              String foto, long cantidadApoyos,
                               EstadoReclamo estado, Prioridad prioridad, OrigenPrioridad origenPrioridad,
                               String motivoPrioridad, boolean vencido, boolean asignacionPendiente,
                               LocalDateTime fechaCreacion, LocalDateTime fechaLimite, ReferenciaResponse categoria,

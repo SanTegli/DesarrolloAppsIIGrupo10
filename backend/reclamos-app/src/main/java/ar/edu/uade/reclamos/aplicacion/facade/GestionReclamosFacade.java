@@ -8,6 +8,7 @@ import ar.edu.uade.reclamos.aplicacion.verificacion.CodigoEmitido;
 import ar.edu.uade.reclamos.aplicacion.verificacion.ServicioVerificacionTelefono;
 import ar.edu.uade.reclamos.dominio.modelo.*;
 import java.util.List;
+import org.springframework.dao.DataIntegrityViolationException;
 import java.util.Set;
 import org.springframework.stereotype.Component;
 
@@ -21,12 +22,16 @@ public class GestionReclamosFacade {
     private final ServicioCuentas cuentas;
     private final ServicioVerificacionTelefono verificacion;
     private final ServicioFotos fotos;
+    private final ServicioDuplicados duplicados;
+    private final ServicioApoyos apoyos;
 
     public GestionReclamosFacade(ReclamoService escritura, ConsultaReclamosService consultas,
                                   ConsultaCatalogosService catalogos, ServicioUbicaciones ubicaciones,
                                   ServicioCuentas cuentas, ServicioVerificacionTelefono verificacion,
-                                  ServicioFotos fotos) {
+                                  ServicioFotos fotos, ServicioDuplicados duplicados, ServicioApoyos apoyos) {
         this.fotos = fotos;
+        this.duplicados = duplicados;
+        this.apoyos = apoyos;
         this.escritura = escritura;
         this.consultas = consultas;
         this.catalogos = catalogos;
@@ -86,11 +91,41 @@ public class GestionReclamosFacade {
         return reclamo;
     }
 
-    /** La foto del reclamo, con los mismos permisos que el detalle. JPEG sin metadatos. */
+    /**
+     * La foto del reclamo, JPEG sin metadatos. La ve quien ve el detalle y, mientras el reclamo puede aparecer
+     * como posible duplicado, cualquier ciudadano.
+     */
     public byte[] foto(Long usuarioId, String numero) {
-        Reclamo reclamo = consultas.buscarPorNumero(usuarioId, numero);
+        Reclamo reclamo = consultas.buscarParaFoto(usuarioId, numero);
         return reclamo.getFoto().flatMap(fotos::leer)
                 .orElseThrow(() -> new RecursoNoEncontradoException("El reclamo " + numero + " no tiene foto."));
+    }
+
+    /** Reclamos abiertos de la categoría cerca del punto elegido, para no crear uno repetido. */
+    public List<CandidatoDuplicado> candidatosDuplicados(Long usuarioId, Long categoriaId, double latitud,
+                                                         double longitud, Integer radioMetros, Integer limite) {
+        return duplicados.candidatos(usuarioId, categoriaId, latitud, longitud, radioMetros, limite);
+    }
+
+    /**
+     * Apoya el reclamo. Si dos pedidos iguales llegan a la vez (un doble clic), el segundo choca con la
+     * restricción única de la base: se responde el estado actual, como si hubiera llegado después.
+     */
+    public EstadoApoyo apoyar(Long usuarioId, String numero) {
+        try {
+            return apoyos.apoyar(usuarioId, numero);
+        } catch (DataIntegrityViolationException repetido) {
+            return apoyos.estado(usuarioId, numero);
+        }
+    }
+
+    public EstadoApoyo retirarApoyo(Long usuarioId, String numero) {
+        return apoyos.retirar(usuarioId, numero);
+    }
+
+    /** Cuántos vecinos apoyan el reclamo. */
+    public long cantidadApoyos(Reclamo reclamo) {
+        return apoyos.cantidad(reclamo);
     }
 
     /** Sugerencias del geocodificador para la dirección, antes del alta. */

@@ -13,7 +13,8 @@ import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
 @EnableJpaRepositories("ar.edu.uade.reclamos.persistencia.jpa")
 @Import({ReclamoRepositoryJpa.class, UsuarioRepositoryJpa.class, MunicipioRepositoryJpa.class,
         BarrioRepositoryJpa.class, CategoriaRepositoryJpa.class, AreaMunicipalRepositoryJpa.class,
-        NotificacionRepositoryJpa.class, MensajeSalienteRepositoryJpa.class, CodigoVerificacionRepositoryJpa.class})
+        NotificacionRepositoryJpa.class, MensajeSalienteRepositoryJpa.class, CodigoVerificacionRepositoryJpa.class,
+        ApoyoRepositoryJpa.class})
 class ConfiguracionPersistenciaTest {
 }
 

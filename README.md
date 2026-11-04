@@ -282,3 +282,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 14 | `feature/14-login` | Login con sesión del servidor y CSRF (Spring Security), registro de ciudadanos, contraseñas con BCrypt y pantalla de ingreso; se elimina `X-Usuario-Id` |
 | 15 | `feature/15-verificacion-reaperturas` | Teléfono verificado por Telegram (un número, una cuenta) con modo simulado, límites de uso, bloqueo de cuentas por el administrador y reaperturas con motivo, una vez y dentro de 7 días |
 | 16 | `feature/16-foto` | Foto obligatoria en el alta (multipart): JPEG o PNG validados por contenido, re-codificados sin EXIF, guardados en un volumen y servidos con los permisos del detalle |
+| 17 | `feature/17-duplicados-apoyos` | Posibles duplicados en el alta (misma categoría, a menos de 50 m, con Haversine) y apoyos únicos por ciudadano, sin datos del autor |

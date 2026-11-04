@@ -18,7 +18,7 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                                   @DefaultValue Geocodificacion geocodificacion,
                                   @DefaultValue Mensajeria mensajeria, @DefaultValue Uso uso,
                                   @DefaultValue Reaperturas reaperturas, @DefaultValue Telegram telegram,
-                                  @DefaultValue Fotos fotos) {
+                                  @DefaultValue Fotos fotos, @DefaultValue Duplicados duplicados) {
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -267,6 +267,27 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
             }
             if (calidad <= 0 || calidad > 1) {
                 throw new IllegalArgumentException("reclamos.fotos.calidad debe estar entre 0 y 1");
+            }
+        }
+    }
+
+    /**
+     * Posibles duplicados en el alta (PR 17).
+     *
+     * @param radioMetros       radio por defecto alrededor del punto elegido
+     * @param radioMaximoMetros radio más grande que se acepta en la consulta
+     * @param maximoCandidatos  cuántos candidatos se devuelven como máximo
+     */
+    public record Duplicados(@DefaultValue("50") int radioMetros,
+                             @DefaultValue("200") int radioMaximoMetros,
+                             @DefaultValue("5") int maximoCandidatos) {
+        public Duplicados {
+            if (radioMetros < 1 || radioMaximoMetros < radioMetros) {
+                throw new IllegalArgumentException("reclamos.duplicados: el radio debe ser mayor que cero y no "
+                        + "superar radio-maximo-metros");
+            }
+            if (maximoCandidatos < 1) {
+                throw new IllegalArgumentException("reclamos.duplicados.maximo-candidatos debe ser mayor que cero");
             }
         }
     }

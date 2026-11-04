@@ -227,6 +227,14 @@ public class Reclamo extends Entidad {
         this.foto = Validador.requerirTexto(referencia, "foto", LONGITUD_MAXIMA_REFERENCIA_FOTO);
     }
 
+    /**
+     * Si puede aparecer como posible duplicado de un reclamo nuevo: sigue abierto y tiene la ubicación
+     * confirmada en el mapa, porque sin coordenadas no hay cercanía.
+     */
+    public boolean puedeSerDuplicado() {
+        return estado.estaPendienteDeResolucion() && ubicacion != null && ubicacion.isConfirmada();
+    }
+
     public Optional<String> getFoto() {
         return Optional.ofNullable(foto);
     }

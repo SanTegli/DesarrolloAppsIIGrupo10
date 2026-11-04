@@ -8,9 +8,12 @@
 // verificado. Límites como en el backend: 5 reclamos por día, 3 códigos por hora y una reapertura en 7 días.
 // El alta es multipart con la foto obligatoria (JPEG o PNG, hasta 5 MB). A diferencia del backend, la foto se
 // guarda tal cual, en memoria: no se re-codifica ni se le borran los metadatos.
+// Posibles duplicados y apoyos (PR 17): al arrancar hay un reclamo de Bruno sobre un farol en Belgrano 450,
+// Bernal, ubicado en el mapa. Si Ana reclama lo mismo eligiendo esa dirección, aparece como posible duplicado.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
+import { existsSync, readFileSync } from 'node:fs'
 
 const PUERTO = Number(process.env.PUERTO || 8080)
 const ESTRATEGIA_PRIORIDAD = process.env.ESTRATEGIA_PRIORIDAD || 'categoria' // categoria | palabras-clave
@@ -65,6 +68,9 @@ const notificaciones = []
 // número de reclamo -> { bytes, tipo }
 const fotos = new Map()
 const MAXIMO_FOTO = 5 * 1024 * 1024
+// "usuarioId|numero" de cada apoyo
+const apoyos = new Set()
+const DUPLICADOS = { radioMetros: 50, radioMaximoMetros: 200, maximoCandidatos: 5 }
 
 // Respuestas fijas en lugar de Georef: "Belgrano" devuelve dos opciones, "caido" simula Georef sin responder
 // y cualquier otra dirección, ninguna. Las coordenadas son las que devolvió Georef para Belgrano 450.
@@ -234,6 +240,69 @@ function cambiarBloqueo(actor, id, cuerpo) {
   return usuarioPublico(usuario)
 }
 
+// Igual que Distancia.metros del dominio (Haversine).
+function metros(latitud1, longitud1, latitud2, longitud2) {
+  const rad = (grados) => (grados * Math.PI) / 180
+  const a =
+    Math.sin(rad(latitud2 - latitud1) / 2) ** 2 +
+    Math.cos(rad(latitud1)) * Math.cos(rad(latitud2)) * Math.sin(rad(longitud2 - longitud1) / 2) ** 2
+  return 2 * 6371000 * Math.asin(Math.min(1, Math.sqrt(a)))
+}
+const cantidadApoyos = (numero) => [...apoyos].filter((clave) => clave.endsWith(`|${numero}`)).length
+const puedeSerDuplicado = (reclamo) =>
+  ['INGRESADO', 'ASIGNADO', 'EN_PROCESO'].includes(reclamo.estado) && reclamo.ubicacion.estado === 'CONFIRMADA'
+
+function candidatosDuplicados(usuario, consulta) {
+  const categoriaId = Number(consulta.get('categoriaId'))
+  const latitud = Number(consulta.get('latitud'))
+  const longitud = Number(consulta.get('longitud'))
+  const radio = consulta.get('radio') ? Number(consulta.get('radio')) : DUPLICADOS.radioMetros
+  if (!Number.isInteger(categoriaId) || categoriaId <= 0) throw invalido('Los parametros recibidos no son validos.')
+  if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90) throw invalido('La latitud debe estar entre -90 y 90.')
+  if (!Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
+    throw invalido('La longitud debe estar entre -180 y 180.')
+  }
+  if (!(radio >= 1 && radio <= DUPLICADOS.radioMaximoMetros)) {
+    throw invalido(`El radio tiene que estar entre 1 y ${DUPLICADOS.radioMaximoMetros} metros.`)
+  }
+  buscar(categorias, categoriaId, 'categoría')
+  return reclamos
+    .filter((r) => r.categoriaId === categoriaId && puedeSerDuplicado(r))
+    .map((r) => ({ r, distancia: metros(latitud, longitud, r.ubicacion.latitud, r.ubicacion.longitud) }))
+    .filter(({ distancia }) => distancia <= radio)
+    .sort((a, b) => a.distancia - b.distancia)
+    .slice(0, DUPLICADOS.maximoCandidatos)
+    .map(({ r, distancia }) => ({
+      numero: r.numero,
+      estado: r.estado,
+      fechaCreacion: r.fechaCreacion,
+      descripcion: r.descripcion,
+      direccion: r.ubicacion.direccionNormalizada,
+      foto: fotos.has(r.numero) ? `/api/reclamos/${r.numero}/foto` : null,
+      distanciaMetros: Math.round(distancia),
+      cantidadApoyos: cantidadApoyos(r.numero),
+      apoyadoPorMi: apoyos.has(`${usuario.id}|${r.numero}`),
+      propio: r.ciudadanoId === usuario.id,
+    }))
+}
+
+function cambiarApoyo(usuario, numero, apoyar) {
+  const reclamo = reclamos.find((candidato) => candidato.numero === numero)
+  if (!reclamo) throw inexistente('reclamo', numero)
+  if (usuario.rol !== 'CIUDADANO') throw denegado('Solo los ciudadanos apoyan reclamos.')
+  const clave = `${usuario.id}|${numero}`
+  if (apoyar && !apoyos.has(clave)) {
+    controlarUso(usuario, false)
+    if (reclamo.ciudadanoId === usuario.id) throw regla('No podés apoyar tu propio reclamo.')
+    if (!['INGRESADO', 'ASIGNADO', 'EN_PROCESO'].includes(reclamo.estado)) {
+      throw regla(`El reclamo ${numero} ya no está abierto: solo se apoyan reclamos que siguen pendientes.`)
+    }
+    apoyos.add(clave)
+  }
+  if (!apoyar) apoyos.delete(clave)
+  return { numero, cantidadApoyos: cantidadApoyos(numero), apoyado: apoyos.has(clave) }
+}
+
 // Reaperturas: se cuentan en el historial, como Reclamo.getCantidadReaperturas.
 const reaperturas = (reclamo) =>
   reclamo.historial.filter((c) => c.estadoAnterior === 'RESUELTO' && c.estadoNuevo === 'EN_PROCESO').length
@@ -340,6 +409,7 @@ function detalle(usuario, reclamo) {
     descripcion: reclamo.descripcion,
     ubicacion: reclamo.ubicacion,
     foto: fotos.has(reclamo.numero) ? `/api/reclamos/${reclamo.numero}/foto` : null,
+    cantidadApoyos: cantidadApoyos(reclamo.numero),
     origenPrioridad: reclamo.origenPrioridad,
     motivoPrioridad: reclamo.motivoPrioridad,
     agente: referenciaUsuario(usuarios.find((u) => u.id === reclamo.agenteId)),
@@ -668,9 +738,18 @@ async function atender(peticion, contexto) {
       fotos.set(reclamo.numero, foto)
       return [201, detalle(usuario, reclamo), { Location: `/api/reclamos/${reclamo.numero}` }]
     }
+    if (partes.length === 3 && metodo === 'GET' && partes[2] === 'candidatos-duplicados') {
+      return [200, candidatosDuplicados(usuario, url.searchParams)]
+    }
+    if (partes.length === 4 && partes[3] === 'apoyo' && (metodo === 'POST' || metodo === 'DELETE')) {
+      return [200, cambiarApoyo(usuario, partes[2], metodo === 'POST')]
+    }
     if (partes.length === 3 && metodo === 'GET') return [200, detalle(usuario, reclamoVisible(usuario, partes[2]))]
     if (partes.length === 4 && metodo === 'GET' && partes[3] === 'foto') {
-      const reclamo = reclamoVisible(usuario, partes[2])
+      // Como el backend: además de quien ve el detalle, cualquier ciudadano ve la foto de un posible duplicado.
+      const posible = reclamos.find((r) => r.numero === partes[2])
+      const reclamo =
+        posible && usuario.rol === 'CIUDADANO' && puedeSerDuplicado(posible) ? posible : reclamoVisible(usuario, partes[2])
       const foto = fotos.get(reclamo.numero)
       if (!foto) throw new ErrorHttp(404, 'RECURSO_NO_ENCONTRADO', `El reclamo ${reclamo.numero} no tiene foto.`)
       return [200, foto.bytes, { 'Content-Type': foto.tipo, 'Cache-Control': 'private, max-age=3600' }]
@@ -750,3 +829,19 @@ createServer(async (peticion, respuesta) => {
   console.log(`Vencimientos: control cada ${INTERVALO_VENCIMIENTOS_MS} ms.`)
 })
 setInterval(marcarVencidos, INTERVALO_VENCIMIENTOS_MS)
+
+// Reclamo de Bruno ya cargado, para ver un posible duplicado al reclamar en Belgrano 450, Bernal.
+{
+  const sembrado = crear(usuarios[1], {
+    categoriaId: 1,
+    barrioId: 2,
+    descripcion: 'El farol frente a la plaza está apagado hace dos noches y el poste quedó inclinado.',
+    direccion: 'Belgrano 450',
+    ubicacion: { ...SUGERENCIAS_BELGRANO[0], latitud: SUGERENCIAS_BELGRANO[0].latitud + 0.00012 },
+  })
+  const ejemplo = new URL('../../docs/evidencias/fotos/farol-ejemplo.jpg', import.meta.url)
+  if (existsSync(ejemplo)) {
+    fotos.set(sembrado.numero, { bytes: readFileSync(ejemplo), tipo: 'image/jpeg' })
+  }
+  console.log(`Reclamo de ejemplo de Bruno: ${sembrado.numero} (Belgrano 450, Bernal)`)
+}
