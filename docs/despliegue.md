@@ -3,7 +3,9 @@
 El sistema se despliega en ocho contenedores. El navegador solo habla con el contenedor del
 frontend, que sirve la interfaz y reenvía las llamadas a `/api` al backend. El backend consulta la
 cobertura al servicio SOAP y la prioridad al servicio de IA por la red interna de Compose. Salen a
-Internet el servicio de IA, a la API de Gemini, y el backend, a Georef para ubicar las direcciones.
+Internet el servicio de IA, a la API de Gemini, y el backend, a Georef para ubicar las direcciones y, si el
+modo de verificación es `telegram`, a la Bot API de Telegram. Las fotos de los reclamos quedan en un volumen
+del backend.
 
 ```mermaid
 flowchart LR
@@ -36,9 +38,11 @@ flowchart LR
       MP["Mailpit<br/>SMTP y buzón web"]
     end
     VOL[["Volumen reclamos-mysql-data"]]
+    VOLF[["Volumen reclamos-fotos<br/>/data/fotos"]]
   end
   GEM["API de Gemini<br/>generativelanguage.googleapis.com"]
   GEO["Georef<br/>apis.datos.gob.ar"]
+  TG["Telegram Bot API<br/>api.telegram.org"]
 
   NAV -->|"HTTP 5173"| NGINX
   NGINX -->|"HTTP 8080, /api"| APP
@@ -47,6 +51,8 @@ flowchart LR
   APP -->|"REST 8082, /api/prioridades"| IA
   IA -->|"HTTPS, GEMINI_API_KEY"| GEM
   APP -->|"HTTPS, sin clave"| GEO
+  APP -.->|"HTTPS, TELEGRAM_BOT_TOKEN<br/>solo en modo telegram"| TG
+  APP --- VOLF
   APP -->|"AMQP 5672"| MQ
   MQ -->|"AMQP 5672"| NOT
   NOT -->|"SMTP 1025"| MP
@@ -117,6 +123,11 @@ de Node, dentro de la misma red: crea un reclamo y sigue su recorrido por las ci
 contenedor está en el perfil `verificacion`, así que `docker compose up` no lo levanta. El detalle está en
 [demo.md](demo.md#verificación-automática).
 
+**Prueba de carga.** `docker compose run --rm -T prueba-carga` corre `scripts/prueba-carga.mjs` en otro
+contenedor de Node del mismo perfil: 20 usuarios simultáneos leyendo del backend durante 30 s, sin crear
+reclamos. Se ajusta con `CARGA_USUARIOS` y `CARGA_DURACION_S`. Las metas están en
+[requerimientos.md](requerimientos.md#prueba-de-carga).
+
 ## Configuración externalizada
 
 | Variable | Dónde se usa | Para qué |
@@ -160,6 +171,7 @@ contenedor está en el perfil `verificacion`, así que `docker compose up` no lo
 | Desarrollo | Contenedor | En la máquina, con Maven | En la máquina, con Vite | `docker compose up -d mysql` y después backend y frontend a mano |
 | Demo | Contenedor | Contenedor | Contenedor | `docker compose up --build` |
 | Verificación de la demo | — | — | — | Con la demo levantada: `docker compose run --rm verificar-demo` |
+| Prueba de carga | — | — | — | Con la demo levantada: `docker compose run --rm -T prueba-carga` |
 
 En desarrollo el backend usa la cobertura local; para probar el SOAP se levanta `servicio-cobertura` con
 `./mvnw -pl servicio-cobertura spring-boot:run` desde `servicios/` (o `docker compose up -d servicio-cobertura`)

@@ -33,6 +33,18 @@ public class EvaluarPrioridades {
 
     private static final List<String> NIVELES = List.of("BAJA", "MEDIA", "ALTA", "CRITICA");
 
+    /**
+     * Metas del componente de IA (docs/requerimientos.md, RNF-IA-1 a RNF-IA-4). La de latencia es el tiempo
+     * límite con que el backend espera al servicio: por encima, usaría el respaldo por categoría.
+     */
+    static final double META_EXACTOS = 0.70;
+    static final double META_A_UN_NIVEL = 0.90;
+    static final double META_RESPONDIDOS = 0.95;
+    static final long META_P95_MS = 6000;
+
+    /** Una meta, lo que dio y si se cumple. */
+    record Meta(String requisito, String nombre, String objetivo, String obtenido, boolean cumple) { }
+
     record Caso(int numero, String esperada, String categoria, String descripcion) { }
 
     record Resultado(Caso caso, String obtenida, String motivo, String proveedor, String modelo, String error,
@@ -74,6 +86,12 @@ public class EvaluarPrioridades {
         Files.createDirectories(salida.toAbsolutePath().getParent());
         Files.writeString(salida, informe(resultados, url), StandardCharsets.UTF_8);
         System.out.println("Resultado guardado en " + salida);
+        List<Meta> metas = metas(resultados);
+        metas.forEach(meta -> System.out.printf("%-10s %-32s objetivo %-10s obtenido %-12s %s%n", meta.requisito(),
+                meta.nombre(), meta.objetivo(), meta.obtenido(), meta.cumple() ? "cumple" : "NO CUMPLE"));
+        System.out.println(metas.stream().allMatch(Meta::cumple)
+                ? "El componente de IA cumple todas las metas."
+                : "Hay metas sin cumplir: revisar las instrucciones del prompt o el modelo.");
     }
 
     private static List<Caso> leerCasos(Path archivo) throws IOException {
@@ -117,6 +135,39 @@ public class EvaluarPrioridades {
         }
     }
 
+    /** Compara los resultados con las metas de los requerimientos. */
+    static List<Meta> metas(List<Resultado> resultados) {
+        List<Resultado> respondidos = resultados.stream().filter(r -> r.error() == null).toList();
+        int total = respondidos.size();
+        double exactos = total == 0 ? 0 : respondidos.stream().filter(Resultado::acierto).count() / (double) total;
+        double aUnNivel = total == 0 ? 0
+                : respondidos.stream().filter(r -> Math.abs(r.diferencia()) <= 1).count() / (double) total;
+        double respuesta = resultados.isEmpty() ? 0 : total / (double) resultados.size();
+        long p95 = percentil(respondidos.stream().map(Resultado::milisegundos).sorted().toList(), 0.95);
+        return List.of(
+                new Meta("RNF-IA-1", "Aciertos exactos", "≥ " + entero(META_EXACTOS), entero(exactos),
+                        total > 0 && exactos >= META_EXACTOS),
+                new Meta("RNF-IA-1", "A un nivel o menos de la esperada", "≥ " + entero(META_A_UN_NIVEL),
+                        entero(aUnNivel), total > 0 && aUnNivel >= META_A_UN_NIVEL),
+                new Meta("RNF-IA-2", "Tiempo de respuesta, percentil 95", "≤ " + META_P95_MS + " ms",
+                        total == 0 ? "sin datos" : p95 + " ms", total > 0 && p95 <= META_P95_MS),
+                new Meta("RNF-IA-3", "Casos con respuesta válida", "≥ " + entero(META_RESPONDIDOS), entero(respuesta),
+                        respuesta >= META_RESPONDIDOS));
+    }
+
+    /** Percentil por el método del rango más cercano, sobre una lista ya ordenada. */
+    static long percentil(List<Long> ordenados, double fraccion) {
+        if (ordenados.isEmpty()) {
+            return 0;
+        }
+        int posicion = (int) Math.ceil(fraccion * ordenados.size()) - 1;
+        return ordenados.get(Math.max(0, Math.min(posicion, ordenados.size() - 1)));
+    }
+
+    private static String entero(double fraccion) {
+        return Math.round(fraccion * 100) + " %";
+    }
+
     private static String informe(List<Resultado> resultados, String url) {
         List<Resultado> respondidos = resultados.stream().filter(r -> r.error() == null).toList();
         long aciertos = respondidos.stream().filter(Resultado::acierto).count();
@@ -141,6 +192,17 @@ public class EvaluarPrioridades {
         md.append("| Por debajo de la esperada | ").append(subestimados.size())
                 .append(" (los más delicados: el reclamo quedaría con menos prioridad de la que merece) |\n");
         md.append("| Tiempo de respuesta | ").append(tiempos(tiempos)).append(" |\n\n");
+        md.append("## Metas\n\n");
+        md.append("Las metas están en [`requerimientos.md`](../requerimientos.md#requerimientos-del-componente-de-ia).\n\n");
+        md.append("| Requisito | Meta | Objetivo | Obtenido | Resultado |\n| --- | --- | --- | --- | --- |\n");
+        for (Meta meta : metas(resultados)) {
+            md.append("| ").append(meta.requisito()).append(" | ").append(meta.nombre()).append(" | ")
+                    .append(meta.objetivo()).append(" | ").append(meta.obtenido()).append(" | ")
+                    .append(meta.cumple() ? "Cumple" : "**No cumple**").append(" |\n");
+        }
+        md.append("\nLa privacidad (RNF-IA-4) no se mide acá: la garantiza el contrato de REST 2, que solo acepta ")
+                .append("categoría y descripción (`PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`).\n\n");
+        md.append("## Casos\n\n");
         if (respondidos.size() < resultados.size()) {
             int sinRespuesta = resultados.size() - respondidos.size();
             md.append(sinRespuesta == 1 ? "Hubo 1 caso" : "Hubo " + sinRespuesta + " casos")

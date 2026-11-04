@@ -1,7 +1,8 @@
 # Evidencias de ejecución
 
-Cómo demostrar cada caso de la Primera Parte y de las integraciones de la Segunda Parte: qué test
-automático lo cubre y cómo reproducirlo a mano.
+Cómo demostrar cada caso de la Primera Parte, de las integraciones de la Segunda Parte y de las pruebas
+del Integrador: qué test automático lo cubre y cómo reproducirlo a mano. Los
+[requerimientos](../requerimientos.md) dicen qué caso verifica cada requerimiento.
 
 ## Tests automáticos
 
@@ -17,7 +18,7 @@ npm install
 npm test             # 74 tests: capa de API, etiquetas y componentes
 
 cd ..
-node --test scripts/verificar-demo.test.mjs   # el script que recorre la demo, contra un sistema simulado
+node --test scripts/*.test.mjs   # los scripts de la demo y de la carga, contra un sistema simulado
 ```
 
 Guardar en esta carpeta la salida de los comandos (`BUILD SUCCESS` y el resumen de Vitest).
@@ -177,24 +178,41 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | CP66 | Cada agente ve solo su área; un ciudadano no ve la gestión | `cadaAgenteVeSoloSuAreaYLosCiudadanosNoLoVen` | Como Carla, **Tablero** muestra solo Alumbrado. Solo por API: `GET /api/dashboard/gestion` con la sesión de Ana responde `403` |
 | CP67 | Período inválido o filtro inexistente: `400` o `404` | `losParametrosInvalidosResponden400O404`, `ServicioTableroTest.elPeriodoTieneQueSerValido` | Solo por API: `desde` posterior a `hasta` responde `400` |
 
+### Integrador: prueba de carga básica
+
+Ver [Prueba de carga](../requerimientos.md#prueba-de-carga) en los requerimientos. La de la IA es la
+evaluación de CP25, con sus metas (RNF-IA-1 a RNF-IA-3).
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP68 | 20 usuarios simultáneos leyendo durante 30 s: ningún error y percentil 95 ≤ 1000 ms (RNF-3) | `scripts/prueba-carga.test.mjs` (el script) y el paso «Prueba de carga básica» del CI (el sistema, con 3000 ms de límite) | Con la demo levantada: `docker compose run --rm -T prueba-carga > docs/evidencias/prueba-carga.md`. Termina con "Resultado: **cumple**" |
+
 ## Capturas de la interfaz
 
-Las capturas de `interfaz/` muestran el recorrido completo de los tres roles. **Se tomaron con la
-API simulada** (`npm run mock`), no con el backend real: sirven para ver la interfaz, no como
-evidencia de la integración.
+Las capturas de `interfaz/` muestran el recorrido completo de los tres roles, con el login, la foto, los
+posibles duplicados y los tableros. **Se tomaron con la API simulada** (`npm run mock`), no con el backend
+real: sirven para ver la interfaz, no como evidencia de la integración. Por eso la prioridad sale "por
+categoría" (la API simulada no llama a la IA) y la verificación del teléfono está en modo simulado.
 
-| Captura | Qué muestra |
-| --- | --- |
-| [02-formulario-crear](interfaz/02-formulario-crear.png) | Ciudadano: alta de un reclamo |
-| [03-detalle-asignado-ciudadano](interfaz/03-detalle-asignado-ciudadano.png) | Reclamo asignado automáticamente, con historial y avisos |
-| [04-detalle-ingresado-sin-area](interfaz/04-detalle-ingresado-sin-area.png) | Reclamo sin área compatible |
-| [06-agente-listado](interfaz/06-agente-listado.png) | Agente: reclamos de su área |
-| [07-agente-en-proceso](interfaz/07-agente-en-proceso.png) | Agente: reclamo tomado, listo para resolver |
-| [08-admin-listado](interfaz/08-admin-listado.png) | Administrador: todos los reclamos, con filtros |
-| [09-admin-administracion](interfaz/09-admin-administracion.png) | Administrador: reclamos sin asignar y cobertura de las áreas |
-| [10-admin-asignacion-manual](interfaz/10-admin-asignacion-manual.png) | Administrador: asignación manual y rechazo |
-| [13-ciudadano-cerrado](interfaz/13-ciudadano-cerrado.png) | Flujo completo: historial de cinco pasos y avisos |
-| [14-avisos-ciudadano](interfaz/14-avisos-ciudadano.png) | Pestaña Avisos: lo que recibió el usuario, con enlace a cada reclamo |
+| Captura | Qué muestra | Caso |
+| --- | --- | --- |
+| [01-ingreso](interfaz/01-ingreso.png) | Pantalla de ingreso, con el registro y el tablero público sin sesión | CP41 |
+| [02-formulario-crear](interfaz/02-formulario-crear.png) | Ciudadano: alta con la dirección elegida entre las sugerencias del mapa y la vista previa de la foto | CP27, CP53 |
+| [03-detalle-asignado-ciudadano](interfaz/03-detalle-asignado-ciudadano.png) | Reclamo asignado automáticamente, con la foto, el enlace a Google Maps, el historial y los avisos | CP01, CP28 |
+| [04-detalle-ingresado-sin-area](interfaz/04-detalle-ingresado-sin-area.png) | Reclamo sin área compatible (Residuos en Ezpeleta): queda ingresado | CP06 |
+| [05-verificacion-telefono](interfaz/05-verificacion-telefono.png) | Cuenta nueva: la verificación del teléfono antes del primer reclamo, en modo simulado | CP47 |
+| [06-agente-listado](interfaz/06-agente-listado.png) | Agente: los reclamos de su área | CP12 |
+| [07-agente-en-proceso](interfaz/07-agente-en-proceso.png) | Agente: reclamo tomado, con la observación lista para resolver | CP08 |
+| [08-admin-listado](interfaz/08-admin-listado.png) | Administrador: todos los reclamos, con filtros | CP12 |
+| [09-admin-administracion](interfaz/09-admin-administracion.png) | Administrador: reclamos sin asignar, cuentas de ciudadanos y cobertura de las áreas | CP06, CP51 |
+| [10-admin-asignacion-manual](interfaz/10-admin-asignacion-manual.png) | Administrador: asignación manual y rechazo | CP06 |
+| [11-posible-duplicado](interfaz/11-posible-duplicado.png) | Alta: un reclamo abierto de la misma categoría a 13 m, con su foto y sin datos del autor | CP58 |
+| [12-tablero-gestion](interfaz/12-tablero-gestion.png) | Administrador: tablero de gestión y tablero público | CP65 |
+| [13-ciudadano-cerrado](interfaz/13-ciudadano-cerrado.png) | Flujo completo: el ciudadano confirmó la solución; historial de cinco pasos y avisos | CP08 |
+| [14-avisos-ciudadano](interfaz/14-avisos-ciudadano.png) | Pestaña Avisos: lo que recibió el usuario, con enlace a cada reclamo | CP14 |
+| [15-tablero-publico](interfaz/15-tablero-publico.png) | Tablero público desde la pantalla de ingreso, sin sesión | CP63 |
+
+Para volver a tomarlas: `npm run mock` y `npm run dev` en `frontend/`, y el mismo recorrido a mano.
 
 ## Pendiente antes de entregar
 
@@ -202,7 +220,7 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 
 - [ ] Salida de `./mvnw test` con `BUILD SUCCESS`.
 - [ ] Salida de `npm test`.
-- [ ] Repetir el recorrido de las capturas contra el backend real y reemplazarlas.
+- [ ] Repetir el recorrido de las capturas contra el backend real, con la IA, y reemplazarlas.
 - [ ] Consulta SQL de `reclamos`, `historial_estados` y `notificaciones` después del flujo de CP08.
 - [ ] Log del backend al arrancar con `palabras-clave` y con `carga-trabajo` (CP04 y CP05).
 - [ ] Salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
@@ -214,7 +232,6 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Salida de `docker compose run --rm verificar-demo` con la clave de Gemini real, sin fallas (CP38).
 - [ ] Salida de `docker stats --no-stream` con la demo levantada, o la del paso «Memoria de cada contenedor» del CI (CP40).
 - [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
-- [ ] Rehacer las capturas de `interfaz/`: todavía muestran el selector de usuario que el login del PR 14 reemplazó.
 - [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
 - [ ] Capturas del alta con foto, del formato rechazado y del detalle con la foto contra el backend real (CP53 y CP54), y del contenido de `/data/fotos` (CP56).
 - [ ] Capturas del posible duplicado en el alta, del aviso de apoyo y del detalle con el contador contra el backend real (CP58 y CP60).
@@ -225,3 +242,4 @@ Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y 
 - [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
 - [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).
 - [ ] Respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
+- [ ] Correr la prueba de carga con la demo levantada en la notebook de la presentación y commitear `prueba-carga.md` (CP68).

@@ -132,6 +132,9 @@ Termina con `N pasos bien, N avisos, N fallas` y sale con código 1 si hay algun
 trabajo «Demo completa», después de levantar los ocho contenedores con el proveedor simulado de IA, porque el
 CI no tiene la clave de Gemini.
 
+Después, el mismo trabajo corre la [prueba de carga básica](requerimientos.md#prueba-de-carga): si la
+demo responde con errores cuando la consultan 20 usuarios a la vez, el CI queda en rojo.
+
 ## Si algo sale mal
 
 | Síntoma | Causa probable | Qué hacer |
