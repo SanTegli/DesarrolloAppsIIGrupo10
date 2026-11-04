@@ -1,0 +1,122 @@
+openapi: 3.1.0
+info:
+  title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
+  description: Sugiere la prioridad de un reclamo a partir de su categoría y su descripción
+    con un modelo de lenguaje externo (Gemini u OpenAI). No recibe datos personales.
+  version: 1.0.0
+servers:
+- url: http://localhost
+  description: Generated server url
+tags:
+- name: Prioridades
+  description: Prioridad sugerida por un modelo de lenguaje
+paths:
+  /api/prioridades/evaluar:
+    post:
+      tags:
+      - Prioridades
+      summary: Sugerir la prioridad de un reclamo
+      description: "Le pide al modelo configurado una prioridad (BAJA, MEDIA, ALTA\
+        \ o CRITICA) y una explicación breve. Es una sugerencia: el backend la combina\
+        \ con la prioridad de la categoría."
+      operationId: evaluar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EvaluacionRequest"
+        required: true
+      responses:
+        "200":
+          description: Prioridad sugerida
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/EvaluacionResponse"
+        "400":
+          description: Entrada inválida (DATOS_INVALIDOS)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: El modelo respondió algo inválido (RESPUESTA_INVALIDA)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "Proveedor caído, sin clave o sin cuota (PROVEEDOR_NO_DISPONIBLE)"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+components:
+  schemas:
+    EvaluacionRequest:
+      type: object
+      properties:
+        categoria:
+          type: string
+          example: Luminaria rota
+          maxLength: 80
+          minLength: 0
+        descripcion:
+          type: string
+          example: Poste inclinado con cables expuestos frente a la escuela
+          maxLength: 1000
+          minLength: 0
+      required:
+      - categoria
+      - descripcion
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        codigo:
+          type: string
+        mensaje:
+          type: string
+        detalles:
+          type: array
+          items:
+            type: string
+        ruta:
+          type: string
+        fecha:
+          type: string
+          format: date-time
+    EvaluacionResponse:
+      type: object
+      properties:
+        prioridad:
+          type: string
+          enum:
+          - BAJA
+          - MEDIA
+          - ALTA
+          - CRITICA
+          example: CRITICA
+        motivo:
+          type: string
+          example: "Hay cables expuestos en un lugar con chicos: riesgo eléctrico\
+            \ inmediato."
+          maxLength: 300
+        proveedor:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - simulado
+          example: gemini
+        modelo:
+          type: string
+          example: gemini-3.5-flash-lite

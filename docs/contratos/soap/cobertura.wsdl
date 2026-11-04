@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><wsdl:definitions xmlns:wsdl="http://schemas.xmlsoap.org/wsdl/" xmlns:sch="http://uade.edu.ar/reclamos/cobertura/v1" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/" xmlns:tns="http://uade.edu.ar/reclamos/cobertura/v1" targetNamespace="http://uade.edu.ar/reclamos/cobertura/v1">
+  <wsdl:types>
+    <xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" elementFormDefault="qualified" targetNamespace="http://uade.edu.ar/reclamos/cobertura/v1">
+
+  <!-- Qué áreas atienden una categoría en un barrio de un municipio. -->
+  <xs:element name="ConsultarCoberturaRequest">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element name="municipioId" type="tns:Identificador"/>
+        <xs:element name="barrioId" type="tns:Identificador"/>
+        <xs:element name="categoriaId" type="tns:Identificador"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <!-- Lista vacía: ninguna área cubre la combinación. No es un error. -->
+  <xs:element name="ConsultarCoberturaResponse">
+    <xs:complexType>
+      <xs:sequence>
+        <xs:element maxOccurs="unbounded" minOccurs="0" name="area" type="tns:Area"/>
+      </xs:sequence>
+    </xs:complexType>
+  </xs:element>
+
+  <xs:complexType name="Area">
+    <xs:sequence>
+      <xs:element name="id" type="tns:Identificador"/>
+      <xs:element name="nombre" type="tns:Nombre"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:simpleType name="Identificador">
+    <xs:restriction base="xs:long">
+      <xs:minInclusive value="1"/>
+    </xs:restriction>
+  </xs:simpleType>
+
+  <xs:simpleType name="Nombre">
+    <xs:restriction base="xs:string">
+      <xs:minLength value="1"/>
+      <xs:maxLength value="80"/>
+    </xs:restriction>
+  </xs:simpleType>
+</xs:schema>
+  </wsdl:types>
+  <wsdl:message name="ConsultarCoberturaResponse">
+    <wsdl:part element="tns:ConsultarCoberturaResponse" name="ConsultarCoberturaResponse">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:message name="ConsultarCoberturaRequest">
+    <wsdl:part element="tns:ConsultarCoberturaRequest" name="ConsultarCoberturaRequest">
+    </wsdl:part>
+  </wsdl:message>
+  <wsdl:portType name="CoberturaPort">
+    <wsdl:operation name="ConsultarCobertura">
+      <wsdl:input message="tns:ConsultarCoberturaRequest" name="ConsultarCoberturaRequest">
+    </wsdl:input>
+      <wsdl:output message="tns:ConsultarCoberturaResponse" name="ConsultarCoberturaResponse">
+    </wsdl:output>
+    </wsdl:operation>
+  </wsdl:portType>
+  <wsdl:binding name="CoberturaPortSoap11" type="tns:CoberturaPort">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <wsdl:operation name="ConsultarCobertura">
+      <soap:operation soapAction=""/>
+      <wsdl:input name="ConsultarCoberturaRequest">
+        <soap:body use="literal"/>
+      </wsdl:input>
+      <wsdl:output name="ConsultarCoberturaResponse">
+        <soap:body use="literal"/>
+      </wsdl:output>
+    </wsdl:operation>
+  </wsdl:binding>
+  <wsdl:service name="CoberturaService">
+    <wsdl:port binding="tns:CoberturaPortSoap11" name="CoberturaPortSoap11">
+      <soap:address location="http://localhost:8081/ws"/>
+    </wsdl:port>
+  </wsdl:service>
+</wsdl:definitions>
