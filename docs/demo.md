@@ -1,7 +1,8 @@
 # Guion de la demo
 
-La demo recorre **un solo reclamo** a través de las cinco integraciones de la Segunda Parte. Así se ve el
-flujo completo y no una captura suelta de cada pieza. Después se apagan servicios a propósito, para
+La demo recorre **un solo reclamo** a través de las cinco integraciones del alta: Georef, la IA, el servicio
+SOAP, RabbitMQ y el correo. La sexta, Telegram, se usa antes, una sola vez por cuenta, para verificar el
+teléfono. Así se ve el flujo completo y no una captura suelta de cada pieza. Después se apagan servicios a propósito, para
 mostrar que el sistema sigue andando.
 
 Duración: unos 12 minutos para el recorrido y 5 para las fallas.

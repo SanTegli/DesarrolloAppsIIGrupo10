@@ -9,31 +9,34 @@ estrategias, integraciones) y las capas de afuera las implementan.
 ```mermaid
 flowchart TB
   subgraph UI["Interfaz - frontend/ (React + Vite)"]
-    COMP["Componentes: ingreso, listado, alta, detalle, administración"]
+    COMP["Componentes: ingreso, verificación del teléfono, listado, alta con duplicados,<br/>detalle, avisos, administración y tableros"]
     API["src/api: cliente HTTP, sesión y token CSRF"]
   end
   subgraph SEG["Seguridad - reclamos-app/aplicacion/seguridad"]
     FIL["Cadena de filtros de Spring Security:<br/>CSRF, sesión, autorización, logout"]
   end
   subgraph REST["Presentación REST - reclamos-app/aplicacion/rest"]
-    CTRL["ReclamoController, NotificacionController, UsuarioController,<br/>CatalogoController, AutenticacionController"]
+    CTRL["ReclamoController, NotificacionController, UsuarioController, CatalogoController,<br/>AutenticacionController, VerificacionTelefonoController, UbicacionController, TableroController"]
     DTO["DTOs, RestMapper, ManejadorGlobalErrores"]
   end
   subgraph APP["Servicios - reclamos-app/aplicacion"]
     FAC["GestionReclamosFacade"]
-    SRV["ReclamoService, ServicioAsignacion, ServicioNotificaciones,<br/>ServicioVencimientos y servicios de consulta"]
-    PERM["PermisosReclamo"]
+    SRV["ReclamoService, ServicioAsignacion, ServicioNotificaciones, ServicioVencimientos,<br/>ServicioDuplicados, ServicioApoyos, ServicioCuentas, ServicioUbicaciones<br/>y servicios de consulta"]
+    OTR["ServicioFotos, ServicioVerificacionTelefono, ServicioTablero"]
+    PERM["PermisosReclamo y ControlesDeUso"]
     EST["Estrategias de prioridad y asignación"]
     OBS["PublicadorEventosSpring, NotificacionesReclamoListener<br/>y AuditoriaListener"]
-    TAR["TareaVencimientos"]
+    MSG["OutboxAvisos y PublicadorMensajes"]
+    INT["Adaptadores: CoberturaLocal o CoberturaSoap, GeorefGeocodificador,<br/>ClienteServicioPrioridad, CanalTelegram o CanalSimulado, AlmacenFotosLocal"]
+    TAR["Tareas: TareaVencimientos, PublicadorMensajes, BotTelegram"]
   end
   subgraph DOM["Dominio - reclamos-dominio (Java puro)"]
-    MOD["Modelo y PoliticaTransiciones"]
+    MOD["Modelo, PoliticaTransiciones y PoliticaReapertura"]
     FAB["ReclamoFactory"]
-    CON["Contratos: Repository, Estrategia, PublicadorEventos,<br/>CatalogoCobertura, Geocodificador, eventos"]
+    CON["Contratos: 10 Repository, EstrategiaPrioridad, EstrategiaAsignacion,<br/>PublicadorEventos, CatalogoCobertura, Geocodificador, ConsultasTablero, eventos"]
   end
   subgraph PERS["Persistencia - reclamos-persistencia"]
-    ADP["Adaptadores RepositoryJpa"]
+    ADP["Adaptadores RepositoryJpa y ConsultasTableroJpa"]
     SDJ["Interfaces Spring Data y orm.xml"]
   end
   DB[("MySQL en dev, H2 en tests")]
@@ -44,16 +47,24 @@ flowchart TB
   FIL --> CTRL
   CTRL --> FAC
   CTRL --> DTO
+  CTRL --> OTR
   FAC --> SRV
+  FAC --> OTR
   SRV --> PERM
   SRV --> EST
   SRV --> FAB
   SRV --> MOD
   SRV --> CON
   SRV --> OBS
+  SRV --> MSG
+  OTR --> CON
+  OTR --> INT
   TAR --> SRV
+  TAR --> MSG
   OBS --> CON
   EST --> CON
+  EST --> INT
+  INT -.->|"implementan CatalogoCobertura<br/>y Geocodificador"| CON
   ADP -.->|implementa| CON
   ADP --> SDJ
   SDJ --> DB
@@ -218,9 +229,14 @@ sin tocar el código que la usa:
 
 `ServicioAsignacion` no sabe cuál de las dos recibe: le pide candidatas a `CatalogoCobertura`. Lo remoto
 suma lo que lo local no tiene: tiempo límite, errores de red y un modo degradado (la asignación queda
-pendiente). Las evidencias de los dos modos son CP16 a CP20 en
-[evidencias](evidencias/README.md): con el backend levantado a mano (perfil `dev`) la cobertura es local, y en
-Compose es remota.
+pendiente). Con el backend levantado a mano (perfil `dev`) la cobertura es local, y en Compose es remota.
+
+Evidencias, en [evidencias](evidencias/README.md):
+
+- **CP69:** el mismo reclamo resuelto en los dos modos, con la misma área.
+- **CP16 a CP20:** lo que solo tiene el modo remoto (WSDL, faults, servicio caído o lento).
+- **CP04 y CP05:** el cambio de estrategia local.
+- **CP21 a CP24:** la prioridad remota con la IA y su respaldo local.
 
 ## Servicios orientados a componentes
 
@@ -234,21 +250,44 @@ Cada servicio tiene una responsabilidad y se puede probar por separado.
 | `ServicioVencimientos` | Marcar los reclamos que pasaron su fecha límite y publicar `ReclamoVencido` |
 | `ConsultaReclamosService` | Listar según el rol, buscar por número, avisos y acciones disponibles |
 | `ConsultaCatalogosService` | Usuarios, categorías, barrios y áreas |
+| `ServicioUbicaciones` | Sugerir direcciones con el `Geocodificador` (Georef) y confirmar la elegida dentro del municipio |
+| `ServicioFotos` | Validar y re-codificar la foto, y guardarla en dos pasos: pendiente antes del alta, confirmada después |
+| `ServicioDuplicados` | Buscar reclamos abiertos de la misma categoría cerca del punto elegido |
+| `ServicioApoyos` | Sumar, retirar y contar los apoyos de los ciudadanos a un reclamo |
+| `ServicioCuentas` | Registrar ciudadanos y bloquear o desbloquear cuentas |
+| `ServicioVerificacionTelefono` | Emitir y confirmar códigos por el `CanalVerificacion` activo (Telegram o simulado) |
+| `ServicioTablero` | Validar el período, decidir qué ve cada rol y calcular los porcentajes de los tableros |
 
-`PermisosReclamo` no es un servicio de negocio: es el componente que los servicios consultan para saber
-quién puede crear y quién puede ver cada reclamo.
+Hay dos componentes que no son servicios de negocio, pero que los servicios consultan:
+
+- **`PermisosReclamo`**: quién puede crear y quién puede ver cada reclamo.
+- **`ControlesDeUso`**: la cadena de controles que se recorre antes de crear, reabrir o apoyar. Los controles
+  son teléfono verificado, cuenta no bloqueada y límite diario; ver
+  [Controles de uso y reaperturas](#controles-de-uso-y-reaperturas).
 
 Los servicios se integran entre sí de dos formas:
 
-- **Por interfaces.** Dependen de los contratos del dominio (`ReclamoRepository`,
-  `EstrategiaPrioridad`, `EstrategiaAsignacion`, `PublicadorEventos`, `CatalogoCobertura`) y Spring
-  inyecta la implementación.
+- **Por interfaces.** Dependen de los contratos del dominio y Spring inyecta la implementación:
+  - Los diez `Repository` y el puerto de lectura `ConsultasTablero`.
+  - `EstrategiaPrioridad` y `EstrategiaAsignacion`.
+  - `PublicadorEventos`.
+  - `CatalogoCobertura` y `Geocodificador`.
+
+  Dentro de la aplicación, también por interfaces: `AlmacenFotos` (las fotos), `CanalVerificacion`
+  (Telegram o simulado), `ControlDeUso` (cada control de la cadena) y `SalidaDeAvisos` (la outbox o
+  ninguna, según `reclamos.mensajeria.habilitada`).
 - **Por eventos de dominio.** `ReclamoService` y `ServicioVencimientos` publican `ReclamoCreado`,
   `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto` y `ReclamoVencido`. Dos listeners
   reaccionan sin que quien publica los conozca: `NotificacionesReclamoListener` genera los avisos
   y `AuditoriaListener` registra cada evento.
 
-`TareaVencimientos` ejecuta `ServicioVencimientos` cada minuto. El intervalo se cambia con
+Hay tres tareas programadas:
+
+- `TareaVencimientos` ejecuta `ServicioVencimientos` cada minuto.
+- `PublicadorMensajes` pasa los mensajes pendientes de la outbox a RabbitMQ cada 2 s, solo con la mensajería habilitada.
+- `BotTelegram` consulta el bot cada 2 s, solo en modo `telegram`.
+
+En `TareaVencimientos`, el intervalo se cambia con
 `reclamos.vencimientos.intervalo-ms` y la tarea se apaga con `reclamos.vencimientos.habilitado: false`.
 Toda la configuración `reclamos.*` está tipada en `PropiedadesReclamos`: una clave mal escrita o un
 intervalo que no sea positivo impiden el arranque, en lugar de quedar ignorados.
@@ -474,6 +513,10 @@ límite exacto del partido.
 Cada aviso que genera `ServicioNotificaciones` sigue guardándose como aviso interno y, con
 `reclamos.mensajeria.habilitada: true`, también sale por correo. La publicación es asincrónica: el alta no
 espera a RabbitMQ ni al SMTP.
+
+La secuencia de abajo muestra un aviso en el tiempo. El flujo de mensajes completo, con el exchange, las
+claves de ruteo, la cola de errores y los caminos de falla, está en la
+[topología del contrato de mensajes](contratos/mensajes.md#topología).
 
 ```mermaid
 sequenceDiagram

@@ -119,7 +119,7 @@ dependencias en una caché de BuildKit (`RUN --mount=type=cache`). La primera co
 las siguientes las toman de la caché, aunque cambie el código.
 
 **Verificación.** `docker compose run --rm verificar-demo` corre `scripts/verificar-demo.mjs` en un contenedor
-de Node, dentro de la misma red: crea un reclamo y sigue su recorrido por las cinco integraciones. Ese
+de Node, dentro de la misma red: crea un reclamo y sigue su recorrido por las cinco integraciones del alta. Ese
 contenedor está en el perfil `verificacion`, así que `docker compose up` no lo levanta. El detalle está en
 [demo.md](demo.md#verificación-automática).
 

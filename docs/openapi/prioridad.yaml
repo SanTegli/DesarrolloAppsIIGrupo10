@@ -81,19 +81,30 @@ components:
         status:
           type: integer
           format: int32
+          example: 504
         codigo:
           type: string
+          example: TIEMPO_AGOTADO
         mensaje:
           type: string
+          example: Gemini no respondió a tiempo
         detalles:
           type: array
           items:
             type: string
         ruta:
           type: string
+          example: /api/prioridades/evaluar
         fecha:
           type: string
           format: date-time
+      required:
+      - codigo
+      - detalles
+      - fecha
+      - mensaje
+      - ruta
+      - status
     EvaluacionResponse:
       type: object
       properties:
@@ -120,3 +131,8 @@ components:
         modelo:
           type: string
           example: gemini-3.5-flash-lite
+      required:
+      - modelo
+      - motivo
+      - prioridad
+      - proveedor

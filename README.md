@@ -28,7 +28,8 @@ backend/                    Proyecto Maven multimódulo (Java 21, Spring Boot 3)
   reclamos-app/             Servicios, fachada, eventos y API REST
 frontend/                   Interfaz React + Vite
   src/api/                  Única capa que habla con el backend
-  src/componentes/          Pantallas: listado, alta, detalle, avisos y administración
+  src/componentes/          Pantallas: ingreso, verificación del teléfono, listado, alta con posibles
+                            duplicados, detalle, avisos, administración y tableros
   mock/                     API simulada para trabajar sin Java ni MySQL
 servicios/                  Servicios de integración de la Segunda Parte, cada uno un proceso aparte
   servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
@@ -122,11 +123,13 @@ queda en una cookie del servidor; ver [Sesión](docs/api-contract.md#sesión) en
 
 | Rol | Qué puede hacer en la interfaz |
 | --- | --- |
-| Ciudadano | Crear reclamos, ver los suyos, cancelar, confirmar la solución o reabrir |
+| Ciudadano | Verificar el teléfono, crear reclamos con foto y ubicación, apoyar un reclamo igual en vez de crear otro, ver los suyos, cancelar mientras nadie lo tomó, confirmar la solución o reabrir (una vez, dentro de 7 días) |
 | Agente municipal | Ver los reclamos de su área, tomarlos y resolverlos |
-| Administrador | Ver todos, asignar a mano, reasignar y rechazar |
+| Administrador | Ver todos, asignar a mano o rechazar los que quedaron sin área, reasignar, y bloquear o desbloquear cuentas de ciudadanos |
 
-Los tres roles tienen además la pestaña **Avisos**, con las notificaciones que recibió el usuario.
+Los tres roles tienen además la pestaña **Avisos**, con las notificaciones que recibió el usuario, y la
+pestaña **Tablero**: el público para todos y, para agentes y administradores, también el de gestión. El
+tablero público se ve sin iniciar sesión, desde la pantalla de ingreso.
 
 El navegador llama a `/api` en el mismo origen y Vite reenvía esas llamadas al backend, por eso no
 hace falta configurar CORS. Para apuntar a otro backend, copiar `frontend/.env.example` a
@@ -218,17 +221,28 @@ Las estrategias activas se eligen en `backend/reclamos-app/src/main/resources/ap
 ```yaml
 reclamos:
   prioridad:
-    estrategia: categoria        # categoria | palabras-clave
+    estrategia: categoria        # categoria | palabras-clave | ia
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
+  cobertura:
+    origen: local                # local (la base del backend) | soap (servicio-cobertura)
 ```
+
+Son los valores por defecto, con el backend levantado a mano. En Compose se cambian por variables de
+entorno: `RECLAMOS_PRIORIDAD_ESTRATEGIA: ia` y `RECLAMOS_COBERTURA_ORIGEN: soap`.
 
 `categoria` conserva la prioridad base. `palabras-clave` busca las palabras completas
 `urgente`, `peligro`, `riesgo` y `accidente` en la descripción, sin distinguir mayúsculas:
 si encuentra alguna, devuelve el máximo entre la prioridad base y `ALTA`. No interpreta
-negaciones, plurales ni contexto; varias coincidencias no acumulan aumentos.
+negaciones, plurales ni contexto; varias coincidencias no acumulan aumentos. `ia` le pide la prioridad
+al servicio de prioridad (REST 2, con Gemini) y se queda con la mayor entre esa y la base; si el servicio
+falla o tarda más de 6 s, usa la base. El detalle está en [Prioridad con IA](docs/arquitectura.md#prioridad-con-ia).
 
-Las estrategias de asignación reciben únicamente las áreas candidatas del Repository
+`cobertura.origen` elige de dónde salen las áreas candidatas: `local` las consulta en la base del
+backend y `soap` se las pide a `servicio-cobertura`. Las dos dan el mismo resultado; ver
+[Acceso local y remoto](docs/arquitectura.md#acceso-local-y-remoto-entre-componentes).
+
+Las estrategias de asignación reciben únicamente las áreas candidatas de `CatalogoCobertura`
 (activas, que atienden la categoría y cubren el barrio). `jurisdiccion` elige el menor ID;
 `carga-trabajo` elige la menor cantidad de reclamos `ASIGNADO` o `EN_PROCESO`, con desempate
 por menor ID. Sin candidatas, ambas devuelven vacío. Una estrategia configurada con un
@@ -270,15 +284,18 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
   proxy remoto, proxy de caché, Decorator, circuit breaker, outbox y consumidor idempotente en las
   integraciones; Chain of Responsibility en el login y en los controles de uso; lado de lectura separado
   (Domain Reporting) para los tableros.
-- [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso, creación (con las cinco
-  integraciones) y cambio de estado.
+- [Proceso de negocio y secuencias](docs/secuencias.md): estados, proceso de negocio (con la
+  verificación, los duplicados y la reapertura), creación, el alta con sus cinco integraciones, cambio de
+  estado y vencimiento.
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
-- [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte.
+- [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte, con el
+  [flujo de mensajes](docs/contratos/mensajes.md#topología) de RabbitMQ.
 - [Despliegue](docs/despliegue.md): contenedores, puertos, arranque, memoria y configuración.
 - [Guion de la demo](docs/demo.md): recorrido para presentar, fallas a propósito, matriz de fallos y
   verificación automática.
 - [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso, capturas de la interfaz,
-  [evaluación de la IA](docs/evidencias/ia-evaluacion.md) y lo pendiente antes de entregar.
+  [evaluación de la IA](docs/evidencias/ia-evaluacion.md), [prueba de carga](docs/evidencias/prueba-carga.md)
+  y lo pendiente antes de entregar.
 - [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
 
 ## Plan de trabajo del Hito 1
@@ -309,3 +326,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 17 | `feature/17-duplicados-apoyos` | Posibles duplicados en el alta (misma categoría, a menos de 50 m, con Haversine) y apoyos únicos por ciudadano, sin datos del autor |
 | 18 | `feature/18-dashboards` | Tablero público (sin sesión ni datos personales) y de gestión (vencidos por fecha y tabla por área y barrio), con consultas agregadas en un puerto de lectura propio |
 | 19 | `feature/19-cierre` | Requerimientos funcionales y no funcionales (con los de la IA y su verificación), metas en la evaluación de la IA, prueba de carga básica en el CI, diagramas de componentes y despliegue al día, acceso local y remoto, y capturas nuevas de la interfaz |
+| 20 | `feature/20-consistencia` | Revisión completa contra el TP: metas de la IA sobre los 25 casos (con `--rehacer`), requerimientos corregidos (rechazo, cancelación, límites), diagramas de capas, proceso de negocio, secuencias del alta y flujo de mensajes al día, CP69 de acceso local y remoto, y campos obligatorios en el OpenAPI de REST 2 |

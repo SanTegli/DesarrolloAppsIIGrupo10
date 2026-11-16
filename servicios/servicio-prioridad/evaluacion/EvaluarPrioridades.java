@@ -28,6 +28,13 @@ import java.util.regex.Pattern;
  *
  * Opciones: {@code --url http://localhost:8082}, {@code --pausa-ms 7000} (espera entre casos, para no pasar
  * el límite por minuto del nivel gratuito), {@code --casos <archivo>} y {@code --salida <archivo>}.
+ *
+ * <p>Con {@code --rehacer <informe.md>} no llama al servicio: lee la tabla de casos de un informe anterior y
+ * vuelve a calcular los totales y las metas con los mismos datos medidos. Sirve para regenerar el informe si
+ * cambia el cálculo, sin la clave y sin gastar cuota.
+ *
+ * <p>Todas las cifras se calculan sobre <b>todos</b> los casos: uno sin respuesta válida cuenta como no
+ * acertado, y su tiempo (por ejemplo, el corte por tiempo agotado) entra en el percentil 95.
  */
 public class EvaluarPrioridades {
 
@@ -53,6 +60,11 @@ public class EvaluarPrioridades {
             return caso.esperada().equals(obtenida);
         }
 
+        /** Respondió y quedó a un nivel o menos de la esperada. Un caso sin respuesta no cuenta. */
+        boolean aUnNivel() {
+            return obtenida != null && Math.abs(diferencia()) <= 1;
+        }
+
         /** Diferencia de niveles: negativa si la IA puso menos prioridad que la esperada. */
         int diferencia() {
             return obtenida == null ? 0 : NIVELES.indexOf(obtenida) - NIVELES.indexOf(caso.esperada());
@@ -60,6 +72,11 @@ public class EvaluarPrioridades {
     }
 
     public static void main(String[] args) throws Exception {
+        String rehacer = opcion(args, "--rehacer", null);
+        if (rehacer != null) {
+            rehacerInforme(Path.of(rehacer), Path.of(opcion(args, "--salida", rehacer)));
+            return;
+        }
         String url = opcion(args, "--url", "http://localhost:8082");
         long pausa = Long.parseLong(opcion(args, "--pausa-ms", "7000"));
         Path casos = Path.of(opcion(args, "--casos", "servicios/servicio-prioridad/evaluacion/casos.tsv"));
@@ -83,8 +100,20 @@ public class EvaluarPrioridades {
             System.out.println("Ningún caso respondió: no se modificó " + salida + ". ¿Está levantado el servicio?");
             System.exit(1);
         }
-        Files.createDirectories(salida.toAbsolutePath().getParent());
-        Files.writeString(salida, informe(resultados, url), StandardCharsets.UTF_8);
+        String origen = "Generado por `EvaluarPrioridades.java` el "
+                + ZonedDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ROOT))
+                + " contra `" + url + "`.";
+        guardar(salida, resultados, proveedorDe(resultados), origen);
+    }
+
+    /** Escribe el informe e imprime las metas en la consola. */
+    private static void guardar(Path salida, List<Resultado> resultados, String proveedor, String origen)
+            throws IOException {
+        Path carpeta = salida.toAbsolutePath().getParent();
+        if (carpeta != null) {
+            Files.createDirectories(carpeta);
+        }
+        Files.writeString(salida, informe(resultados, proveedor, origen), StandardCharsets.UTF_8);
         System.out.println("Resultado guardado en " + salida);
         List<Meta> metas = metas(resultados);
         metas.forEach(meta -> System.out.printf("%-10s %-32s objetivo %-10s obtenido %-12s %s%n", meta.requisito(),
@@ -135,15 +164,17 @@ public class EvaluarPrioridades {
         }
     }
 
-    /** Compara los resultados con las metas de los requerimientos. */
+    /**
+     * Compara los resultados con las metas de los requerimientos. Todo se calcula sobre el total de casos: uno
+     * sin respuesta válida no es un acierto, y su tiempo cuenta para la latencia.
+     */
     static List<Meta> metas(List<Resultado> resultados) {
-        List<Resultado> respondidos = resultados.stream().filter(r -> r.error() == null).toList();
-        int total = respondidos.size();
-        double exactos = total == 0 ? 0 : respondidos.stream().filter(Resultado::acierto).count() / (double) total;
-        double aUnNivel = total == 0 ? 0
-                : respondidos.stream().filter(r -> Math.abs(r.diferencia()) <= 1).count() / (double) total;
-        double respuesta = resultados.isEmpty() ? 0 : total / (double) resultados.size();
-        long p95 = percentil(respondidos.stream().map(Resultado::milisegundos).sorted().toList(), 0.95);
+        int total = resultados.size();
+        long respondidos = resultados.stream().filter(r -> r.error() == null).count();
+        double exactos = fraccion(resultados.stream().filter(Resultado::acierto).count(), total);
+        double aUnNivel = fraccion(resultados.stream().filter(Resultado::aUnNivel).count(), total);
+        double respuesta = fraccion(respondidos, total);
+        long p95 = percentil(resultados.stream().map(Resultado::milisegundos).sorted().toList(), 0.95);
         return List.of(
                 new Meta("RNF-IA-1", "Aciertos exactos", "≥ " + entero(META_EXACTOS), entero(exactos),
                         total > 0 && exactos >= META_EXACTOS),
@@ -152,7 +183,11 @@ public class EvaluarPrioridades {
                 new Meta("RNF-IA-2", "Tiempo de respuesta, percentil 95", "≤ " + META_P95_MS + " ms",
                         total == 0 ? "sin datos" : p95 + " ms", total > 0 && p95 <= META_P95_MS),
                 new Meta("RNF-IA-3", "Casos con respuesta válida", "≥ " + entero(META_RESPONDIDOS), entero(respuesta),
-                        respuesta >= META_RESPONDIDOS));
+                        total > 0 && respuesta >= META_RESPONDIDOS));
+    }
+
+    private static double fraccion(long cantidad, int total) {
+        return total == 0 ? 0 : cantidad / (double) total;
     }
 
     /** Percentil por el método del rango más cercano, sobre una lista ya ordenada. */
@@ -168,28 +203,30 @@ public class EvaluarPrioridades {
         return Math.round(fraccion * 100) + " %";
     }
 
-    private static String informe(List<Resultado> resultados, String url) {
-        List<Resultado> respondidos = resultados.stream().filter(r -> r.error() == null).toList();
-        long aciertos = respondidos.stream().filter(Resultado::acierto).count();
-        long aUnNivel = respondidos.stream().filter(r -> Math.abs(r.diferencia()) <= 1).count();
-        List<Resultado> subestimados = respondidos.stream().filter(r -> r.diferencia() < 0).toList();
-        List<Long> tiempos = respondidos.stream().map(Resultado::milisegundos).sorted().toList();
-        String proveedor = respondidos.isEmpty() ? "sin respuestas"
-                : respondidos.get(0).proveedor() + ", modelo " + respondidos.get(0).modelo();
+    private static String proveedorDe(List<Resultado> resultados) {
+        return resultados.stream().filter(r -> r.error() == null).findFirst()
+                .map(r -> r.proveedor() + ", modelo " + r.modelo()).orElse("sin respuestas");
+    }
+
+    private static String informe(List<Resultado> resultados, String proveedor, String origen) {
+        int total = resultados.size();
+        long respondidos = resultados.stream().filter(r -> r.error() == null).count();
+        long aciertos = resultados.stream().filter(Resultado::acierto).count();
+        long aUnNivel = resultados.stream().filter(Resultado::aUnNivel).count();
+        long subestimados = resultados.stream().filter(r -> r.diferencia() < 0).count();
+        List<Long> tiempos = resultados.stream().map(Resultado::milisegundos).sorted().toList();
 
         StringBuilder md = new StringBuilder();
         md.append("# Evaluación de la IA de prioridad\n\n");
-        md.append("Generado por `EvaluarPrioridades.java` el ")
-                .append(ZonedDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm", Locale.ROOT)))
-                .append(" contra `").append(url).append("`.\n\n");
+        md.append(origen).append("\n\n");
+        md.append("Todas las cifras son sobre los ").append(total).append(" casos: uno sin respuesta válida cuenta ")
+                .append("como no acertado, y su tiempo entra en el percentil 95.\n\n");
         md.append("| Dato | Valor |\n| --- | --- |\n");
         md.append("| Proveedor | ").append(proveedor).append(" |\n");
-        md.append("| Casos | ").append(resultados.size()).append(", ").append(respondidos.size())
-                .append(" respondidos |\n");
-        md.append("| Aciertos exactos | ").append(porcentaje(aciertos, respondidos.size())).append(" |\n");
-        md.append("| A un nivel o menos de la esperada | ").append(porcentaje(aUnNivel, respondidos.size()))
-                .append(" |\n");
-        md.append("| Por debajo de la esperada | ").append(subestimados.size())
+        md.append("| Casos | ").append(total).append(", ").append(respondidos).append(" con respuesta válida |\n");
+        md.append("| Aciertos exactos | ").append(porcentaje(aciertos, total)).append(" |\n");
+        md.append("| A un nivel o menos de la esperada | ").append(porcentaje(aUnNivel, total)).append(" |\n");
+        md.append("| Por debajo de la esperada | ").append(subestimados)
                 .append(" (los más delicados: el reclamo quedaría con menos prioridad de la que merece) |\n");
         md.append("| Tiempo de respuesta | ").append(tiempos(tiempos)).append(" |\n\n");
         md.append("## Metas\n\n");
@@ -203,8 +240,8 @@ public class EvaluarPrioridades {
         md.append("\nLa privacidad (RNF-IA-4) no se mide acá: la garantiza el contrato de REST 2, que solo acepta ")
                 .append("categoría y descripción (`PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`).\n\n");
         md.append("## Casos\n\n");
-        if (respondidos.size() < resultados.size()) {
-            int sinRespuesta = resultados.size() - respondidos.size();
+        if (respondidos < total) {
+            long sinRespuesta = total - respondidos;
             md.append(sinRespuesta == 1 ? "Hubo 1 caso" : "Hubo " + sinRespuesta + " casos")
                     .append(" sin respuesta válida; el detalle está en la tabla.\n\n");
         }
@@ -229,12 +266,77 @@ public class EvaluarPrioridades {
 
     private static String tiempos(List<Long> ordenados) {
         if (ordenados.isEmpty()) {
-            return "sin respuestas";
+            return "sin casos";
         }
         long promedio = Math.round(ordenados.stream().mapToLong(Long::longValue).average().orElse(0));
-        long mediana = ordenados.get(ordenados.size() / 2);
-        return "promedio " + promedio + " ms, mediana " + mediana + " ms, máximo " + ordenados.get(ordenados.size() - 1)
-                + " ms";
+        return "promedio " + promedio + " ms, mediana " + percentil(ordenados, 0.5) + " ms, percentil 95 "
+                + percentil(ordenados, 0.95) + " ms, máximo " + ordenados.get(ordenados.size() - 1) + " ms";
+    }
+
+    /**
+     * Lee la tabla de casos de un informe anterior y lo vuelve a escribir con el cálculo actual. Conserva lo
+     * medido (prioridad obtenida, tiempo, motivo o error) y la fecha de la corrida.
+     */
+    private static void rehacerInforme(Path anterior, Path salida) throws IOException {
+        List<String> lineas = Files.readAllLines(anterior, StandardCharsets.UTF_8);
+        String origen = lineas.stream().filter(l -> l.startsWith("Generado por")).findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(anterior + " no parece un informe de esta evaluación."));
+        int finOrigen = origen.indexOf(". Totales");
+        origen = (finOrigen >= 0 ? origen.substring(0, finOrigen + 1) : origen)
+                + " Totales y metas recalculados el "
+                + ZonedDateTime.now().format(DateTimeFormatter.ofPattern("dd/MM/yyyy", Locale.ROOT))
+                + " con `--rehacer`, sobre los mismos datos medidos.";
+        String proveedor = lineas.stream().filter(l -> l.startsWith("| Proveedor | ")).findFirst()
+                .map(l -> celdas(l).get(1)).orElse("sin respuestas");
+        String[] partes = proveedor.split(", modelo ", 2);
+        List<Resultado> resultados = new ArrayList<>();
+        boolean enCasos = false;
+        for (String linea : lineas) {
+            if (linea.startsWith("| # |")) {
+                enCasos = true;
+                continue;
+            }
+            if (!enCasos || !linea.startsWith("| ") || linea.startsWith("| ---")) {
+                continue;
+            }
+            List<String> c = celdas(linea);
+            Caso caso = new Caso(Integer.parseInt(c.get(0)), c.get(3), c.get(1), c.get(2));
+            String marca = c.get(4);
+            long ms = Long.parseLong(c.get(5));
+            if (marca.equals("—")) {
+                resultados.add(new Resultado(caso, null, null, null, null, c.get(6), ms));
+            } else {
+                String obtenida = marca.split(" ")[0];
+                resultados.add(new Resultado(caso, obtenida, c.get(6), partes[0],
+                        partes.length > 1 ? partes[1] : null, null, ms));
+            }
+        }
+        if (resultados.isEmpty()) {
+            throw new IllegalArgumentException(anterior + " no tiene la tabla de casos.");
+        }
+        guardar(salida, resultados, proveedor, origen);
+    }
+
+    /** Celdas de una fila de tabla Markdown, respetando las barras escapadas con \\|. */
+    private static List<String> celdas(String fila) {
+        List<String> salida = new ArrayList<>();
+        StringBuilder actual = new StringBuilder();
+        String interior = fila.strip();
+        interior = interior.substring(1, interior.length() - 1);
+        for (int i = 0; i < interior.length(); i++) {
+            char c = interior.charAt(i);
+            if (c == '\\' && i + 1 < interior.length() && interior.charAt(i + 1) == '|') {
+                actual.append('|');
+                i++;
+            } else if (c == '|') {
+                salida.add(actual.toString().strip());
+                actual.setLength(0);
+            } else {
+                actual.append(c);
+            }
+        }
+        salida.add(actual.toString().strip());
+        return salida;
     }
 
     private static String celda(String texto) {

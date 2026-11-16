@@ -11,6 +11,41 @@ Implementado en el PR 12. El backend publica un mensaje por cada aviso que gener
 
 ## Topología
 
+El flujo de un aviso, del evento de dominio al correo. Las flechas punteadas son los caminos de falla.
+
+```mermaid
+flowchart LR
+  subgraph BACK["Backend (productor)"]
+    EV["Evento de dominio<br/>ReclamoCreado, ReclamoAsignado,<br/>EstadoReclamoCambiado, ReclamoResuelto,<br/>ReclamoVencido"]
+    LIS["NotificacionesReclamoListener<br/>y ServicioNotificaciones"]
+    OUT[("mensajes_salientes<br/>outbox, PENDIENTE")]
+    PUB["PublicadorMensajes<br/>cada 2 s, con confirmación"]
+  end
+  subgraph MQ["RabbitMQ"]
+    EX{{"reclamos.eventos<br/>topic"}}
+    Q[["notificaciones.email<br/>ligada con aviso.#"]]
+    DLX{{"reclamos.eventos.dlx<br/>fanout"}}
+    DLQ[["notificaciones.email.dlq<br/>cola de errores"]]
+  end
+  subgraph NOT["servicio-notificaciones (consumidor)"]
+    CON["ListenerAvisos y ProcesadorAvisos"]
+    IDS[("mensajes_procesados<br/>eventId")]
+  end
+  MAIL["Mailpit<br/>SMTP"]
+
+  EV --> LIS
+  LIS -->|"aviso y fila de outbox<br/>en la misma transacción"| OUT
+  OUT --> PUB
+  PUB -->|"aviso.reclamo-creado, aviso.reclamo-asignado,<br/>aviso.estado-cambiado, aviso.reclamo-resuelto,<br/>aviso.reclamo-vencido"| EX
+  PUB -.->|"RabbitMQ caído: la fila<br/>queda PENDIENTE y se reintenta"| OUT
+  EX --> Q
+  Q --> CON
+  CON -->|"¿eventId ya procesado?<br/>si no: envía y lo registra"| IDS
+  CON --> MAIL
+  CON -.->|"3 intentos fallidos<br/>o mensaje inválido"| DLX
+  DLX --> DLQ
+```
+
 | Elemento | Nombre | Tipo |
 | --- | --- | --- |
 | Exchange | `reclamos.eventos` | `topic`, durable |
