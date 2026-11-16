@@ -788,7 +788,154 @@ docker compose down
 
 `stop` permite volver a iniciar los contenedores; `down` permite recrearlos con `up -d mysql`. Ambos conservan los volúmenes nombrados: la base, la de RabbitMQ y la del servicio de notificaciones. **`down -v` elimina los datos y requiere una decisión explícita de descartarlos.**
 
-## 15. Checklist final
+## 15. Evidencias del sistema real
+
+Lista de lo que hay que juntar antes de entregar. Todo va en `docs/evidencias/sistema-real/`. La lista con las casillas está en [`docs/evidencias/README.md`](docs/evidencias/README.md#pendiente-antes-de-entregar); acá están los comandos. Conviene hacerlo en una sola tarde, en este orden, y con la versión final de `main`.
+
+En PowerShell 5, `>` guarda en UTF-16 y los acentos se ven mal en GitHub. Por eso los comandos usan `Out-File -Encoding utf8`.
+
+### 15.1 Preparar
+
+```powershell
+git checkout main
+git pull
+mkdir docs\evidencias\sistema-real -Force
+docker compose up --build -d
+docker compose ps
+```
+
+Esperar a que los ocho contenedores estén `running` (y `healthy` los que tienen chequeo). `.env` tiene que tener `GEMINI_API_KEY` y `RECLAMOS_TELEGRAM_MODO=simulado`: el bot real se prueba al final (15.6).
+
+### 15.2 Capturas automáticas
+
+Necesita Node 22 en la máquina. La primera vez, `npm install` y la descarga de Chromium tardan unos minutos.
+
+```powershell
+cd scripts\capturas
+npm install
+npx playwright install chromium
+node capturas-evidencias.mjs
+cd ..\..
+```
+
+Saca 27 capturas, `01-…` a `27-…`, y escribe `docs/evidencias/sistema-real/indice.md`. Al final dice cuántas tomó y si alguna sección falló. Si falló una, abrir `error-<sección>.png` en la misma carpeta, corregir lo que falte (por ejemplo, Mailpit sin correos todavía) y volver a correrlo: cada corrida vuelve a sacar todas las capturas. Con `node capturas-evidencias.mjs --ver` se ve el navegador mientras recorre.
+
+Revisar a ojo:
+
+- **`08-detalle-ia-maps-foto.png`:** la prioridad tiene que decir "por IA". Si dice "por categoría" o "respaldo", la clave de Gemini no está funcionando: revisar `docker compose logs servicio-prioridad`.
+- **`23-swagger-rest2-gemini.png`:** tiene que mostrar un `200` con `"proveedor": "gemini"`.
+
+### 15.3 Salidas de consola
+
+Con la demo todavía levantada, desde la raíz:
+
+```powershell
+$d = "docs\evidencias\sistema-real"
+docker compose run --rm verificar-demo 2>&1 | Out-File -Encoding utf8 "$d\m04-verificar-demo.txt"
+docker stats --no-stream 2>&1 | Out-File -Encoding utf8 "$d\m05-docker-stats.txt"
+docker compose exec backend ls -la /data/fotos 2>&1 | Out-File -Encoding utf8 "$d\m13-fotos-volumen.txt"
+docker compose logs backend 2>&1 | Select-String "auditoria|TareaVencimientos|ServicioVencimientos" | Out-File -Encoding utf8 "$d\m08-log-auditoria.txt"
+```
+
+`m04` tiene que terminar con `0 fallas`. Para que `m08` tenga líneas de vencimiento, antes vencer un reclamo como dice «Probar el vencimiento y la auditoría» (sección 10) y esperar dos minutos.
+
+Los tests corren sin la demo, pero el backend usa H2 y no choca con los contenedores:
+
+```powershell
+cd backend
+.\mvnw.cmd test 2>&1 | Out-File -Encoding utf8 "..\docs\evidencias\sistema-real\m01-backend-mvnw-test.txt"
+cd ..\servicios
+.\mvnw.cmd verify 2>&1 | Out-File -Encoding utf8 "..\docs\evidencias\sistema-real\m02-servicios-mvnw-verify.txt"
+cd ..\frontend
+npm test 2>&1 | Out-File -Encoding utf8 "..\docs\evidencias\sistema-real\m03-frontend-npm-test.txt"
+cd ..
+```
+
+Revisar que `m01` y `m02` terminen con `BUILD SUCCESS`. `./mvnw verify` también regenera `docs/openapi/prioridad.yaml` y el WSDL: si `git status` los muestra cambiados, commitearlos.
+
+### 15.4 Base de datos, API y SOAP
+
+Consulta del flujo de las capturas `12` a `15` (el número está en `indice.md` o en la captura `08`). La contraseña es `DB_PASSWORD` de `.env`:
+
+```powershell
+docker compose exec mysql mysql -u reclamos -p reclamos -e "SELECT numero, estado, prioridad, origen_prioridad FROM reclamos ORDER BY id DESC LIMIT 5; SELECT r.numero, h.estado_nuevo, h.fecha, h.observacion FROM historial_estados h JOIN reclamos r ON r.id = h.reclamo_id ORDER BY h.id DESC LIMIT 10; SELECT mensaje, fecha_envio FROM notificaciones ORDER BY id DESC LIMIT 10;"
+```
+
+Capturar la terminal como `m06-sql-flujo.png`. Si algún nombre de columna no coincide, `SHOW COLUMNS FROM historial_estados;` los lista.
+
+Para `m19-tablero-cuenta-a-mano.png`, la cuenta por estado, al lado de la captura `21`:
+
+```powershell
+docker compose exec mysql mysql -u reclamos -p reclamos -e "SELECT estado, COUNT(*) FROM reclamos WHERE fecha_creacion >= NOW() - INTERVAL 30 DAY GROUP BY estado;"
+```
+
+Para `m09-soap-consulta.png`, la consulta y el Fault con el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano), contra `http://localhost:8081/ws`: una con Bache (2) en Bernal (2) y otra con `categoriaId` 99.
+
+Para `m18-respuestas-api.txt`, los casos "solo por API" de la sección 10 (crear como agente: `403`; `PATCH` de una transición inexistente: `409`; un reclamo que no existe: `404`; un alta sin descripción: `400`). Copiar cada respuesta al archivo.
+
+### 15.5 Fallas provocadas
+
+Una por vez, y levantando de nuevo el servicio antes de seguir:
+
+| Archivo | Qué hacer |
+| --- | --- |
+| `m10-asignacion-pendiente.png` | `docker compose stop servicio-cobertura`, crear un reclamo en la interfaz y capturar el detalle con la asignación pendiente. Después `docker compose start servicio-cobertura` |
+| `m11-outbox.png` | `docker compose stop rabbitmq`, crear un reclamo y capturar la consulta de `mensajes_salientes` de «Broker caído» (sección 10) con `PENDIENTE`. `docker compose start rabbitmq` y repetir la consulta: `PUBLICADO`. Las dos en la misma imagen |
+| `m12-cola-errores.png` | `docker compose stop mailpit`, crear un reclamo, esperar unos 10 segundos y capturar la consola de RabbitMQ (**Queues**) con un mensaje en `notificaciones.email.dlq`. Después `docker compose start mailpit` |
+
+### 15.6 Telegram y número repetido
+
+- **`m15-numero-repetido.png`:** en modo simulado, crear una cuenta nueva y, en la verificación, poner el número de Ana (`+5491100000001`). Capturar el error "Ese número ya está verificado en otra cuenta."
+- **`m14-telegram.png`:** con el bot real, siguiendo «Probar la verificación del teléfono» (sección 10). Capturar el chat del bot en el celular y la pantalla que pasa sola al formulario. Al terminar, volver `RECLAMOS_TELEGRAM_MODO=simulado` en `.env` y `docker compose up -d backend`.
+
+### 15.7 Estrategias y cobertura local (backend a mano)
+
+Para CP04, CP05 y la mitad local de CP69, el backend corre fuera de Docker, con las estrategias cambiadas y la cobertura local:
+
+```powershell
+docker compose stop backend frontend
+cd backend
+# Cargar .env en esta sesión, con el Get-Content de la sección 4
+$env:SPRING_PROFILES_ACTIVE="dev"
+$env:RECLAMOS_PRIORIDAD_ESTRATEGIA="palabras-clave"
+$env:RECLAMOS_ASIGNACION_ESTRATEGIA="carga-trabajo"
+.\mvnw.cmd -pl reclamos-app spring-boot:run
+```
+
+En otra terminal, `cd frontend` y `npm run dev`. Después, en `http://localhost:5173`, como Ana:
+
+1. Crear "Luminaria rota" en Bernal con la palabra "peligro" en la descripción: sale con prioridad `ALTA` y origen palabras clave (CP04).
+2. Crear dos "Bache" en Bernal. Las dos áreas que lo cubren son Obras Públicas y Mantenimiento Vial: cada uno va a la que tiene menos reclamos pendientes en ese momento, así que se reparten (CP05). Además, `servicio-cobertura` no recibe ninguna consulta: la cobertura es local (CP69).
+
+Capturar los detalles como `m07-estrategias.png` y `m16-cobertura-local.png`. Cortar el backend y el frontend con `Ctrl+C` y volver a Docker:
+
+```powershell
+docker compose up -d backend frontend
+```
+
+Crear el mismo "Bache" en Bernal desde `http://localhost:5173`: queda en Obras Públicas y la consulta aparece en el log del servicio SOAP:
+
+```powershell
+docker compose logs servicio-cobertura 2>&1 | Select-String "ConsultarCobertura|cobertura" | Out-File -Encoding utf8 "docs\evidencias\sistema-real\m17-cobertura-soap.txt"
+```
+
+### 15.8 Grabar la demo y commitear
+
+1. Grabar la pantalla siguiendo el guion de [`docs/demo.md`](docs/demo.md), con OBS o la grabación de Windows (`Win + Alt + R`). El video no va al repositorio: subirlo a Drive y guardar el enlace.
+2. Tildar las casillas de «Pendiente antes de entregar» en `docs/evidencias/README.md`.
+3. Commitear todo:
+
+```powershell
+git checkout -b evidencias/sistema-real
+git add docs/evidencias
+git status
+git commit -m "docs: evidencias del sistema real"
+git push -u origin evidencias/sistema-real
+```
+
+Antes del commit, `git status` no tiene que mostrar `.env` ni ningún archivo con claves. Revisar también que ninguna captura muestre `GEMINI_API_KEY` o `TELEGRAM_BOT_TOKEN`.
+
+## 16. Checklist final
 
 - [ ] La copia está en `main` actualizada.
 - [ ] Java 21 activo, también en `.\mvnw.cmd -version`.
@@ -806,3 +953,4 @@ docker compose down
 - [ ] Modo demo: al crear un reclamo, el correo llega a Mailpit en `http://localhost:8025`.
 - [ ] Modo demo: `docker compose run --rm verificar-demo` termina con `0 fallas`.
 - [ ] Modo demo: `docker compose run --rm -T prueba-carga` termina con "Resultado: **cumple**".
+- [ ] Evidencias del sistema real (sección 15): `capturas-evidencias.mjs` sin fallas y las de `docs/evidencias/sistema-real/m…` completas.
