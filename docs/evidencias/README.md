@@ -224,33 +224,81 @@ categoría" (la API simulada no llama a la IA) y la verificación del teléfono 
 
 Para volver a tomarlas: `npm run mock` y `npm run dev` en `frontend/`, y el mismo recorrido a mano.
 
+## Capturas del sistema real
+
+Las capturas de `interfaz/` son de la API simulada. Las del sistema real van en `sistema-real/`, en dos
+partes:
+
+- **Automáticas:** las saca `scripts/capturas/capturas-evidencias.mjs`. Recorre la interfaz con los usuarios de
+  la semilla y captura también Swagger de REST 2, el WSDL, Mailpit y la consola de RabbitMQ. Escribe
+  `sistema-real/indice.md` con cada captura y su caso.
+- **A mano:** lo que un navegador no puede sacar solo, como las salidas de consola, la base, los logs, las
+  fallas provocadas y Telegram. Van con los nombres `mNN-…` de la lista de abajo, para que se ordenen después de
+  las automáticas.
+
+```powershell
+# Con docker compose up --build corriendo y la clave de Gemini en .env:
+cd scripts/capturas
+npm install
+npx playwright install chromium
+node capturas-evidencias.mjs
+```
+
+El script crea datos de prueba en cada corrida:
+
+- Dos reclamos de Ana y uno de Bruno.
+- Una cuenta nueva.
+- Un apoyo de Ana.
+- El reclamo de Ana pasa por tomar, resolver, reabrir, resolver y cerrar.
+
+También bloquea a Bruno para la captura y lo desbloquea al final. Si una sección falla, guarda
+`error-<sección>.png`, la anota en el índice y sigue con la próxima. Con `--ver` abre el navegador en pantalla,
+para seguir el recorrido.
+
+| Automática | Caso |
+| --- | --- |
+| `01` a `03`: ingreso, login fallido y registro | CP41, CP42, CP45 |
+| `04` y `05`: verificación simulada de la cuenta nueva | CP47 |
+| `06` a `08`: alta con Georef y foto, archivo rechazado, detalle con origen IA, Maps y foto | CP23, CP27, CP28, CP53, CP54 |
+| `09` a `11`: posible duplicado, apoyo y contador | CP58, CP60 |
+| `12` a `16`: agente, reapertura con motivo, cierre y avisos | CP08, CP12, CP14, CP52 |
+| `17` a `20`: sin asignar, asignación manual, cuenta bloqueada | CP06, CP18, CP51 |
+| `21` y `22`: tableros | CP63, CP65 |
+| `23` a `27`: Swagger de REST 2 con Gemini, WSDL, Mailpit y RabbitMQ | CP16, CP22, CP33, CP36 |
+
 ## Pendiente antes de entregar
 
-Evidencias que hay que capturar con el sistema real levantado (MySQL, backend y frontend):
+Todo con el sistema real levantado (`docker compose up --build`, con la clave de Gemini en `.env`). Los
+archivos van en `sistema-real/`. El paso a paso, con los comandos, está en la sección 15 del
+[instructivo](../../README_INSTRUCTIVO.md#15-evidencias-del-sistema-real).
 
-- [ ] Salida de `./mvnw test` con `BUILD SUCCESS`.
-- [ ] Salida de `npm test`.
-- [ ] Repetir el recorrido de las capturas contra el backend real, con la IA, y reemplazarlas.
-- [ ] Consulta SQL de `reclamos`, `historial_estados` y `notificaciones` después del flujo de CP08.
-- [ ] Log del backend al arrancar con `palabras-clave` y con `carga-trabajo` (CP04 y CP05).
-- [ ] Salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
-- [ ] Captura del WSDL en el navegador y de una consulta SOAP con su respuesta (CP16, CP17 y CP19).
-- [ ] Captura del detalle de un reclamo con la asignación pendiente, con el servicio detenido (CP20).
-- [ ] Captura de las sugerencias de Georef en el alta y del detalle con el enlace a Google Maps (CP27 y CP28).
-- [ ] Captura de Mailpit con los correos de un reclamo y de la consola de RabbitMQ con el exchange y las colas (CP33).
-- [ ] Captura de `mensajes_salientes` con un mensaje `PENDIENTE` y después `PUBLICADO` (CP35) y de la cola de errores con un mensaje (CP36).
-- [ ] Salida de `docker compose run --rm verificar-demo` con la clave de Gemini real, sin fallas (CP38).
-- [ ] Salida de `docker stats --no-stream` con la demo levantada, o la del paso «Memoria de cada contenedor» del CI (CP40).
-- [ ] Grabar el recorrido del guion de `docs/demo.md` una vez, por si el día de la demo falla algo externo.
-- [ ] Captura de la pantalla de ingreso, de un login fallido y del registro (CP41, CP42 y CP45).
-- [ ] Capturas del alta con foto, del formato rechazado y del detalle con la foto contra el backend real (CP53 y CP54), y del contenido de `/data/fotos` (CP56).
-- [ ] Capturas del posible duplicado en el alta, del aviso de apoyo y del detalle con el contador contra el backend real (CP58 y CP60).
-- [ ] Capturas de los dos tableros contra el backend real, con la cuenta a mano de la semilla al lado (CP63 y CP65).
-- [ ] Captura de la verificación con el bot real de Telegram: el chat con el bot y la pantalla que pasa al formulario (CP49).
-- [ ] Capturas de la verificación simulada, el número repetido, el panel de cuentas y la reapertura contra el backend real (CP47, CP48, CP51 y CP52).
+**Con el script de capturas** (las automáticas de la tabla anterior):
+
+- [ ] Correr `capturas-evidencias.mjs` y commitear `sistema-real/` con `indice.md`, sin secciones con fallas.
+
+**A mano:**
+
+- [ ] `m01-backend-mvnw-test.txt`: salida de `./mvnw test` en `backend/` con `BUILD SUCCESS`.
+- [ ] `m02-servicios-mvnw-verify.txt`: salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
+- [ ] `m03-frontend-npm-test.txt`: salida de `npm test`.
+- [ ] `m04-verificar-demo.txt`: `docker compose run --rm verificar-demo` con la clave de Gemini, sin fallas (CP38).
+- [ ] `m05-docker-stats.txt`: `docker stats --no-stream` con la demo levantada (CP40).
+- [ ] `m06-sql-flujo.png`: consulta SQL de `reclamos`, `historial_estados` y `notificaciones` del reclamo de las capturas `12` a `15` (CP11).
+- [ ] `m07-estrategias.png`: con el backend a mano, un reclamo con "peligro" en `ALTA` por `palabras-clave` y dos baches repartidos por `carga-trabajo` (CP04 y CP05).
+- [ ] `m08-log-auditoria.txt`: líneas del logger `auditoria` y de `TareaVencimientos` (CP07 y CP13).
+- [ ] `m09-soap-consulta.png`: una consulta SOAP con su respuesta y un Fault por id inválido (CP17 y CP19).
+- [ ] `m10-asignacion-pendiente.png`: detalle de un reclamo creado con `servicio-cobertura` detenido (CP20).
+- [ ] `m11-outbox.png`: `mensajes_salientes` con un mensaje `PENDIENTE` con RabbitMQ detenido, y después `PUBLICADO` (CP35).
+- [ ] `m12-cola-errores.png`: la cola de errores con un mensaje (CP36).
+- [ ] `m13-fotos-volumen.txt`: contenido de `/data/fotos` en el contenedor del backend (CP56).
+- [ ] `m14-telegram.png`: el chat con el bot real y la pantalla que pasa al formulario (CP49).
+- [ ] `m15-numero-repetido.png`: un número ya verificado en otra cuenta se rechaza (CP48).
+- [ ] `m16-cobertura-local.png` y `m17-cobertura-soap.txt`: el mismo reclamo con cobertura local y con SOAP, y el log de `servicio-cobertura` (CP69).
+- [ ] `m18-respuestas-api.txt`: respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
+- [ ] `m19-tablero-cuenta-a-mano.png`: la consulta SQL que cuenta los reclamos por estado, al lado del tablero público (CP63).
+- [ ] Grabar el recorrido del guion de [demo.md](../demo.md) una vez, por si el día de la demo falla algo externo (fuera del repositorio).
+
+**Ya hechas:**
+
 - [x] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
-- [ ] Captura de Swagger de REST 2 con una inferencia real de Gemini (CP22) y del detalle de un reclamo con origen IA (CP23).
-- [ ] Líneas del logger `auditoria` y de `TareaVencimientos` en el log del backend (CP07 y CP13).
-- [ ] Respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
-- [ ] Capturas del mismo reclamo con cobertura local y con SOAP, y el log de `servicio-cobertura` (CP69).
 - [x] Correr la prueba de carga con la demo levantada en la notebook de la presentación y commitear `prueba-carga.md` (CP68).

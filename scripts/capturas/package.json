@@ -1,0 +1,12 @@
+{
+  "name": "capturas-evidencias",
+  "private": true,
+  "description": "Capturas de pantalla del sistema real para docs/evidencias/sistema-real",
+  "type": "module",
+  "scripts": {
+    "capturas": "node capturas-evidencias.mjs"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

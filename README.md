@@ -38,7 +38,8 @@ servicios/                  Servicios de integración de la Segunda Parte, cada 
 docs/                       Requerimientos, arquitectura, patrones, contratos, despliegue, demo y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
-scripts/                    Verificación de la demo de punta a punta y prueba de carga (Node, sin dependencias)
+scripts/                    Verificación de la demo de punta a punta y prueba de carga (Node, sin dependencias);
+                            capturas/: capturas del sistema real para las evidencias (Playwright)
 docker-compose.yml          MySQL para desarrollo; backend, frontend y servicios para la demo
 ```
 
@@ -327,3 +328,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 18 | `feature/18-dashboards` | Tablero público (sin sesión ni datos personales) y de gestión (vencidos por fecha y tabla por área y barrio), con consultas agregadas en un puerto de lectura propio |
 | 19 | `feature/19-cierre` | Requerimientos funcionales y no funcionales (con los de la IA y su verificación), metas en la evaluación de la IA, prueba de carga básica en el CI, diagramas de componentes y despliegue al día, acceso local y remoto, y capturas nuevas de la interfaz |
 | 20 | `feature/20-consistencia` | Revisión completa contra el TP: metas de la IA sobre los 25 casos (con `--rehacer`), requerimientos corregidos (rechazo, cancelación, límites), diagramas de capas, proceso de negocio, secuencias del alta y flujo de mensajes al día, CP69 de acceso local y remoto, y campos obligatorios en el OpenAPI de REST 2 |
+| 21 | `feature/21-capturas-evidencias` | Script de Playwright que saca las capturas del sistema real (interfaz, Swagger de REST 2, WSDL, Mailpit y RabbitMQ) con su índice de casos, y paso a paso de las evidencias a mano en la sección 15 del instructivo |
