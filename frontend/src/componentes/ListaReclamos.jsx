@@ -21,9 +21,18 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
     [usuario.id, estadoConsulta, areaConsulta],
   )
   const reclamos = datos ?? []
+  const pendientes = reclamos.filter((reclamo) => ['INGRESADO', 'ASIGNADO', 'EN_PROCESO'].includes(reclamo.estado)).length
+  const finalizados = reclamos.filter((reclamo) => ['RESUELTO', 'CERRADO'].includes(reclamo.estado)).length
 
   return (
     <section>
+      {datos && !error && !cargando && !estadoFijo && (
+        <div className="resumen-reclamos" aria-label="Resumen del listado filtrado">
+          <div className="resumen-item"><span className="resumen-punto punto-total" /><div><span>En este listado</span><strong>{reclamos.length}</strong></div></div>
+          <div className="resumen-item"><span className="resumen-punto punto-pendiente" /><div><span>En seguimiento</span><strong>{pendientes}</strong></div></div>
+          <div className="resumen-item"><span className="resumen-punto punto-resuelto" /><div><span>Con solución</span><strong>{finalizados}</strong></div></div>
+        </div>
+      )}
       <div className="filtros">
         {!estadoFijo && (
           <label>
@@ -80,7 +89,7 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
               {reclamos.map((reclamo) => (
                 <tr key={reclamo.numero}>
                   <td>
-                    <button type="button" className="enlace" onClick={() => onAbrir(reclamo.numero)}>
+                    <button type="button" className="enlace numero-reclamo" onClick={() => onAbrir(reclamo.numero)}>
                       {reclamo.numero}
                     </button>
                   </td>
