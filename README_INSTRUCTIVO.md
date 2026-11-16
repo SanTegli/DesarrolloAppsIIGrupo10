@@ -63,15 +63,20 @@ DesarrolloAppsIIGrupo10/
     package.json
     src/
   docs/
+    requerimientos.md
     api-contract.md
     arquitectura.md
     modelo-dominio.md
     patrones.md
     secuencias.md
     despliegue.md
+    demo.md
     contratos/
     openapi/
     evidencias/
+  scripts/
+    verificar-demo.mjs
+    prueba-carga.mjs
   servicios/
     pom.xml
     mvnw.cmd
@@ -91,8 +96,9 @@ DesarrolloAppsIIGrupo10/
 | `servicios/servicio-cobertura` | Servicio SOAP de cobertura, aparte del backend: otro proyecto Maven, otro proceso, puerto 8081. |
 | `servicios/servicio-prioridad` | Servicio REST 2 de prioridad con IA (Gemini), también aparte, puerto 8082. |
 | `servicios/servicio-notificaciones` | Consumidor de RabbitMQ: manda por correo los avisos que publica el backend. No tiene puerto propio. |
+| `scripts/` | Verificación de la demo de punta a punta y prueba de carga, en Node sin dependencias. |
 
-`docs/api-contract.md` contiene el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
+`docs/requerimientos.md` tiene los requerimientos, incluidos los de la IA, y `docs/api-contract.md` el contrato REST. `frontend/` es la interfaz React, que se levanta después del backend (sección 8).
 
 ## 4. Configurar variables de entorno
 

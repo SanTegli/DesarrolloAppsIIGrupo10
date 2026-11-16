@@ -9,6 +9,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -38,6 +40,12 @@ class OpenApiPrioridadTest {
                 .containsExactlyInAnyOrder("200", "400", "502", "503", "504");
         assertThat(contrato.path("components").path("schemas").path("EvaluacionResponse").path("properties")
                 .path("prioridad").path("enum").toString()).contains("BAJA", "MEDIA", "ALTA", "CRITICA");
+        // Igual que el contrato escrito (docs/contratos/rest2-prioridad.yaml): las respuestas traen todos sus campos.
+        JsonNode esquemas = contrato.path("components").path("schemas");
+        assertThat(requeridos(esquemas.path("EvaluacionResponse")))
+                .containsExactlyInAnyOrder("prioridad", "motivo", "proveedor", "modelo");
+        assertThat(requeridos(esquemas.path("ErrorResponse")))
+                .containsExactlyInAnyOrder("status", "codigo", "mensaje", "detalles", "ruta", "fecha");
 
         String yaml = mvc.perform(get("/v3/api-docs.yaml")).andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
@@ -45,5 +53,11 @@ class OpenApiPrioridadTest {
         if (Files.isDirectory(CONTRATO.getParent())) {
             Files.writeString(CONTRATO, yaml, StandardCharsets.UTF_8);
         }
+    }
+
+    private static List<String> requeridos(JsonNode esquema) {
+        List<String> nombres = new ArrayList<>();
+        esquema.path("required").forEach(campo -> nombres.add(campo.asText()));
+        return nombres;
     }
 }

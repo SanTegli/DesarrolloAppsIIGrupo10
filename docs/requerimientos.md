@@ -9,9 +9,9 @@ documento donde está la decisión.
 | Actor | Quién es | Qué hace |
 | --- | --- | --- |
 | Visitante | Cualquiera, sin sesión | Ve el tablero público y crea una cuenta |
-| Ciudadano | Vecino registrado | Crea reclamos con foto y ubicación, apoya reclamos de otros, sigue los suyos, confirma la solución o reabre |
-| Agente | Empleado de un área municipal | Toma, resuelve o rechaza los reclamos de su área y ve el tablero de gestión de su área |
-| Administrador | Empleado de la administración | Ve todos los reclamos, asigna los que quedaron sin área, bloquea cuentas y ve el tablero de gestión completo |
+| Ciudadano | Vecino registrado | Verifica su teléfono, crea reclamos con foto y ubicación, apoya reclamos de otros, sigue los suyos, los cancela mientras nadie los tomó, confirma la solución o reabre |
+| Agente | Empleado de un área municipal | Toma y resuelve los reclamos de su área y ve el tablero de gestión de su área. No rechaza: un reclamo que no corresponde se rechaza antes de asignarlo |
+| Administrador | Empleado de la administración | Ve todos los reclamos, asigna o rechaza los que quedaron sin área, reasigna, bloquea cuentas y ve el tablero de gestión completo |
 | Sistemas externos | Georef, Gemini, Telegram, el servidor de correo | Ubican direcciones, sugieren la prioridad, verifican el teléfono y reciben los avisos |
 
 ## Requerimientos funcionales
@@ -25,13 +25,14 @@ documento donde está la decisión.
 | RF-05 | Antes de crear el reclamo, el sistema muestra los reclamos abiertos de la misma categoría a menos de 50 m, sin datos del autor, y el ciudadano puede apoyar uno en vez de crear otro | CP58 a CP62 |
 | RF-06 | El sistema asigna el reclamo al área que cubre ese barrio y esa categoría. Si no hay ninguna, o el servicio de cobertura no responde, queda sin asignar para la administración | CP05, CP06, CP17 a CP20 |
 | RF-07 | El sistema calcula la prioridad con la IA a partir de la descripción, sin bajar nunca la prioridad de la categoría. Si la IA no responde, usa la de la categoría | CP04, CP21 a CP26 |
-| RF-08 | Los agentes toman, resuelven o rechazan los reclamos de su área. El ciudadano confirma la solución o reabre el reclamo con un motivo, una sola vez y dentro de 7 días | CP08 a CP10, CP52 |
+| RF-08 | Los agentes toman y resuelven los reclamos de su área. El ciudadano confirma la solución o reabre el reclamo con un motivo, una sola vez y dentro de 7 días. Cada transición la puede pedir un solo rol (`PoliticaTransiciones`): otro rol recibe `403`, y una transición que no existe, `409` | CP08 a CP10, CP52 |
 | RF-09 | Cada cambio queda en el historial, y el ciudadano y el área reciben un aviso en la aplicación y por correo | CP07, CP11, CP14, CP32, CP33 |
 | RF-10 | El sistema marca como vencidos los reclamos que pasaron su fecha límite, les sube la prioridad y avisa | CP13 |
 | RF-11 | Cada rol ve solo los reclamos que le tocan: el ciudadano los suyos, el agente los de su área, el administrador todos | CP12, CP43, CP55 |
-| RF-12 | El administrador asigna o reasigna el área de un reclamo y bloquea o desbloquea cuentas de ciudadanos | CP06, CP51 |
+| RF-12 | El administrador asigna el área de un reclamo ingresado o lo rechaza si no corresponde al municipio, reasigna uno asignado y bloquea o desbloquea cuentas de ciudadanos | CP06, CP51, `ObserverIntegrationTest.sinAsignacionAutomaticaAsignacionManualReasignacionCancelacionYRechazoAvisanAlCiudadano` |
 | RF-13 | Cualquiera, sin sesión, ve un tablero público con cifras agregadas por período, barrio y categoría | CP63, CP64, CP67 |
 | RF-14 | Agentes y administradores ven un tablero de gestión con pendientes, vencidos y sin asignar, por área y barrio | CP65, CP66 |
+| RF-15 | El ciudadano cancela su reclamo mientras está ingresado o asignado, es decir, antes de que un agente lo tome | `ReclamoServiceTest.ciudadanoCancelaIngresadoOAsignado`, `ReclamoTest.cancelacion` |
 
 ## Requerimientos no funcionales
 
@@ -39,10 +40,10 @@ documento donde está la decisión.
 | --- | --- | --- | --- |
 | RNF-1 | Disponibilidad | El reclamo se crea aunque fallen Georef, la IA, el servicio SOAP, RabbitMQ, el servicio de notificaciones o el correo. Cada falla tiene su respaldo y se recupera sola o con un paso manual documentado. Solo la base de datos no tiene respaldo | [Matriz de fallos](demo.md#matriz-de-fallos), CP20, CP24, CP30, CP35, CP36, CP39 |
 | RNF-2 | Tiempo de respuesta del alta | Una integración lenta no traba el alta más que su tiempo límite: 6 s la IA y 2 s el SOAP, unos 8 s en el peor caso. Georef se consulta antes, en la búsqueda, con 3 s. Con el circuito de la IA abierto, el respaldo es inmediato | `PrioridadPorIAIntegrationTest.siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `ClienteServicioPrioridadTest.despuesDeVariasFallasElCircuitoSeAbreYNoVuelveALlamar` |
-| RNF-3 | Carga básica | Con la demo levantada en una notebook, 20 usuarios simultáneos consultando durante 30 s (catálogos, tablero público, listado, detalle y avisos): ningún error y percentil 95 de 1000 ms o menos | CP68, `scripts/prueba-carga.mjs` (ver [Prueba de carga](#prueba-de-carga)) |
+| RNF-3 | Carga básica | Con la demo levantada en una notebook, 20 usuarios simultáneos consultando durante 30 s (catálogos, tablero público, listado, detalle y avisos): ningún error y percentil 95 de 1000 ms o menos | CP68, `scripts/prueba-carga.mjs`. **Medido: 0 errores, p95 de 62 ms** ([prueba-carga.md](evidencias/prueba-carga.md)) |
 | RNF-4 | Seguridad | Sesión del servidor con cookie `HttpOnly` y `SameSite=Lax`, que vence a los 30 minutos sin actividad. Token CSRF en todo `POST`, `PATCH` y `DELETE`. Contraseñas con BCrypt. Permisos por rol en cada endpoint, no solo en la interfaz | CP09, CP41 a CP46 |
 | RNF-5 | Privacidad de los datos personales | El teléfono se muestra enmascarado y no viaja a la IA ni a RabbitMQ. Los mensajes de la cola no llevan DNI, teléfono ni descripción. La foto se guarda re-codificada, sin EXIF. Los posibles duplicados y los tableros no muestran quién reclamó | CP53, CP58, CP63, `OutboxIntegrationTest`, [contratos de mensajes](contratos/README.md) |
-| RNF-6 | Abuso | Hasta 5 reclamos por día y 3 códigos de verificación por hora por ciudadano, con `429`. Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos | CP50, CP61 |
+| RNF-6 | Abuso | Hasta 5 reclamos por día y 3 códigos de verificación por hora por ciudadano, con `429`. Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos. En la demo con Docker el límite diario sube a 20 (`RECLAMOS_USO_RECLAMOS_POR_DIA`), para poder repetir el guion y el script de verificación el mismo día | CP50, CP61 |
 | RNF-7 | Consistencia | Bloqueo optimista en los reclamos. El aviso y el reclamo se guardan en la misma transacción (outbox). Si el alta falla, no queda ni el mensaje ni la foto | CP32, CP56, [Arquitectura](arquitectura.md) |
 | RNF-8 | Entrega de los avisos | Al menos una vez, sin correos repetidos: el consumidor descarta por `eventId`. Tres reintentos y después a la cola de errores; un mensaje inválido va directo a la cola de errores | CP34, CP36 |
 | RNF-9 | Manejo de errores y logging | Todos los errores de la API responden con el mismo formato (`status`, `codigo`, `mensaje`, `detalles` por campo, `ruta` y `fecha`) y el código HTTP que corresponde. Los eventos de negocio quedan en el logger `auditoria`; las fallas de las integraciones, en el log de cada servicio | [Errores en el contrato](api-contract.md#errores), CP03, CP07 |
@@ -106,6 +107,25 @@ de metas que dice si cada una se cumple.
 | RNF-IA-3 | Disponibilidad | Al menos el 95 % de los casos con una respuesta válida (`200` con una de las cuatro prioridades). Una respuesta fuera del esquema es un error del proveedor (`502`) y el backend usa el respaldo | `EvaluarPrioridades.java`, `EvaluadorPrioridadTest`, `ErroresDelProveedorTest` |
 | RNF-IA-4 | Privacidad de los datos | Al proveedor de IA solo le llegan la categoría y la descripción: nunca nombre, DNI, email, teléfono, dirección ni foto. El motivo que devuelve no incluye datos personales. La clave del proveedor solo está en `.env` | `PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`, `ConfiguracionProveedorTest` |
 | RNF-IA-5 | Robustez | Una instrucción escondida en la descripción no cambia la prioridad. La IA puede subir la prioridad de la categoría pero no bajarla, así que un error de la IA no deja sin atender un reclamo peligroso | CP26 (caso 25 de la evaluación), `InstruccionesPrioridadTest`, `PrioridadPorIATest` |
+
+**Resultado medido** ([ia-evaluacion.md](evidencias/ia-evaluacion.md), Gemini `gemini-3.5-flash-lite`,
+sobre los 25 casos):
+
+| Requisito | Meta | Obtenido | Resultado |
+| --- | --- | --- | --- |
+| RNF-IA-1 | ≥ 70 % exactos | 92 % (23 de 25) | Cumple |
+| RNF-IA-1 | ≥ 90 % a un nivel o menos | 96 % (24 de 25) | Cumple |
+| RNF-IA-2 | p95 ≤ 6000 ms | 4504 ms | Cumple |
+| RNF-IA-3 | ≥ 95 % de respuestas válidas | 96 % (24 de 25) | Cumple |
+
+Los dos casos no acertados muestran por qué la IA está detrás de un respaldo:
+
+- **Caso 7** (bache grande en una avenida): Gemini no respondió en 5 s y REST 2 devolvió `504`. En el
+  sistema, el reclamo habría quedado con la prioridad de la categoría.
+- **Caso 18** (farol con un foco de dos): la IA dijo BAJA donde el grupo esperaba MEDIA. En el sistema queda
+  MEDIA, porque esa es la prioridad de "Luminaria rota" y la IA no puede bajarla (RNF-IA-5).
+
+El caso 25, la instrucción escondida, salió BAJA, como se esperaba.
 
 **Sobre la privacidad en el nivel gratuito.** En el nivel gratuito de Gemini, Google puede usar lo que se le
 manda para mejorar sus productos. Por eso RNF-IA-4 no depende del proveedor: el contrato de REST 2 solo

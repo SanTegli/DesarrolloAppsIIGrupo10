@@ -1,15 +1,16 @@
 # Patrones de diseño aplicados
 
 Los cinco patrones que pide la Primera Parte, con el problema que resuelve cada uno en este sistema,
-las clases que lo implementan y cómo comprobarlo. Al final están los que suma la Segunda Parte.
+las clases que lo implementan y cómo comprobarlo. Al final están los que suman la Segunda Parte (las
+integraciones) y el Integrador (login, controles de uso, verificación, fotos y tableros).
 
 Las rutas son relativas a `backend/`. `…` abrevia `src/main/java/ar/edu/uade/reclamos`.
 
 | Patrón | Para qué se usa | Clases principales |
 | --- | --- | --- |
 | Factory | Crear reclamos siempre consistentes | `ReclamoFactory` |
-| Repository | Separar el negocio de la base de datos | 7 interfaces en el dominio, 7 adaptadores JPA |
-| Strategy | Cambiar por configuración cómo se calcula la prioridad y cómo se asigna el área | `EstrategiaPrioridad`, `EstrategiaAsignacion` y sus 4 implementaciones |
+| Repository | Separar el negocio de la base de datos | 10 interfaces en el dominio, 10 adaptadores JPA |
+| Strategy | Cambiar por configuración cómo se calcula la prioridad y cómo se asigna el área | `EstrategiaPrioridad` (3 implementaciones, una con IA) y `EstrategiaAsignacion` (2) |
 | Observer | Reaccionar a lo que pasa con un reclamo sin acoplar componentes | `PublicadorEventos`, `NotificacionesReclamoListener`, `AuditoriaListener` |
 | Facade | Dar a los controladores una única entrada a los casos de uso | `GestionReclamosFacade` |
 
@@ -74,8 +75,17 @@ public interface ReclamoRepository {
 }
 ```
 
-Las siete interfaces son `ReclamoRepository`, `UsuarioRepository`, `MunicipioRepository`,
-`BarrioRepository`, `AreaMunicipalRepository`, `CategoriaRepository` y `NotificacionRepository`.
+Las diez interfaces son:
+
+- Las de la Primera Parte: `ReclamoRepository`, `UsuarioRepository`, `MunicipioRepository`,
+  `BarrioRepository`, `AreaMunicipalRepository`, `CategoriaRepository` y `NotificacionRepository`.
+- `MensajeSalienteRepository`, para la outbox.
+- `CodigoVerificacionRepository`, para la verificación del teléfono.
+- `ApoyoRepository`, para los apoyos.
+
+Los tableros no usan un Repository: leen por `ConsultasTablero`, un puerto de lectura con proyecciones
+planas (ver [Lado de lectura para los tableros](#lado-de-lectura-para-los-tableros-domain-reporting-cqrs)).
+
 El mapeo objeto-relacional está en `META-INF/orm.xml`, así que las clases del dominio no tienen
 anotaciones de JPA.
 
@@ -86,9 +96,9 @@ anotaciones de JPA.
 
 ## Strategy
 
-**Problema.** Hay más de una forma razonable de calcular la prioridad y de elegir el área, y en el
-Hito 2 se suman otras (IA, servicio SOAP). Con condicionales dentro del servicio, cada variante
-nueva obligaría a modificarlo.
+**Problema.** Hay más de una forma razonable de calcular la prioridad y de elegir el área, y con las
+integraciones se sumó otra (la IA). Con condicionales dentro del servicio, cada variante nueva obligaría a
+modificarlo.
 
 **Solución.** Dos familias de algoritmos intercambiables, cada una detrás de una interfaz.
 
@@ -96,12 +106,14 @@ nueva obligaría a modificarlo.
 | --- | --- | --- | --- |
 | `EstrategiaPrioridad` | `PrioridadPorCategoria` | Devuelve la prioridad base de la categoría | `categoria` |
 | `EstrategiaPrioridad` | `PrioridadPorPalabrasClave` | Si la descripción dice urgente, peligro, riesgo o accidente, sube como mínimo a `ALTA` | `palabras-clave` |
+| `EstrategiaPrioridad` | `PrioridadPorIA`, envuelta en `PrioridadConRespaldo` | Le pide la prioridad a REST 2 (Gemini) y se queda con la mayor entre esa y la de la categoría. Si REST 2 falla, el Decorator devuelve la de la categoría con origen `RESPALDO` | `ia` |
 | `EstrategiaAsignacion` | `AsignacionPorJurisdiccion` | Entre las áreas candidatas, la de menor id | `jurisdiccion` |
 | `EstrategiaAsignacion` | `AsignacionPorCargaDeTrabajo` | Entre las áreas candidatas, la que tiene menos reclamos pendientes | `carga-trabajo` |
 
 Las áreas candidatas son las activas que atienden la categoría y tienen jurisdicción sobre el barrio.
-Las entrega `CatalogoCobertura`: hoy `CoberturaLocal`, que consulta la base; en la Segunda Parte, el
-servicio SOAP. La estrategia no cambia.
+Las entrega `CatalogoCobertura`: `CoberturaLocal`, que consulta la base del backend, o `CoberturaSoap`,
+que se las pide a `servicio-cobertura` por SOAP (`reclamos.cobertura.origen: local | soap`). La estrategia
+no cambia: recibe la misma lista en los dos casos.
 
 Las estrategias de prioridad devuelven una `PrioridadCalculada`: la prioridad, qué la decidió
 (`CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO`) y un motivo. El reclamo guarda las tres cosas, así
@@ -112,12 +124,14 @@ La estrategia activa se elige en `application.yml`, sin tocar código:
 ```yaml
 reclamos:
   prioridad:
-    estrategia: categoria        # categoria | palabras-clave
+    estrategia: categoria        # categoria | palabras-clave | ia
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
 ```
 
-`ConfiguracionAplicacion` lee esas propiedades y registra una implementación por interfaz.
+En Compose la prioridad es `ia` (`RECLAMOS_PRIORIDAD_ESTRATEGIA`). `ConfiguracionAplicacion` lee esas
+propiedades y registra una implementación por interfaz; con `ia`, registra `PrioridadPorIA` ya envuelta en
+`PrioridadConRespaldo`.
 Los servicios solo conocen las interfaces:
 
 ```java

@@ -1,15 +1,17 @@
 # Evaluación de la IA de prioridad
 
-Generado por `EvaluarPrioridades.java` el 11/11/2026 22:33 contra `http://localhost:8082`.
+Generado por `EvaluarPrioridades.java` el 11/11/2026 22:33 contra `http://localhost:8082`. Totales y metas recalculados el 16/11/2026 con `--rehacer`, sobre los mismos datos medidos.
+
+Todas las cifras son sobre los 25 casos: uno sin respuesta válida cuenta como no acertado, y su tiempo entra en el percentil 95.
 
 | Dato | Valor |
 | --- | --- |
 | Proveedor | gemini, modelo gemini-3.5-flash-lite |
-| Casos | 25, 24 respondidos |
-| Aciertos exactos | 23 de 24 (96 %) |
-| A un nivel o menos de la esperada | 24 de 24 (100 %) |
+| Casos | 25, 24 con respuesta válida |
+| Aciertos exactos | 23 de 25 (92 %) |
+| A un nivel o menos de la esperada | 24 de 25 (96 %) |
 | Por debajo de la esperada | 1 (los más delicados: el reclamo quedaría con menos prioridad de la que merece) |
-| Tiempo de respuesta | promedio 1567 ms, mediana 1577 ms, máximo 4504 ms |
+| Tiempo de respuesta | promedio 1708 ms, mediana 1577 ms, percentil 95 4504 ms, máximo 5081 ms |
 
 ## Metas
 
@@ -17,9 +19,9 @@ Las metas están en [`requerimientos.md`](../requerimientos.md#requerimientos-de
 
 | Requisito | Meta | Objetivo | Obtenido | Resultado |
 | --- | --- | --- | --- | --- |
-| RNF-IA-1 | Aciertos exactos | ≥ 70 % | 96 % | Cumple |
-| RNF-IA-1 | A un nivel o menos de la esperada | ≥ 90 % | 100 % | Cumple |
-| RNF-IA-2 | Tiempo de respuesta, percentil 95 | ≤ 6000 ms | 1820 ms | Cumple |
+| RNF-IA-1 | Aciertos exactos | ≥ 70 % | 92 % | Cumple |
+| RNF-IA-1 | A un nivel o menos de la esperada | ≥ 90 % | 96 % | Cumple |
+| RNF-IA-2 | Tiempo de respuesta, percentil 95 | ≤ 6000 ms | 4504 ms | Cumple |
 | RNF-IA-3 | Casos con respuesta válida | ≥ 95 % | 96 % | Cumple |
 
 La privacidad (RNF-IA-4) no se mide acá: la garantiza el contrato de REST 2, que solo acepta categoría y descripción (`PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`).

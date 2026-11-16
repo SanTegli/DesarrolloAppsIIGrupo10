@@ -135,8 +135,20 @@ java servicios/servicio-prioridad/evaluacion/EvaluarPrioridades.java
 
 Manda los 25 casos con 7 segundos entre uno y otro, para respetar el límite por minuto del nivel gratuito,
 y escribe [`docs/evidencias/ia-evaluacion.md`](../docs/evidencias/ia-evaluacion.md) con los aciertos, los
-casos en que la IA puso menos prioridad de la esperada y los tiempos. Tarda unos tres minutos. No necesita
-Maven: Java 21 ejecuta el archivo directamente.
+casos en que la IA puso menos prioridad de la esperada, los tiempos y la tabla de metas de los
+[requerimientos de la IA](../docs/requerimientos.md#requerimientos-del-componente-de-ia). Tarda unos tres
+minutos. No necesita Maven: Java 21 ejecuta el archivo directamente.
+
+Todas las cifras son sobre los 25 casos: uno sin respuesta válida (por ejemplo, un `504` porque Gemini tardó
+más de 5 s) cuenta como no acertado, y su tiempo entra en el percentil 95. Así una falla no mejora los
+porcentajes ni esconde la latencia.
+
+Para recalcular los totales de una corrida anterior sin volver a llamar a Gemini (por ejemplo, si cambia el
+cálculo), `--rehacer` lee la tabla de casos del informe y lo vuelve a escribir con los mismos datos medidos:
+
+```powershell
+java servicios/servicio-prioridad/evaluacion/EvaluarPrioridades.java --rehacer docs/evidencias/ia-evaluacion.md
+```
 
 | Test | Qué comprueba |
 | --- | --- |
