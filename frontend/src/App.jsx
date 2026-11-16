@@ -8,6 +8,7 @@ import DetalleReclamo from './componentes/DetalleReclamo.jsx'
 import Encabezado from './componentes/Encabezado.jsx'
 import FormularioReclamo from './componentes/FormularioReclamo.jsx'
 import Ingreso from './componentes/Ingreso.jsx'
+import Icono from './componentes/Icono.jsx'
 import ListaReclamos from './componentes/ListaReclamos.jsx'
 import PanelAdministracion from './componentes/PanelAdministracion.jsx'
 import Tablero, { TableroPublico } from './componentes/Tablero.jsx'
@@ -112,6 +113,7 @@ export default function App() {
               aria-current={pestana.id === pestanaActiva ? 'page' : undefined}
               onClick={() => setVista({ nombre: pestana.id })}
             >
+              <Icono nombre={pestana.id} />
               {pestana.texto}
             </button>
           ))}
@@ -146,7 +148,18 @@ export default function App() {
 
         {usuario && vista.nombre === 'reclamos' && (
           <>
-            <h2>{TITULOS_LISTADO[usuario.rol]}</h2>
+            <div className="cabecera-pagina">
+              <div>
+                <span className="antetitulo">ATENCIÓN CIUDADANA</span>
+                <h2>{TITULOS_LISTADO[usuario.rol]}</h2>
+                <p>Consultá las novedades y el avance de cada solicitud.</p>
+              </div>
+              {usuario.rol === 'CIUDADANO' && !usuario.bloqueado && (
+                <button className="boton-primario" type="button" onClick={() => setVista({ nombre: 'crear' })}>
+                  <Icono nombre="crear" /> Nuevo reclamo
+                </button>
+              )}
+            </div>
             <AvisoExito>{vista.aviso}</AvisoExito>
             <ListaReclamos
               key={usuario.id}

@@ -13,7 +13,9 @@ export default function BandejaAvisos({ usuario, onAbrir }) {
 
   return (
     <section>
-      <h2>Avisos</h2>
+      <div className="cabecera-pagina cabecera-compacta">
+        <div><span className="antetitulo">MANTENETE AL DÍA</span><h2>Avisos</h2><p>Las novedades de tus reclamos, en un solo lugar.</p></div>
+      </div>
       <div className="filtros">
         <button type="button" className="boton-secundario" onClick={recargar}>
           Actualizar

@@ -47,7 +47,8 @@ export function TableroPublico({ barrios, categorias }) {
   const cambiar = (campo) => (evento) => setFiltros((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
 
   return (
-    <section aria-labelledby="titulo-publico">
+    <section className="tablero-publico" aria-labelledby="titulo-publico">
+      <span className="antetitulo">UNA CIUDAD QUE AVANZA</span>
       <h2 id="titulo-publico">Tablero público</h2>
       <p className="ayuda">Cuántos reclamos hay y cómo se están atendiendo. Sin datos de las personas.</p>
       <div className="filtros-tablero">
