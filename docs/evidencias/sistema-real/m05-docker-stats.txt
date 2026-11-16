@@ -1,0 +1,9 @@
+CONTAINER ID   NAME                      CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O         PIDS
+4584886292ef   reclamos-backend          0.14%     481.5MiB / 14.44GiB   3.26%     1.54MB / 1.2MB    158MB / 369kB     43
+4a6b3223ab52   reclamos-frontend         0.00%     10.35MiB / 14.44GiB   0.07%     805kB / 2.61MB    15MB / 0B         13
+e4dbd62c1532   servicio-notificaciones   0.17%     240.6MiB / 14.44GiB   1.63%     43.4kB / 34kB     46.1MB / 90.1kB   33
+ce9cb2d3d4a3   reclamos-rabbitmq         0.84%     110.3MiB / 14.44GiB   0.75%     83.5kB / 609kB    95.5MB / 3.93MB   45
+a53511f1cf87   reclamos-mysql            1.60%     449.3MiB / 14.44GiB   3.04%     636kB / 1.21MB    164MB / 125MB     47
+bd122e925802   servicio-prioridad        4.87%     300.3MiB / 14.44GiB   2.03%     49.5kB / 1.99MB   61.8MB / 57.3kB   32
+aa49ec972fe0   servicio-cobertura        0.20%     239.8MiB / 14.44GiB   1.62%     12.5kB / 10.8kB   137MB / 49.2kB    29
+8e5b8eca8167   reclamos-mailpit          0.00%     30.71MiB / 14.44GiB   0.21%     104kB / 467kB     28.1MB / 877kB    15

@@ -1,0 +1,31 @@
+
+> reclamos-frontend@0.1.0 test
+> vitest run --run
+
+
+ RUN  v5.0.3 /home/arod/Projects/DesarrolloAppsIIGrupo10/frontend
+
+ ✓ src/dominio/etiquetas.test.js (6 tests) 23ms
+ ✓ src/api/cliente.test.js (13 tests) 60ms
+ ✓ src/componentes/Tablero.test.jsx (7 tests) 653ms
+ ✓ src/componentes/DetalleReclamo.test.jsx (16 tests) 917ms
+ ✓ src/componentes/FormularioReclamo.test.jsx (6 tests) 1082ms
+   ✓ FormularioReclamo: foto (6)
+     ✓ manda el reclamo y la foto en un solo formulario multipart, sin Content-Type a mano 531ms
+ ✓ src/componentes/CandidatosDuplicados.test.jsx (6 tests) 1842ms
+   ✓ Posibles duplicados en el alta (6)
+     ✓ antes de crear muestra los reclamos parecidos cercanos, sin el nombre del autor 750ms
+ ✓ src/App.test.jsx (15 tests) 2463ms
+   ✓ App (15)
+     ✓ sin sesión muestra el login, entra con email y contraseña y lista los reclamos 608ms
+     ✓ el ciudadano busca la dirección en el mapa, elige una opción y la manda en el alta 319ms
+ ✓ src/App.verificacion.test.jsx (5 tests) 3939ms
+   ✓ Teléfono verificado, bloqueo de cuentas (5)
+     ✓ sin teléfono verificado, Crear reclamo pide verificarlo; en modo simulado se confirma con el número 598ms
+     ✓ con Telegram muestra el enlace al bot y entra al formulario cuando el bot confirma 3089ms
+
+ Test Files  8 passed (8)
+      Tests  74 passed (74)
+   Start at  11:08:56
+   Duration  6.31s (environment 47%, tests 40%, setup 5%, transform 5%, import 2%)
+

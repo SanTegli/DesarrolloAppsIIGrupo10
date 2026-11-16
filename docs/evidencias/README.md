@@ -274,28 +274,28 @@ archivos van en `sistema-real/`. El paso a paso, con los comandos, está en la s
 
 **Con el script de capturas** (las automáticas de la tabla anterior):
 
-- [ ] Correr `capturas-evidencias.mjs` y commitear `sistema-real/` con `indice.md`, sin secciones con fallas.
+- [x] Correr `capturas-evidencias.mjs` y commitear `sistema-real/` con `indice.md`, sin secciones con fallas.
 
 **A mano:**
 
-- [ ] `m01-backend-mvnw-test.txt`: salida de `./mvnw test` en `backend/` con `BUILD SUCCESS`.
-- [ ] `m02-servicios-mvnw-verify.txt`: salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
-- [ ] `m03-frontend-npm-test.txt`: salida de `npm test`.
-- [ ] `m04-verificar-demo.txt`: `docker compose run --rm verificar-demo` con la clave de Gemini, sin fallas (CP38).
-- [ ] `m05-docker-stats.txt`: `docker stats --no-stream` con la demo levantada (CP40).
-- [ ] `m06-sql-flujo.png`: consulta SQL de `reclamos`, `historial_estados` y `notificaciones` del reclamo de las capturas `12` a `15` (CP11).
-- [ ] `m07-estrategias.png`: con el backend a mano, un reclamo con "peligro" en `ALTA` por `palabras-clave` y dos baches repartidos por `carga-trabajo` (CP04 y CP05).
-- [ ] `m08-log-auditoria.txt`: líneas del logger `auditoria` y de `TareaVencimientos` (CP07 y CP13).
-- [ ] `m09-soap-consulta.png`: una consulta SOAP con su respuesta y un Fault por id inválido (CP17 y CP19).
-- [ ] `m10-asignacion-pendiente.png`: detalle de un reclamo creado con `servicio-cobertura` detenido (CP20).
-- [ ] `m11-outbox.png`: `mensajes_salientes` con un mensaje `PENDIENTE` con RabbitMQ detenido, y después `PUBLICADO` (CP35).
-- [ ] `m12-cola-errores.png`: la cola de errores con un mensaje (CP36).
-- [ ] `m13-fotos-volumen.txt`: contenido de `/data/fotos` en el contenedor del backend (CP56).
-- [ ] `m14-telegram.png`: el chat con el bot real y la pantalla que pasa al formulario (CP49).
-- [ ] `m15-numero-repetido.png`: un número ya verificado en otra cuenta se rechaza (CP48).
-- [ ] `m16-cobertura-local.png` y `m17-cobertura-soap.txt`: el mismo reclamo con cobertura local y con SOAP, y el log de `servicio-cobertura` (CP69).
-- [ ] `m18-respuestas-api.txt`: respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
-- [ ] `m19-tablero-cuenta-a-mano.png`: la consulta SQL que cuenta los reclamos por estado, al lado del tablero público (CP63).
+- [x] `m01-backend-mvnw-test.txt`: salida de `./mvnw test` en `backend/` con `BUILD SUCCESS`.
+- [x] `m02-servicios-mvnw-verify.txt`: salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
+- [x] `m03-frontend-npm-test.txt`: salida de `npm test`.
+- [x] `m04-verificar-demo.txt`: `docker compose run --rm verificar-demo` con la clave de Gemini, sin fallas (CP38).
+- [x] `m05-docker-stats.txt`: `docker stats --no-stream` con la demo levantada (CP40).
+- [x] `m06-sql-flujo.png`: consulta SQL de `reclamos`, `historial_estados` y `notificaciones` del reclamo de las capturas `12` a `15` (CP11).
+- [x] `m07-estrategias.png`: con el backend a mano, un reclamo con "peligro" en `ALTA` por `palabras-clave` y dos baches repartidos por `carga-trabajo` (CP04 y CP05).
+- [x] `m08-log-auditoria.txt`: líneas del logger `auditoria` y de `TareaVencimientos` (CP07 y CP13).
+- [x] `m09-soap-consulta.png`: una consulta SOAP con su respuesta y un Fault por id inválido (CP17 y CP19).
+- [x] `m10-asignacion-pendiente.png`: detalle de un reclamo creado con `servicio-cobertura` detenido (CP20).
+- [x] `m11-outbox.png`: `mensajes_salientes` con un mensaje `PENDIENTE` con RabbitMQ detenido, y después `PUBLICADO` (CP35).
+- [x] `m12-cola-errores.png`: la cola de errores con un mensaje (CP36).
+- [x] `m13-fotos-volumen.txt`: contenido de `/data/fotos` en el contenedor del backend (CP56).
+- [x] `m14-telegram.png`: el chat con el bot real y la pantalla que pasa al formulario (CP49).
+- [x] `m15-numero-repetido.png`: un número ya verificado en otra cuenta se rechaza (CP48).
+- [x] `m16-cobertura-local.png` y `m17-cobertura-soap.txt`: el mismo reclamo con cobertura local y con SOAP, y el log de `servicio-cobertura` (CP69).
+- [x] `m18-respuestas-api.txt`: respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
+- [x] `m19-tablero-cuenta-a-mano.png`: la consulta SQL que cuenta los reclamos por estado, al lado del tablero público (CP63).
 - [ ] Grabar el recorrido del guion de [demo.md](../demo.md) una vez, por si el día de la demo falla algo externo (fuera del repositorio).
 
 **Ya hechas:**

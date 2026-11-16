@@ -1,0 +1,22 @@
+ Container desarrolloappsiigrupo10-verificar-demo-run-49af75b38eab Creating 
+ Container desarrolloappsiigrupo10-verificar-demo-run-49af75b38eab Created 
+Verificación de la demo: sistema de reclamos con sus cinco integraciones
+
+OK     Frontend (nginx)                interfaz y proxy de /api: 3 categorías
+OK     Backend (REST 1)                3 categorías en la semilla; contrato OpenAPI publicado
+OK     Login                           sesión iniciada como Ana Pérez (CIUDADANO), teléfono +54 •••••••0001
+OK     Servicio de cobertura (SOAP)    WSDL con la operación ConsultarCobertura
+OK     Servicio de prioridad (REST 2)  contrato OpenAPI con POST /api/prioridades/evaluar
+OK     RabbitMQ                        exchange reclamos.eventos, cola notificaciones.email con 1 consumidor y cola de errores
+OK     Mailpit                         buzón web con 18 correos
+OK     Georef (API externa)            4 sugerencias; se elige "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"
+OK     Alta del reclamo                REC-F245B247, estado ASIGNADO
+OK     Prioridad con IA                MEDIA, origen IA: Se trata de un problema concreto que molesta como una luminaria apagada, sin peligro inmediato.
+OK     Área por SOAP                   ASIGNADO, área Alumbrado
+OK     Ubicación                       confirmada: GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires (-34.73614578, -58.322899857500005)
+OK     Foto                            JPEG de 828 bytes, servido con la sesión de la ciudadana
+OK     Tablero público                 5 creados del 2026-10-18 al 2026-11-16; atendidos: 33.3 %
+OK     Correo por RabbitMQ             3 correos; a la ciudadana: "Reclamo REC-F245B247: ya tiene un área a cargo", "Reclamo REC-F245B247: lo recibimos"
+OK     Cola de errores                 notificaciones.email.dlq vacía
+
+16 pasos bien, 0 avisos, 0 fallas.

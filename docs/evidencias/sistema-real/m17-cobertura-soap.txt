@@ -1,0 +1,59 @@
+servicio-cobertura  | Picked up JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
+servicio-cobertura  | 
+servicio-cobertura  |   .   ____          _            __ _ _
+servicio-cobertura  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+servicio-cobertura  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+servicio-cobertura  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+servicio-cobertura  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+servicio-cobertura  |  =========|_|==============|___/=/_/_/_/
+servicio-cobertura  | 
+servicio-cobertura  |  :: Spring Boot ::                (v3.5.9)
+servicio-cobertura  | 
+servicio-cobertura  | 2026-11-11T22:27:01.880-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : Starting ServicioCoberturaApplication v0.1.0-SNAPSHOT using Java 21.0.13 with PID 1 (/app/app.jar started by root in /app)
+servicio-cobertura  | 2026-11-11T22:27:01.885-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : No active profile set, falling back to 1 default profile: "default"
+servicio-cobertura  | 2026-11-11T22:27:03.949-03:00  INFO 1 --- [servicio-cobertura] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+servicio-cobertura  | 2026-11-11T22:27:03.975-03:00  INFO 1 --- [servicio-cobertura] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+servicio-cobertura  | 2026-11-11T22:27:03.976-03:00  INFO 1 --- [servicio-cobertura] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.50]
+servicio-cobertura  | 2026-11-11T22:27:04.023-03:00  INFO 1 --- [servicio-cobertura] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+servicio-cobertura  | 2026-11-11T22:27:04.025-03:00  INFO 1 --- [servicio-cobertura] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2004 ms
+servicio-cobertura  | 2026-11-11T22:27:04.360-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.c.ConfiguracionCatalogo        : Catálogo de cobertura versión 1 cargado de class path resource [cobertura.json]: 4 áreas
+servicio-cobertura  | 2026-11-11T22:27:04.549-03:00  INFO 1 --- [servicio-cobertura] [           main] .w.s.a.s.AnnotationActionEndpointMapping : Supporting [WS-Addressing August 2004, WS-Addressing 1.0]
+servicio-cobertura  | 2026-11-11T22:27:05.196-03:00  INFO 1 --- [servicio-cobertura] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+servicio-cobertura  | 2026-11-11T22:27:05.219-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : Started ServicioCoberturaApplication in 4.398 seconds (process running for 5.397)
+servicio-cobertura  | 2026-11-11T22:27:49.418-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-9] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring MessageDispatcherServlet 'messageDispatcherServlet'
+servicio-cobertura  | 2026-11-11T22:27:49.419-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-9] o.s.w.t.http.MessageDispatcherServlet    : Initializing Servlet 'messageDispatcherServlet'
+servicio-cobertura  | 2026-11-11T22:27:49.425-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-9] o.s.ws.soap.saaj.SaajSoapMessageFactory  : Creating SAAJ 1.3 MessageFactory with SOAP 1.1 Protocol
+servicio-cobertura  | 2026-11-11T22:27:49.443-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-9] o.s.w.t.http.MessageDispatcherServlet    : Completed initialization in 24 ms
+servicio-cobertura  | 2026-11-11T22:27:53.415-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-1] a.e.u.r.c.endpoint.CoberturaEndpoint     : ConsultarCobertura municipio=1 barrio=2 categoria=1: 1 áreas
+servicio-cobertura  | 2026-11-11T22:42:14.570-03:00  INFO 1 --- [servicio-cobertura] [ionShutdownHook] o.s.b.w.e.tomcat.GracefulShutdown        : Commencing graceful shutdown. Waiting for active requests to complete
+servicio-cobertura  | 2026-11-11T22:42:14.588-03:00  INFO 1 --- [servicio-cobertura] [tomcat-shutdown] o.s.b.w.e.tomcat.GracefulShutdown        : Graceful shutdown complete
+servicio-cobertura  | Picked up JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
+servicio-cobertura  | 
+servicio-cobertura  |   .   ____          _            __ _ _
+servicio-cobertura  |  /\\ / ___'_ __ _ _(_)_ __  __ _ \ \ \ \
+servicio-cobertura  | ( ( )\___ | '_ | '_| | '_ \/ _` | \ \ \ \
+servicio-cobertura  |  \\/  ___)| |_)| | | | | || (_| |  ) ) ) )
+servicio-cobertura  |   '  |____| .__|_| |_|_| |_\__, | / / / /
+servicio-cobertura  |  =========|_|==============|___/=/_/_/_/
+servicio-cobertura  | 
+servicio-cobertura  |  :: Spring Boot ::                (v3.5.9)
+servicio-cobertura  | 
+servicio-cobertura  | 2026-11-16T11:05:39.044-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : Starting ServicioCoberturaApplication v0.1.0-SNAPSHOT using Java 21.0.13 with PID 1 (/app/app.jar started by root in /app)
+servicio-cobertura  | 2026-11-16T11:05:39.049-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : No active profile set, falling back to 1 default profile: "default"
+servicio-cobertura  | 2026-11-16T11:05:41.142-03:00  INFO 1 --- [servicio-cobertura] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat initialized with port 8081 (http)
+servicio-cobertura  | 2026-11-16T11:05:41.176-03:00  INFO 1 --- [servicio-cobertura] [           main] o.apache.catalina.core.StandardService   : Starting service [Tomcat]
+servicio-cobertura  | 2026-11-16T11:05:41.177-03:00  INFO 1 --- [servicio-cobertura] [           main] o.apache.catalina.core.StandardEngine    : Starting Servlet engine: [Apache Tomcat/10.1.50]
+servicio-cobertura  | 2026-11-16T11:05:41.229-03:00  INFO 1 --- [servicio-cobertura] [           main] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring embedded WebApplicationContext
+servicio-cobertura  | 2026-11-16T11:05:41.231-03:00  INFO 1 --- [servicio-cobertura] [           main] w.s.c.ServletWebServerApplicationContext : Root WebApplicationContext: initialization completed in 2076 ms
+servicio-cobertura  | 2026-11-16T11:05:41.546-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.c.ConfiguracionCatalogo        : Catálogo de cobertura versión 1 cargado de class path resource [cobertura.json]: 4 áreas
+servicio-cobertura  | 2026-11-16T11:05:41.771-03:00  INFO 1 --- [servicio-cobertura] [           main] .w.s.a.s.AnnotationActionEndpointMapping : Supporting [WS-Addressing August 2004, WS-Addressing 1.0]
+servicio-cobertura  | 2026-11-16T11:05:42.448-03:00  INFO 1 --- [servicio-cobertura] [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port 8081 (http) with context path '/'
+servicio-cobertura  | 2026-11-16T11:05:42.471-03:00  INFO 1 --- [servicio-cobertura] [           main] a.e.u.r.c.ServicioCoberturaApplication   : Started ServicioCoberturaApplication in 4.611 seconds (process running for 5.618)
+servicio-cobertura  | 2026-11-16T11:06:21.174-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-8] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring MessageDispatcherServlet 'messageDispatcherServlet'
+servicio-cobertura  | 2026-11-16T11:06:21.174-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-8] o.s.w.t.http.MessageDispatcherServlet    : Initializing Servlet 'messageDispatcherServlet'
+servicio-cobertura  | 2026-11-16T11:06:21.181-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-8] o.s.ws.soap.saaj.SaajSoapMessageFactory  : Creating SAAJ 1.3 MessageFactory with SOAP 1.1 Protocol
+servicio-cobertura  | 2026-11-16T11:06:21.204-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-8] o.s.w.t.http.MessageDispatcherServlet    : Completed initialization in 30 ms
+servicio-cobertura  | 2026-11-16T11:06:21.445-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-8] a.e.u.r.c.endpoint.CoberturaEndpoint     : ConsultarCobertura municipio=1 barrio=2 categoria=1: 1 áreas
+servicio-cobertura  | 2026-11-16T11:06:25.397-03:00  INFO 1 --- [servicio-cobertura] [io-8081-exec-10] a.e.u.r.c.endpoint.CoberturaEndpoint     : ConsultarCobertura municipio=1 barrio=2 categoria=2: 2 áreas
+servicio-cobertura  | 2026-11-16T11:06:31.073-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-2] a.e.u.r.c.endpoint.CoberturaEndpoint     : ConsultarCobertura municipio=1 barrio=3 categoria=3: 0 áreas
+servicio-cobertura  | 2026-11-16T11:07:25.820-03:00  INFO 1 --- [servicio-cobertura] [nio-8081-exec-7] a.e.u.r.c.endpoint.CoberturaEndpoint     : ConsultarCobertura municipio=1 barrio=2 categoria=1: 1 áreas
