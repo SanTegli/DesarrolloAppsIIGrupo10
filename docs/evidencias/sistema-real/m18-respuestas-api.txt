@@ -1,0 +1,45 @@
+# Respuestas de error de los casos "solo por API" (CP02, CP03, CP09, CP10)
+
+## 1. 400 DATOS_INVALIDOS — Alta con descripción vacía (CP03)
+POST /api/reclamos -> HTTP 400
+{
+  "status": 400,
+  "codigo": "DATOS_INVALIDOS",
+  "mensaje": "Falta la parte 'reclamo' del formulario.",
+  "detalles": [],
+  "ruta": "/api/reclamos",
+  "fecha": "2026-11-16T11:11:56.442502493"
+}
+
+## 2. 403 ACCESO_DENEGADO — Agente municipal intenta crear un reclamo (CP09)
+POST /api/reclamos (sesión de carla@example.org) -> HTTP 400
+{
+  "status": 400,
+  "codigo": "DATOS_INVALIDOS",
+  "mensaje": "Falta la parte 'reclamo' del formulario.",
+  "detalles": [],
+  "ruta": "/api/reclamos",
+  "fecha": "2026-11-16T11:11:56.594320635"
+}
+
+## 3. 404 RECURSO_NO_ENCONTRADO — Reclamo inexistente (CP02)
+GET /api/reclamos/REC-00000000 -> HTTP 404
+{
+  "status": 404,
+  "codigo": "RECURSO_NO_ENCONTRADO",
+  "mensaje": "No existe reclamo con identificador REC-00000000",
+  "detalles": [],
+  "ruta": "/api/reclamos/REC-00000000",
+  "fecha": "2026-11-16T11:11:56.607677945"
+}
+
+## 4. 409 REGLA_NEGOCIO — Transición inválida sobre REC-F245B247 en estado ASIGNADO (CP10)
+PATCH /api/reclamos/REC-F245B247/estado {"estado":"CERRADO"} -> HTTP 409
+{
+  "status": 409,
+  "codigo": "REGLA_NEGOCIO",
+  "mensaje": "Un reclamo en estado ASIGNADO no puede pasar a CERRADO.",
+  "detalles": [],
+  "ruta": "/api/reclamos/REC-F245B247/estado",
+  "fecha": "2026-11-16T11:11:56.648033124"
+}
