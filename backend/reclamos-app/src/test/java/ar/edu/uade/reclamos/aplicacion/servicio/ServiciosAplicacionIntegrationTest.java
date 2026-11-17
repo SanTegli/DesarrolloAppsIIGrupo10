@@ -23,7 +23,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ServiciosAplicacionIntegrationTest {
     @Autowired GestionReclamosFacade facade;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
@@ -33,24 +32,22 @@ class ServiciosAplicacionIntegrationTest {
 
     @Test
     void flujoPersisteEntreTransaccionesYUnaFallaRevierteEstadoAgenteEHistorial() {
-        record Datos(Long ciudadano, Long agente, Long administrador, Long categoria, Long barrio, Long area) { }
+        record Datos(Long ciudadano, Long agente, Long administrador, Long categoria, Long municipio, Long area) { }
         Datos datos = new TransactionTemplate(transacciones).execute(tx -> {
             Municipio municipio = municipios.guardar(new Municipio("Municipio del test", "Buenos Aires"));
-            Barrio barrio = barrios.guardar(new Barrio("Barrio del test", municipio));
             Categoria categoria = categorias.guardar(new Categoria("Categoría del test", "Prueba", 24, Prioridad.ALTA));
             AreaMunicipal area = new AreaMunicipal("Área del test", "area@test.org", municipio);
             area.agregarCategoria(categoria);
-            area.agregarBarrio(barrio);
             area = areas.guardar(area);
             Usuario ciudadano = usuarios.guardar(verificado(new Ciudadano("70111222", "Ana", "Test", "ana@test.org", null)));
             Usuario agente = usuarios.guardar(new AgenteMunicipal("70222333", "Carla", "Test", "carla@test.org", null, area));
             Usuario administrador = usuarios.guardar(new Administrador("70333444", "Elena", "Test", "elena@test.org", null));
             return new Datos(ciudadano.getId(), agente.getId(), administrador.getId(),
-                    categoria.getId(), barrio.getId(), area.getId());
+                    categoria.getId(), municipio.getId(), area.getId());
         });
         assertThat(entorno.getProperty("spring.jpa.open-in-view", Boolean.class)).isFalse();
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
-        Reclamo creado = facade.crear(datos.ciudadano(), datos.categoria(), datos.barrio(), "Pozo", "Calle 450");
+        Reclamo creado = facade.crear(datos.ciudadano(), datos.categoria(), datos.municipio(), "Pozo", "Calle 450");
         String numero = creado.getNumero();
         Reclamo guardado = facade.buscarPorNumero(datos.ciudadano(), numero);
         assertThat(guardado.getId()).isNotNull();

@@ -63,14 +63,13 @@ class FotosIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
     @Autowired ReclamoRepository reclamos;
     @Autowired ReclamoService servicio;
 
-    private record Datos(Long ana, Long bruno, Long carla, Long diego, Long elena, Long categoria, Long barrio) { }
+    private record Datos(Long ana, Long bruno, Long carla, Long diego, Long elena, Long categoria, Long municipio) { }
 
     private Datos datos;
 
@@ -79,15 +78,12 @@ class FotosIntegrationTest {
         vaciar(DIRECTORIO);
         datos = new TransactionTemplate(transacciones).execute(tx -> {
             for (String tabla : List.of("codigos_verificacion", "notificaciones", "historial_estados", "reclamos",
-                    "area_barrio", "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias",
-                    "municipios")) {
+                    "area_categoria", "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria luminaria = categorias.guardar(new Categoria("Luminaria rota", "Farol", 48, Prioridad.MEDIA));
             AreaMunicipal alumbrado = new AreaMunicipal("Alumbrado", "alumbrado@example.org", quilmes);
-            alumbrado.agregarBarrio(bernal);
             alumbrado.agregarCategoria(luminaria);
             alumbrado = areas.guardar(alumbrado);
             AreaMunicipal obras = areas.guardar(new AreaMunicipal("Obras", "obras@example.org", quilmes));
@@ -100,7 +96,7 @@ class FotosIntegrationTest {
                     null, obras));
             Usuario elena = usuarios.guardar(new Administrador("20555666", "Elena", "Ruiz", "elena@example.org", null));
             return new Datos(ana.getId(), bruno.getId(), carla.getId(), diego.getId(), elena.getId(),
-                    luminaria.getId(), bernal.getId());
+                    luminaria.getId(), quilmes.getId());
         });
     }
 
@@ -195,7 +191,7 @@ class FotosIntegrationTest {
 
     @Test
     void unReclamoAnteriorALaFotoNoTieneFoto() throws Exception {
-        String numero = servicio.crear(datos.ana(), datos.categoria(), datos.barrio(), "Farol apagado", "Belgrano 450")
+        String numero = servicio.crear(datos.ana(), datos.categoria(), datos.municipio(), "Farol apagado", "Belgrano 450")
                 .getNumero();
 
         mvc.perform(get("/api/reclamos/" + numero).with(como(datos.ana()))).andExpect(status().isOk())
@@ -211,8 +207,8 @@ class FotosIntegrationTest {
 
     private String reclamo(Long categoria) {
         return """
-                {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol apagado frente a la plaza",
-                 "direccion": "Belgrano 450"}""".formatted(categoria, datos.barrio());
+                {"categoriaId": %d, "municipioId": %d, "descripcion": "Farol apagado frente a la plaza",
+                 "direccion": "Belgrano 450"}""".formatted(categoria, datos.municipio());
     }
 
     private String numero(ResultActions resultado) throws Exception {

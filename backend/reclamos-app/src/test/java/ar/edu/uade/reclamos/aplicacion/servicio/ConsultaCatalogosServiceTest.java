@@ -16,26 +16,26 @@ class ConsultaCatalogosServiceTest {
         var e = new EscenarioAplicacion();
         var usuarios = mock(UsuarioRepository.class);
         var categorias = mock(CategoriaRepository.class);
-        var barrios = mock(BarrioRepository.class);
+        var municipios = mock(MunicipioRepository.class);
         var areas = mock(AreaMunicipalRepository.class);
-        var servicio = new ConsultaCatalogosService(usuarios, categorias, barrios, areas);
+        var servicio = new ConsultaCatalogosService(usuarios, categorias, municipios, areas);
         e.ciudadano.desactivar();
         e.area.desactivar();
         when(usuarios.buscarTodos()).thenReturn(List.of(e.ciudadano, e.agente, e.administrador));
         when(usuarios.buscarPorId(1L)).thenReturn(Optional.of(e.ciudadano));
         when(usuarios.buscarPorId(5L)).thenReturn(Optional.of(e.administrador));
         when(categorias.buscarTodas()).thenReturn(List.of(e.categoria));
-        when(barrios.buscarTodos()).thenReturn(List.of(e.barrio));
+        when(municipios.buscarTodos()).thenReturn(List.of(e.municipio));
         when(areas.buscarTodas()).thenReturn(List.of(e.area));
         assertThat(servicio.usuarios(5L)).containsExactly(e.ciudadano, e.agente, e.administrador);
         assertThat(servicio.usuario(1L)).isSameAs(e.ciudadano);
         assertThat(servicio.categorias()).containsExactly(e.categoria);
-        assertThat(servicio.barrios()).containsExactly(e.barrio);
+        assertThat(servicio.municipios()).containsExactly(e.municipio);
         assertThat(servicio.areas()).containsExactly(e.area);
         assertThatThrownBy(() -> servicio.usuario(99L)).isInstanceOf(RecursoNoEncontradoException.class);
         verify(usuarios).buscarTodos();
         verify(categorias).buscarTodas();
-        verify(barrios).buscarTodos();
+        verify(municipios).buscarTodos();
         verify(areas).buscarTodas();
     }
 
@@ -44,7 +44,7 @@ class ConsultaCatalogosServiceTest {
         var e = new EscenarioAplicacion();
         var usuarios = mock(UsuarioRepository.class);
         var servicio = new ConsultaCatalogosService(usuarios, mock(CategoriaRepository.class),
-                mock(BarrioRepository.class), mock(AreaMunicipalRepository.class));
+                mock(MunicipioRepository.class), mock(AreaMunicipalRepository.class));
         when(usuarios.buscarPorId(1L)).thenReturn(Optional.of(e.ciudadano));
         when(usuarios.buscarPorId(3L)).thenReturn(Optional.of(e.agente));
         when(usuarios.buscarPorId(5L)).thenReturn(Optional.of(e.administrador));

@@ -19,29 +19,29 @@ class AreaMunicipalTest {
     }
 
     @Test
-    @DisplayName("Un área puede atender si cubre el barrio Y atiende la categoría")
+    @DisplayName("Un área puede atender si es del municipio del reclamo Y atiende la categoría")
     void puedeAtender() {
-        assertTrue(datos.alumbrado.puedeAtender(datos.luminaria, datos.bernal));
-        assertTrue(datos.alumbrado.puedeAtender(datos.luminaria, datos.quilmesCentro));
-        assertFalse(datos.alumbrado.puedeAtender(datos.bache, datos.bernal), "no atiende la categoría");
-        assertFalse(datos.alumbrado.puedeAtender(datos.luminaria, datos.ezpeleta), "no cubre el barrio");
-        assertFalse(datos.obrasPublicas.puedeAtender(datos.bache, datos.quilmesCentro));
+        assertTrue(datos.alumbrado.puedeAtender(datos.luminaria, datos.quilmes));
+        assertFalse(datos.alumbrado.puedeAtender(datos.bache, datos.quilmes), "no atiende la categoría");
+        assertFalse(datos.alumbrado.puedeAtender(datos.luminaria, datos.avellaneda), "es de otro municipio");
+        assertTrue(datos.obrasAvellaneda.puedeAtender(datos.bache, datos.avellaneda));
+        assertFalse(datos.obrasAvellaneda.puedeAtender(datos.bache, datos.quilmes), "cada municipio, sus áreas");
     }
 
     @Test
     @DisplayName("Un área inactiva no puede atender nada")
     void areaInactiva() {
         datos.alumbrado.desactivar();
-        assertFalse(datos.alumbrado.puedeAtender(datos.luminaria, datos.bernal));
+        assertFalse(datos.alumbrado.puedeAtender(datos.luminaria, datos.quilmes));
 
         datos.alumbrado.activar();
-        assertTrue(datos.alumbrado.puedeAtender(datos.luminaria, datos.bernal));
+        assertTrue(datos.alumbrado.puedeAtender(datos.luminaria, datos.quilmes));
     }
 
     @Test
-    @DisplayName("Barrios y categorías solo se modifican con los métodos del área")
+    @DisplayName("Las categorías solo se modifican con los métodos del área")
     void coleccionesProtegidas() {
-        assertThrows(UnsupportedOperationException.class, () -> datos.alumbrado.getBarrios().add(datos.ezpeleta));
+        assertThrows(UnsupportedOperationException.class, () -> datos.alumbrado.getCategorias().add(datos.bache));
         assertThrows(UnsupportedOperationException.class, () -> datos.alumbrado.getCategorias().clear());
     }
 

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { listarReclamos } from '../api/reclamos.js'
-import { ESTADOS, formatearFecha } from '../dominio/etiquetas.js'
+import { ESTADOS, formatearFecha, nombreDeArea } from '../dominio/etiquetas.js'
 import { useCarga } from '../hooks/useCarga.js'
 import { AvisoError } from './Aviso.jsx'
 import { InsigniaEstado, InsigniaPrioridad, InsigniaVencido } from './Insignias.jsx'
@@ -54,7 +54,7 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
               <option value="">Todas</option>
               {areas.map((area) => (
                 <option key={area.id} value={area.id}>
-                  {area.nombre}
+                  {nombreDeArea(area)}
                 </option>
               ))}
             </select>
@@ -78,7 +78,7 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
               <tr>
                 <th>Número</th>
                 <th>Categoría</th>
-                <th>Barrio y dirección</th>
+                <th>Municipio y dirección</th>
                 <th>Estado</th>
                 <th>Prioridad</th>
                 <th>Área</th>
@@ -95,7 +95,7 @@ export default function ListaReclamos({ usuario, areas = [], estadoFijo, mensaje
                   </td>
                   <td>{reclamo.categoria.nombre}</td>
                   <td>
-                    {reclamo.barrio.nombre}
+                    {reclamo.municipio.nombre}
                     <span className="secundario">{reclamo.direccion}</span>
                   </td>
                   <td>

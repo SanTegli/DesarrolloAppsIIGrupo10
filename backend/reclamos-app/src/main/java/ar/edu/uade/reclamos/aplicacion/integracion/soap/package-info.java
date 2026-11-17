@@ -6,7 +6,7 @@
  * <p>Están escritos a mano, no generados: son tres clases y el backend no publica el servicio.
  * {@code MensajesCoberturaSoapTest} comprueba que lo que producen y aceptan cumple el XSD.
  */
-@XmlSchema(namespace = "http://uade.edu.ar/reclamos/cobertura/v1", elementFormDefault = XmlNsForm.QUALIFIED)
+@XmlSchema(namespace = "http://uade.edu.ar/reclamos/cobertura/v2", elementFormDefault = XmlNsForm.QUALIFIED)
 package ar.edu.uade.reclamos.aplicacion.integracion.soap;
 
 import jakarta.xml.bind.annotation.XmlNsForm;

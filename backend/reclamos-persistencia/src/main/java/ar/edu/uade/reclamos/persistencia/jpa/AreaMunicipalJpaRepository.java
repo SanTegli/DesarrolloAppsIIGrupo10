@@ -13,9 +13,9 @@ public interface AreaMunicipalJpaRepository extends JpaRepository<AreaMunicipal,
     List<AreaMunicipal> findAllByOrderByNombreAsc();
 
     @EntityGraph(attributePaths = "municipio")
-    @Query("select distinct a from AreaMunicipal a join a.categorias c join a.barrios b "
-            + "where a.activa = true and c.id = :categoriaId and b.id = :barrioId order by a.id")
+    @Query("select distinct a from AreaMunicipal a join a.categorias c "
+            + "where a.activa = true and c.id = :categoriaId and a.municipio.id = :municipioId order by a.id")
     List<AreaMunicipal> buscarCandidatas(@Param("categoriaId") Long categoriaId,
-                                       @Param("barrioId") Long barrioId);
+                                       @Param("municipioId") Long municipioId);
 }
 

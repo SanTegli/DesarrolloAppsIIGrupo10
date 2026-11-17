@@ -10,7 +10,7 @@ import java.time.LocalDate;
  * @param porcentajeAtendidos resueltos y cerrados sobre pendientes, resueltos y cerrados; {@code null} si no hay
  *                            ninguno ("sin casos"), para no mostrar un porcentaje que no significa nada
  */
-public record TableroPublico(LocalDate desde, LocalDate hasta, Long barrioId, Long categoriaId,
+public record TableroPublico(LocalDate desde, LocalDate hasta, Long municipioId, Long categoriaId,
                              long creadosEnPeriodo, long pendientes, long resueltos, long cerrados,
                              long rechazados, long cancelados, Double porcentajeAtendidos) {
 }

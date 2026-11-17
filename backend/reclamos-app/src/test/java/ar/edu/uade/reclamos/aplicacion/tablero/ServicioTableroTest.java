@@ -29,7 +29,7 @@ class ServicioTableroTest {
     private final EscenarioAplicacion e = new EscenarioAplicacion();
     private final Consultas consultas = new Consultas();
     private final ServicioTablero servicio = new ServicioTablero(consultas,
-            new DoblesEnMemoria.Usuarios(e.ciudadano, e.agente, e.administrador), new DoblesEnMemoria.Barrios(e.barrio),
+            new DoblesEnMemoria.Usuarios(e.ciudadano, e.agente, e.administrador), new DoblesEnMemoria.Municipios(e.municipio),
             new DoblesEnMemoria.Categorias(e.categoria), RELOJ);
 
     @Test
@@ -89,8 +89,8 @@ class ServicioTableroTest {
 
     @Test
     void elAdministradorVeTodasLasAreasYLosSinAsignar() {
-        consultas.filas = List.of(new FilaPendientes(e.area.getId(), "Obras", e.barrio.getId(), "Bernal", 4L, 1L),
-                new FilaPendientes(null, null, e.barrio.getId(), "Bernal", 2L, 2L));
+        consultas.filas = List.of(new FilaPendientes(e.area.getId(), "Obras", e.municipio.getId(), "Quilmes", 4L, 1L),
+                new FilaPendientes(null, null, e.municipio.getId(), "Quilmes", 2L, 2L));
 
         TableroGestion tablero = servicio.gestion(e.administrador.getId());
 
@@ -123,19 +123,19 @@ class ServicioTableroTest {
         Long areaId;
 
         @Override
-        public long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long barrioId, Long categoriaId) {
+        public long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long municipioId, Long categoriaId) {
             this.desde = desde;
             this.hasta = hasta;
             return creados;
         }
 
         @Override
-        public List<ConteoPorEstado> contarPorEstado(Long barrioId, Long categoriaId) {
+        public List<ConteoPorEstado> contarPorEstado(Long municipioId, Long categoriaId) {
             return estados;
         }
 
         @Override
-        public List<FilaPendientes> pendientesPorAreaYBarrio(LocalDateTime ahora, Long areaId) {
+        public List<FilaPendientes> pendientesPorAreaYMunicipio(LocalDateTime ahora, Long areaId) {
             this.areaId = areaId;
             return filas;
         }

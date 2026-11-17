@@ -7,7 +7,7 @@ public final class MensajesCobertura {
      * Namespace de la versión 1 del contrato; es el mismo que declara {@code package-info.java}. Cambia solo
      * si el contrato cambia de forma incompatible.
      */
-    public static final String NAMESPACE = "http://uade.edu.ar/reclamos/cobertura/v1";
+    public static final String NAMESPACE = "http://uade.edu.ar/reclamos/cobertura/v2";
 
     private MensajesCobertura() {
     }

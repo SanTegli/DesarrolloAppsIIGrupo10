@@ -249,8 +249,8 @@ Cada servicio tiene una responsabilidad y se puede probar por separado.
 | `ServicioNotificaciones` | Decidir a quién se avisa en cada evento y guardar los avisos |
 | `ServicioVencimientos` | Marcar los reclamos que pasaron su fecha límite y publicar `ReclamoVencido` |
 | `ConsultaReclamosService` | Listar según el rol, buscar por número, avisos y acciones disponibles |
-| `ConsultaCatalogosService` | Usuarios, categorías, barrios y áreas |
-| `ServicioUbicaciones` | Sugerir direcciones con el `Geocodificador` (Georef) y confirmar la elegida dentro del municipio |
+| `ConsultaCatalogosService` | Usuarios, categorías, municipios y áreas |
+| `ServicioUbicaciones` | Sugerir direcciones con el `Geocodificador` (Georef), una búsqueda por municipio, y confirmar que la elegida cae en el municipio del reclamo |
 | `ServicioFotos` | Validar y re-codificar la foto, y guardarla en dos pasos: pendiente antes del alta, confirmada después |
 | `ServicioDuplicados` | Buscar reclamos abiertos de la misma categoría cerca del punto elegido |
 | `ServicioApoyos` | Sumar, retirar y contar los apoyos de los ciudadanos a un reclamo |
@@ -390,7 +390,7 @@ sequenceDiagram
   participant EA as EstrategiaAsignacion
 
   RS->>SA: asignarAutomaticamente(reclamo)
-  SA->>CS: buscarCandidatas(municipio, barrio, categoría)
+  SA->>CS: buscarCandidatas(municipio, categoría)
   CS->>WS: ConsultarCoberturaRequest (HTTP POST /ws, hasta 2 s)
   alt responde con áreas
     WS-->>CS: ConsultarCoberturaResponse con ids 2 y 4
@@ -412,7 +412,7 @@ sequenceDiagram
 
 | Pieza | Responsabilidad |
 | --- | --- |
-| `servicio-cobertura` | Dueño de la cobertura: qué área atiende qué categoría en qué barrio, en `cobertura.json`. Publica el WSDL generado de `cobertura.xsd` y valida cada pedido contra el XSD |
+| `servicio-cobertura` | Dueño de la cobertura: qué área de cada municipio atiende qué categoría, en `cobertura.json`. Desde el PR 25 el contrato es la versión 2 (`.../cobertura/v2`), sin barrio. Publica el WSDL generado de `cobertura.xsd` y valida cada pedido contra el XSD |
 | `CoberturaSoap` | Adapter entre `CatalogoCobertura` y la operación SOAP. Traduce los mensajes, aplica el tiempo límite y convierte cualquier falla en `ServicioExternoNoDisponibleException` |
 | `ServicioAsignacion` | Igual que antes: si la cobertura no está disponible, marca la asignación pendiente; si no, la estrategia elige |
 | Backend | Sigue siendo dueño de los datos de cada área (nombre, email, activa). Descarta las áreas que no tiene, las inactivas y las de otro municipio |
@@ -528,32 +528,43 @@ sequenceDiagram
   participant GR as Georef
 
   C->>UI: escribe "Belgrano 450" y toca Buscar en el mapa
-  UI->>UC: GET /api/ubicaciones/sugerencias?direccion=…&barrioId=2
-  UC->>SU: sugerir(direccion, barrio)
-  SU->>CA: sugerir(direccion, barrio)
-  alt no está en la caché
-    CA->>GG: sugerir(direccion, barrio)
-    GG->>GR: GET /direcciones?direccion=…&departamento=Quilmes&provincia=Buenos Aires
-    GR-->>GG: direcciones con calle, localidad y ubicación
-    GG-->>CA: SugerenciaUbicacion (nomenclatura y coordenadas)
+  UI->>UC: GET /api/ubicaciones/sugerencias?direccion=…
+  UC->>SU: sugerir(direccion)
+  par una consulta por municipio, en hilos virtuales
+    SU->>CA: sugerir(direccion, Quilmes)
+    alt no está en la caché
+      CA->>GG: sugerir(direccion, Quilmes)
+      GG->>GR: GET /direcciones?direccion=…&departamento=Quilmes&provincia=Buenos Aires
+      GR-->>GG: direcciones con calle, localidad y ubicación
+      GG-->>CA: SugerenciaUbicacion (nomenclatura y coordenadas)
+    end
+  and
+    SU->>CA: sugerir(direccion, Avellaneda) y lo mismo con Berazategui
   end
-  CA-->>SU: sugerencias
-  SU-->>UI: las que tienen coordenadas dentro de Quilmes, hasta 5
-  C->>UI: elige "GRL BELGRANO 450, Bernal Oeste" y crea el reclamo
-  UI->>SU: POST /api/reclamos con ubicacion (por ReclamoController y la fachada)
-  Note over SU: confirmar: dentro del recuadro → Ubicacion CONFIRMADA, proveedor georef
+  CA-->>SU: sugerencias de cada municipio
+  SU-->>UI: las que tienen coordenadas dentro de su municipio, con el municipio, hasta 5
+  C->>UI: elige "GRL BELGRANO 450, Bernal Oeste · Quilmes" y crea el reclamo
+  UI->>SU: POST /api/reclamos con municipioId y ubicacion (por ReclamoController y la fachada)
+  SU->>CA: municipioEn(lat, lon)
+  CA->>GG: municipioEn(lat, lon), sin caché
+  GG->>GR: GET /ubicacion?lat=…&lon=…
+  GR-->>GG: departamento Quilmes
+  Note over SU: confirmar: dentro del recuadro y Georef dice Quilmes → Ubicacion CONFIRMADA
 ```
 
 | Pieza | Responsabilidad |
 | --- | --- |
-| `GeorefGeocodificador` | Adapter y capa anticorrupción: arma la consulta de Georef y traduce su respuesta a `SugerenciaUbicacion`. Un 400 de Georef es "no encontrada"; un error, un tiempo agotado (1 s para conectar, 3 s para responder) o una respuesta con otra forma es `ServicioExternoNoDisponibleException` |
-| `GeocodificadorConCache` | Proxy de caché: misma interfaz; la misma dirección en el mismo municipio se responde de memoria durante 10 minutos. Las fallas no se guardan |
-| `ServicioUbicaciones` | Filtra las sugerencias sin coordenadas o fuera del recuadro del municipio y, en el alta, valida la elegida. Si Georef no responde, devuelve `disponible: false` en lugar de fallar |
+| `GeorefGeocodificador` | Adapter y capa anticorrupción: arma las consultas de Georef (`/direcciones` y `/ubicacion`) y traduce sus respuestas a `SugerenciaUbicacion` o al nombre del partido. Un 400 de Georef es "no encontrada"; un error, un tiempo agotado (1 s para conectar, 3 s para responder) o una respuesta con otra forma es `ServicioExternoNoDisponibleException` |
+| `GeocodificadorConCache` | Proxy de caché: misma interfaz; la misma dirección en el mismo municipio se responde de memoria durante 10 minutos. Las fallas y la ubicación inversa no se guardan |
+| `ServicioUbicaciones` | Busca en todos los municipios en paralelo, filtra las sugerencias sin coordenadas o fuera del recuadro de su municipio y, en el alta, valida la elegida con el recuadro y con la ubicación inversa. Si Georef no responde para ningún municipio, devuelve `disponible: false` en lugar de fallar, y el vecino elige el municipio de la lista |
 | `ReclamoService` | Guarda la `Ubicacion` que le pasa la fachada: confirmada o pendiente |
 
 El recuadro de cada municipio está en `reclamos.geocodificacion.recuadros`. Es un filtro grueso: evita
-coordenadas de otra provincia o inventadas en el navegador, pero no prueba que el punto esté dentro del
-límite exacto del partido.
+coordenadas de otra provincia o inventadas en el navegador, pero los recuadros de partidos vecinos se pisan
+(Quilmes y Avellaneda comparten borde). Por eso, desde el PR 25, el alta le pregunta además a Georef en qué
+partido cae el punto (`GET /ubicacion`) y rechaza la ubicación si no es el del reclamo. Si Georef no
+responde, alcanza el recuadro: el alta no se traba. Los tests la apagan
+(`reclamos.geocodificacion.confirmar-municipio: false`) para no salir a Internet.
 
 ### Mensajería: outbox, RabbitMQ y servicio de notificaciones
 
@@ -777,9 +788,9 @@ parecido: decide el vecino. La vinculación de dos reclamos ya creados quedó fu
 Dos tableros, con tarjetas y una tabla:
 
 - **Público:** sin sesión y sin datos de personas. Muestra los creados en el período y cuántos hay hoy pendientes,
-  resueltos y cerrados, con filtro de barrio y categoría.
-- **Gestión:** para el municipio. Muestra pendientes, vencidos por fecha, sin asignar y una tabla por área y
-  barrio. Cada agente ve solo su área.
+  resueltos y cerrados, con filtro de municipio y categoría.
+- **Gestión:** para los municipios. Muestra pendientes, vencidos por fecha, sin asignar y una tabla por área y
+  municipio. Cada agente ve solo su área.
 
 **Lado de lectura separado (Domain Reporting, CQRS: Clase 5).** Las métricas no pasan por el agregado ni por
 `ReclamoRepository`. Recorrer reclamos con el Repository para contarlos es el antipatrón que marca la clase:
@@ -795,12 +806,12 @@ flowchart LR
   ST --> CT[[ConsultasTablero<br/>puerto de lectura]]
   CT -.implementa.- CJ[ConsultasTableroJpa<br/>JPQL agregado]
   CJ --> DB[(MySQL)]
-  ST -. usuarios, barrios, categorías .-> R[[Repositories]]
+  ST -. usuarios, municipios, categorías .-> R[[Repositories]]
 ```
 
 | Pieza | Responsabilidad |
 | --- | --- |
-| `ConsultasTablero` | Tres consultas: creados en un período, cuántos hay por estado y pendientes y vencidos por área y barrio |
+| `ConsultasTablero` | Tres consultas: creados en un período, cuántos hay por estado y pendientes y vencidos por área y municipio |
 | `ConsultasTableroJpa` | JPQL con proyecciones (`ConteoPorEstado`, `FilaPendientes`); los filtros opcionales se agregan solo si vienen |
 | `ServicioTablero` | Período por defecto (30 días) y máximo (366), qué ve cada rol y los porcentajes. Si el denominador es cero, el porcentaje es `null`: "sin casos" |
 
@@ -835,16 +846,16 @@ una tabla proyectada desde los eventos de dominio sin tocar el servicio ni la in
 - **Tableros sin historia.** El público dice cuántos reclamos hay hoy en cada estado, no cuántos había en una
   fecha pasada. Tampoco hay gráficos ni mapas: tarjetas y una tabla.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.
-- **Datos maestros de solo lectura.** Áreas, categorías, barrios y usuarios salen de la semilla; no
+- **Datos maestros de solo lectura.** Municipios, áreas, categorías y usuarios salen de la semilla; no
   hay alta ni edición desde la interfaz.
 
 ## Decisiones de la Segunda Parte
 
 | Tema | Decisión |
 | --- | --- |
-| Geolocalización | El ciudadano sigue eligiendo el barrio. Georef normaliza la dirección y devuelve sugerencias con coordenadas; el ciudadano elige una. No se deduce el barrio |
-| Servicio SOAP | Recibe municipio, barrio y categoría y devuelve las áreas que los cubren. Es el dueño de la cobertura |
+| Geolocalización | Georef busca la dirección en cada municipio y devuelve sugerencias con coordenadas y municipio; el ciudadano elige una y con eso queda elegido el municipio (PR 25: ya no hay barrios). Si el mapa no responde, el ciudadano elige el municipio de una lista. En el alta, Georef confirma el partido del punto elegido |
+| Servicio SOAP | Recibe municipio y categoría y devuelve las áreas del municipio que la atienden (contrato v2). Es el dueño de la cobertura |
 | IA | Estima la prioridad a partir del texto. Gemini por su nivel gratuito; OpenAI queda como segundo adaptador. La categoría la sigue eligiendo el ciudadano |
-| IA sincrónica o por cola | Sincrónica, dentro del alta, con tiempo límite y respaldo por categoría |
+| IA sincrónica o por cola | Híbrida (PR 24): sincrónica en el alta con 4 s; si no llega, la revisa por la cola con reintentos |
 | Identificador de mensaje | Cada aviso que sale por RabbitMQ lleva el `eventId` de su fila de outbox; los eventos de dominio no cambian |
 | Más de un proceso | Cobertura, prioridad y notificaciones son aplicaciones separadas, en `servicios/` |

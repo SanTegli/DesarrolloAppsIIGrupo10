@@ -43,7 +43,7 @@ public class Reclamo extends Entidad {
     private Ciudadano ciudadano;
     private AgenteMunicipal agente;
     private Categoria categoria;
-    private Barrio barrio;
+    private Municipio municipio;
     private AreaMunicipal area;
     private List<HistorialEstado> historial = new ArrayList<>();
 
@@ -51,12 +51,12 @@ public class Reclamo extends Entidad {
     protected Reclamo() {
     }
 
-    public Reclamo(String numero, Ciudadano ciudadano, Categoria categoria, Barrio barrio, String descripcion,
+    public Reclamo(String numero, Ciudadano ciudadano, Categoria categoria, Municipio municipio, String descripcion,
                    String direccion, Prioridad prioridad, LocalDateTime fechaCreacion, LocalDateTime fechaLimite) {
         this.numero = Validador.requerirTexto(numero, "número");
         this.ciudadano = Validador.requerirNoNulo(ciudadano, "ciudadano");
         this.categoria = Validador.requerirNoNulo(categoria, "categoría");
-        this.barrio = Validador.requerirNoNulo(barrio, "barrio");
+        this.municipio = Validador.requerirNoNulo(municipio, "municipio");
         this.descripcion = Validador.requerirTexto(descripcion, "descripción", LONGITUD_MAXIMA_DESCRIPCION);
         this.direccion = Validador.requerirTexto(direccion, "dirección", LONGITUD_MAXIMA_DIRECCION);
         this.prioridad = Validador.requerirNoNulo(prioridad, "prioridad");
@@ -85,6 +85,10 @@ public class Reclamo extends Entidad {
         }
         if (nuevaArea.equals(area)) {
             throw new ReglaNegocioException("El reclamo ya está asignado al área " + nuevaArea.getNombre() + ".");
+        }
+        if (!nuevaArea.getMunicipio().equals(municipio)) {
+            throw new ReglaNegocioException("El área " + nuevaArea.getNombre() + " es de "
+                    + nuevaArea.getMunicipio().getNombre() + " y el reclamo es de " + municipio.getNombre() + ".");
         }
         EstadoReclamo anterior = estado;
         this.area = nuevaArea;
@@ -374,8 +378,8 @@ public class Reclamo extends Entidad {
         return categoria;
     }
 
-    public Barrio getBarrio() {
-        return barrio;
+    public Municipio getMunicipio() {
+        return municipio;
     }
 
     /** {@code null} mientras el reclamo está sin asignar. */

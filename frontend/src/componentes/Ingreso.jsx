@@ -15,7 +15,7 @@ export default function Ingreso({ aviso, onIngreso }) {
     <section className="ingreso" aria-labelledby="titulo-ingreso">
       <div className="ingreso-presentacion">
         <span className="sobre-titulo">QUILMES · ATENCIÓN CIUDADANA</span>
-        <h1>Tu barrio,<br />cada día mejor.</h1>
+        <h1>Tu ciudad,<br />cada día mejor.</h1>
         <p>Un espacio para avisar lo que pasa, seguir tus reclamos y acompañar las mejoras de tu ciudad.</p>
         <svg className="ciudad-ilustracion" viewBox="0 0 520 210" fill="none" aria-hidden="true">
           <circle cx="410" cy="46" r="25" fill="#e6c77e" />

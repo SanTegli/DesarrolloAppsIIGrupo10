@@ -45,17 +45,17 @@ class MensajesCoberturaSoapTest {
     @Test
     void elPedidoQueArmaElBackendCumpleElXsd() throws Exception {
         StringResult xml = new StringResult();
-        marshaller.marshal(new ConsultarCoberturaRequest(1, 2, 3), xml);
+        marshaller.marshal(new ConsultarCoberturaRequest(1, 3), xml);
 
         contrato.newValidator().validate(new StringSource(xml.toString()));
-        assertThat(xml.toString()).contains("http://uade.edu.ar/reclamos/cobertura/v1")
-                .containsSubsequence("municipioId>1<", "barrioId>2<", "categoriaId>3<");
+        assertThat(xml.toString()).contains("http://uade.edu.ar/reclamos/cobertura/v2")
+                .containsSubsequence("municipioId>1<", "categoriaId>3<").doesNotContain("barrio");
     }
 
     @Test
     void entiendeUnaRespuestaValidaDelContrato() throws Exception {
         String respuesta = """
-                <cob:ConsultarCoberturaResponse xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v1">
+                <cob:ConsultarCoberturaResponse xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v2">
                   <cob:area><cob:id>2</cob:id><cob:nombre>Obras Públicas</cob:nombre></cob:area>
                   <cob:area><cob:id>4</cob:id><cob:nombre>Mantenimiento Vial</cob:nombre></cob:area>
                 </cob:ConsultarCoberturaResponse>""";
@@ -71,7 +71,7 @@ class MensajesCoberturaSoapTest {
 
     @Test
     void entiendeLaRespuestaVacia() throws Exception {
-        String vacia = "<ConsultarCoberturaResponse xmlns=\"http://uade.edu.ar/reclamos/cobertura/v1\"/>";
+        String vacia = "<ConsultarCoberturaResponse xmlns=\"http://uade.edu.ar/reclamos/cobertura/v2\"/>";
         contrato.newValidator().validate(new StringSource(vacia));
 
         ConsultarCoberturaResponse leida = (ConsultarCoberturaResponse) unmarshaller.unmarshal(new StringSource(vacia));
@@ -80,10 +80,19 @@ class MensajesCoberturaSoapTest {
     }
 
     @Test
+    void elXsdV2YaNoAceptaElBarrio() {
+        assertThatThrownBy(() -> contrato.newValidator().validate(new StringSource(
+                "<ConsultarCoberturaRequest xmlns=\"http://uade.edu.ar/reclamos/cobertura/v2\">"
+                        + "<municipioId>1</municipioId><barrioId>2</barrioId><categoriaId>3</categoriaId>"
+                        + "</ConsultarCoberturaRequest>")))
+                .isInstanceOf(SAXException.class);
+    }
+
+    @Test
     void elXsdRechazaIdsQueNoSonPositivos() {
         assertThatThrownBy(() -> contrato.newValidator().validate(new StringSource(
-                "<ConsultarCoberturaRequest xmlns=\"http://uade.edu.ar/reclamos/cobertura/v1\">"
-                        + "<municipioId>0</municipioId><barrioId>2</barrioId><categoriaId>3</categoriaId>"
+                "<ConsultarCoberturaRequest xmlns=\"http://uade.edu.ar/reclamos/cobertura/v2\">"
+                        + "<municipioId>0</municipioId><categoriaId>3</categoriaId>"
                         + "</ConsultarCoberturaRequest>")))
                 .isInstanceOf(SAXException.class);
     }

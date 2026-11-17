@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from '../App.jsx'
-import { AREAS, BARRIOS, CATEGORIAS, SIN_SESION, USUARIOS, simularApi } from '../pruebas/apiFalsa.js'
+import { AREAS, MUNICIPIOS, CATEGORIAS, SIN_SESION, USUARIOS, simularApi } from '../pruebas/apiFalsa.js'
 import Tablero, { formatearDia, textoPorcentaje } from './Tablero.jsx'
 
 const [ana, carla, elena] = USUARIOS
@@ -10,7 +10,7 @@ const [ana, carla, elena] = USUARIOS
 const PUBLICO = {
   desde: '2026-10-05',
   hasta: '2026-11-03',
-  barrioId: null,
+  municipioId: null,
   categoriaId: null,
   creadosEnPeriodo: 5,
   pendientes: 3,
@@ -29,8 +29,8 @@ const GESTION = {
   sinAsignar: 1,
   porcentajeVencidos: 66.7,
   filas: [
-    { area: { id: 1, nombre: 'Alumbrado' }, barrio: { id: 2, nombre: 'Bernal' }, pendientes: 2, vencidos: 1 },
-    { area: null, barrio: { id: 2, nombre: 'Bernal' }, pendientes: 1, vencidos: 0 },
+    { area: { id: 1, nombre: 'Alumbrado' }, municipio: { id: 1, nombre: 'Quilmes' }, pendientes: 2, vencidos: 1 },
+    { area: null, municipio: { id: 1, nombre: 'Quilmes' }, pendientes: 1, vencidos: 0 },
   ],
 }
 
@@ -39,7 +39,7 @@ const cifra = (titulo) => screen.getByText(titulo, { selector: '.cifra-titulo' }
 describe('Tablero', () => {
   it('el ciudadano ve solo el público, con el período y el porcentaje', async () => {
     const llamadas = simularApi({ 'GET /api/dashboard/publico': PUBLICO })
-    render(<Tablero usuario={ana} barrios={BARRIOS} categorias={CATEGORIAS} />)
+    render(<Tablero usuario={ana} municipios={MUNICIPIOS} categorias={CATEGORIAS} />)
 
     expect(await screen.findByText('Creados en el período')).toBeInTheDocument()
     expect(cifra('Creados en el período')).toHaveTextContent('5Del 05/10/2026 al 03/11/2026')
@@ -52,34 +52,34 @@ describe('Tablero', () => {
 
   it('sin casos muestra "sin casos" en lugar de un porcentaje', async () => {
     simularApi({ 'GET /api/dashboard/publico': { ...PUBLICO, porcentajeAtendidos: null } })
-    render(<Tablero usuario={ana} barrios={BARRIOS} categorias={CATEGORIAS} />)
+    render(<Tablero usuario={ana} municipios={MUNICIPIOS} categorias={CATEGORIAS} />)
 
     expect(await screen.findByText('sin casos')).toBeInTheDocument()
   })
 
-  it('los filtros vuelven a pedir las cifras con barrio, categoría y fechas', async () => {
+  it('los filtros vuelven a pedir las cifras con municipio, categoría y fechas', async () => {
     const llamadas = simularApi({ 'GET /api/dashboard/publico': PUBLICO })
     const usuario = userEvent.setup()
-    render(<Tablero usuario={ana} barrios={BARRIOS} categorias={CATEGORIAS} />)
+    render(<Tablero usuario={ana} municipios={MUNICIPIOS} categorias={CATEGORIAS} />)
     await screen.findByText('Creados en el período')
 
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
     await usuario.selectOptions(screen.getByLabelText('Categoría'), 'Luminaria rota')
     await usuario.type(screen.getByLabelText('Desde'), '2026-10-01')
 
     const ultima = llamadas.at(-1)
-    expect(ultima.consulta).toEqual({ barrioId: '2', categoriaId: '1', desde: '2026-10-01' })
+    expect(ultima.consulta).toEqual({ municipioId: '1', categoriaId: '1', desde: '2026-10-01' })
   })
 
-  it('el administrador ve la gestión: vencidos con su porcentaje, sin asignar y la tabla por área y barrio', async () => {
+  it('el administrador ve la gestión: vencidos con su porcentaje, sin asignar y la tabla por área y municipio', async () => {
     simularApi({ 'GET /api/dashboard/publico': PUBLICO, 'GET /api/dashboard/gestion': GESTION })
-    render(<Tablero usuario={elena} barrios={BARRIOS} categorias={CATEGORIAS} />)
+    render(<Tablero usuario={elena} municipios={MUNICIPIOS} categorias={CATEGORIAS} />)
 
     expect(await screen.findByRole('heading', { name: 'Tablero de gestión' })).toBeInTheDocument()
     expect(cifra('Vencidos')).toHaveTextContent('266,7 % de los pendientes')
     expect(cifra('Sin asignar')).toHaveTextContent('1')
     const filas = within(screen.getByRole('table')).getAllByRole('row').slice(1)
-    expect(filas.map((fila) => fila.textContent)).toEqual(['AlumbradoBernal21', 'Sin áreaBernal10'])
+    expect(filas.map((fila) => fila.textContent)).toEqual(['AlumbradoQuilmes21', 'Sin áreaQuilmes10'])
   })
 
   it('el agente ve su área y no la cifra de sin asignar', async () => {
@@ -95,7 +95,7 @@ describe('Tablero', () => {
         porcentajeVencidos: null,
       },
     })
-    render(<Tablero usuario={carla} barrios={BARRIOS} categorias={CATEGORIAS} />)
+    render(<Tablero usuario={carla} municipios={MUNICIPIOS} categorias={CATEGORIAS} />)
 
     expect(await screen.findByRole('heading', { name: 'Tablero de gestión: Alumbrado' })).toBeInTheDocument()
     expect(screen.queryByText('Sin asignar')).not.toBeInTheDocument()
@@ -106,7 +106,7 @@ describe('Tablero', () => {
   it('sin sesión, el tablero público se ve desde la pantalla de ingreso', async () => {
     simularApi({
       'GET /api/categorias': CATEGORIAS,
-      'GET /api/barrios': BARRIOS,
+      'GET /api/municipios': MUNICIPIOS,
       'GET /api/areas': AREAS,
       'GET /api/auth/yo': SIN_SESION,
       'GET /api/dashboard/publico': PUBLICO,

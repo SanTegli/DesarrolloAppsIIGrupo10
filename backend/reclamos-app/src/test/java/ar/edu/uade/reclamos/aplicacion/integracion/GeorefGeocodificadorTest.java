@@ -9,7 +9,6 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import ar.edu.uade.reclamos.dominio.integracion.ServicioExternoNoDisponibleException;
 import ar.edu.uade.reclamos.dominio.integracion.SugerenciaUbicacion;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import java.io.IOException;
 import java.net.ServerSocket;
@@ -32,7 +31,7 @@ import org.springframework.web.client.RestClient;
  */
 class GeorefGeocodificadorTest {
 
-    private final Barrio bernal = new Barrio("Bernal", new Municipio("Quilmes", "Buenos Aires"));
+    private final Municipio quilmes = new Municipio("Quilmes", "Buenos Aires");
 
     private MockRestServiceServer georef;
     private GeorefGeocodificador geocodificador;
@@ -56,7 +55,7 @@ class GeorefGeocodificadorTest {
                         "direccion=Belgrano 450&departamento=Quilmes&provincia=Buenos Aires&max=10"))
                 .andRespond(withSuccess(new ClassPathResource("georef/belgrano-450.json"), MediaType.APPLICATION_JSON));
 
-        assertThat(geocodificador.sugerir("Belgrano 450", bernal)).containsExactly(
+        assertThat(geocodificador.sugerir("Belgrano 450", quilmes)).containsExactly(
                 new SugerenciaUbicacion("GRL BELGRANO 450, Quilmes Oeste, Quilmes, Buenos Aires", null, null),
                 new SugerenciaUbicacion("GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires", -34.73614578,
                         -58.322899857500005));
@@ -68,7 +67,7 @@ class GeorefGeocodificadorTest {
                 .andRespond(withSuccess(new ClassPathResource("georef/sin-resultados.json"),
                         MediaType.APPLICATION_JSON));
 
-        assertThat(geocodificador.sugerir("Calle Inventada Xyzw 123", bernal)).isEmpty();
+        assertThat(geocodificador.sugerir("Calle Inventada Xyzw 123", quilmes)).isEmpty();
     }
 
     @Test
@@ -78,7 +77,7 @@ class GeorefGeocodificadorTest {
                 .andRespond(withSuccess(new ClassPathResource("georef/sin-resultados.json"),
                         MediaType.APPLICATION_JSON));
 
-        assertThat(geocodificador.sugerir("Belgrano & Moreno", bernal)).isEmpty();
+        assertThat(geocodificador.sugerir("Belgrano & Moreno", quilmes)).isEmpty();
     }
 
     @Test
@@ -87,14 +86,14 @@ class GeorefGeocodificadorTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body("{\"errores\":[{\"mensaje\":\"El parámetro direccion es inválido\"}]}"));
 
-        assertThat(geocodificador.sugerir("450", bernal)).isEmpty();
+        assertThat(geocodificador.sugerir("450", quilmes)).isEmpty();
     }
 
     @Test
     void errorDeGeorefEsServicioNoDisponible() {
         georef.expect(method(HttpMethod.GET)).andRespond(withServerError());
 
-        assertThatThrownBy(() -> geocodificador.sugerir("Belgrano 450", bernal))
+        assertThatThrownBy(() -> geocodificador.sugerir("Belgrano 450", quilmes))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class);
     }
 
@@ -103,7 +102,7 @@ class GeorefGeocodificadorTest {
         georef.expect(method(HttpMethod.GET))
                 .andRespond(withSuccess("{\"resultado\": \"otra cosa\"}", MediaType.APPLICATION_JSON));
 
-        assertThatThrownBy(() -> geocodificador.sugerir("Belgrano 450", bernal))
+        assertThatThrownBy(() -> geocodificador.sugerir("Belgrano 450", quilmes))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class);
     }
 
@@ -114,10 +113,37 @@ class GeorefGeocodificadorTest {
                     "http://localhost:" + mudo.getLocalPort(), Duration.ofMillis(300), Duration.ofMillis(300), 10);
             long inicio = System.nanoTime();
 
-            assertThatThrownBy(() -> conTiempoCorto.sugerir("Belgrano 450", bernal))
+            assertThatThrownBy(() -> conTiempoCorto.sugerir("Belgrano 450", quilmes))
                     .isInstanceOf(ServicioExternoNoDisponibleException.class);
             assertThat(Duration.ofNanos(System.nanoTime() - inicio)).isLessThan(Duration.ofSeconds(2));
         }
+    }
+
+    @Test
+    void laUbicacionInversaDevuelveElPartidoDondeCaeElPunto() {
+        georef.expect(method(HttpMethod.GET))
+                .andExpect(consulta("/georef/api/v2.0/ubicacion", "lat=-34.7&lon=-58.32"))
+                .andRespond(withSuccess(new ClassPathResource("georef/ubicacion-wilde.json"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(geocodificador.municipioEn(-34.7, -58.32)).contains("Avellaneda");
+    }
+
+    @Test
+    void unPuntoFueraDeTodoMunicipioNoTieneMunicipio() {
+        georef.expect(method(HttpMethod.GET))
+                .andRespond(withSuccess(new ClassPathResource("georef/ubicacion-fuera.json"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(geocodificador.municipioEn(-34.6, -57.9)).isEmpty();
+    }
+
+    @Test
+    void laUbicacionInversaConErrorEsServicioNoDisponible() {
+        georef.expect(method(HttpMethod.GET)).andRespond(withServerError());
+
+        assertThatThrownBy(() -> geocodificador.municipioEn(-34.7, -58.32))
+                .isInstanceOf(ServicioExternoNoDisponibleException.class);
     }
 
     /** Ruta y parámetros ya decodificados, para no depender de cómo se codifican los espacios. */

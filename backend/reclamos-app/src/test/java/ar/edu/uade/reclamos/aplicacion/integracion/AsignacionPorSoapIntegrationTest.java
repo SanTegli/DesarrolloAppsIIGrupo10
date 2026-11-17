@@ -10,13 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
@@ -70,13 +68,11 @@ class AsignacionPorSoapIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
 
     private Long municipio;
-    private Long barrio;
     private Long categoria;
     private Long area;
     private Long ciudadano;
@@ -95,19 +91,17 @@ class AsignacionPorSoapIntegrationTest {
     void escenario() {
         PEDIDOS.clear();
         new TransactionTemplate(transacciones).executeWithoutResult(tx -> {
-            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_barrio",
-                    "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias", "municipios")) {
+            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_categoria",
+                    "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria bache = categorias.guardar(new Categoria("Bache", "Pozo en la calzada", 120, Prioridad.BAJA));
-            // Sin barrios ni categorías locales: con origen soap, la cobertura la decide el servicio.
+            // Sin categorías locales: con origen soap, la cobertura la decide el servicio.
             AreaMunicipal obras = areas.guardar(new AreaMunicipal("Obras Públicas", "obras@example.org", quilmes));
             Ciudadano ana = (Ciudadano) usuarios.guardar(
                     verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null)));
             municipio = quilmes.getId();
-            barrio = bernal.getId();
             categoria = bache.getId();
             area = obras.getId();
             ciudadano = ana.getId();
@@ -124,9 +118,9 @@ class AsignacionPorSoapIntegrationTest {
                 .andExpect(jsonPath("$.area.id").value(area))
                 .andExpect(jsonPath("$.asignacionPendiente").value(false));
         assertThat(PEDIDOS).singleElement().asString()
-                .contains("http://uade.edu.ar/reclamos/cobertura/v1")
-                .containsSubsequence("municipioId>" + municipio + "<", "barrioId>" + barrio + "<",
-                        "categoriaId>" + categoria + "<");
+                .contains("http://uade.edu.ar/reclamos/cobertura/v2")
+                .containsSubsequence("municipioId>" + municipio + "<", "categoriaId>" + categoria + "<")
+                .doesNotContain("barrio");
     }
 
     @Test
@@ -162,8 +156,8 @@ class AsignacionPorSoapIntegrationTest {
 
     private ResultActions crearReclamo() throws Exception {
         return mvc.perform(alta("""
-                        {"categoriaId": %d, "barrioId": %d, "descripcion": "Pozo en la calle",
-                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)).with(como(ciudadano)));
+                        {"categoriaId": %d, "municipioId": %d, "descripcion": "Pozo en la calle",
+                         "direccion": "Belgrano 450"}""".formatted(categoria, municipio)).with(como(ciudadano)));
     }
 
     private static HttpServer iniciarServidorSoap() {
@@ -186,18 +180,18 @@ class AsignacionPorSoapIntegrationTest {
         PEDIDOS.add(new String(intercambio.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
         int estado = 200;
         String cuerpo = switch (respuesta) {
-            case AREA -> "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v1\">"
+            case AREA -> "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v2\">"
                     + "<cob:area><cob:id>" + areaQueCubre + "</cob:id><cob:nombre>Obras Públicas</cob:nombre></cob:area>"
                     + "</cob:ConsultarCoberturaResponse>";
-            case VACIA -> "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v1\"/>";
+            case VACIA -> "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v2\"/>";
             case FAULT -> {
                 estado = 500;
                 yield "<SOAP-ENV:Fault><faultcode>SOAP-ENV:Client</faultcode>"
-                        + "<faultstring xml:lang=\"es\">No existe el barrio 9</faultstring></SOAP-ENV:Fault>";
+                        + "<faultstring xml:lang=\"es\">No existe el municipio 9</faultstring></SOAP-ENV:Fault>";
             }
             case LENTA -> {
                 dormir(3_000);
-                yield "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v1\"/>";
+                yield "<cob:ConsultarCoberturaResponse xmlns:cob=\"http://uade.edu.ar/reclamos/cobertura/v2\"/>";
             }
         };
         byte[] sobre = ("<SOAP-ENV:Envelope xmlns:SOAP-ENV=\"http://schemas.xmlsoap.org/soap/envelope/\">"

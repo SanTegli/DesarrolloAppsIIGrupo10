@@ -3,7 +3,6 @@ package ar.edu.uade.reclamos.dominio;
 import ar.edu.uade.reclamos.dominio.modelo.Administrador;
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
@@ -12,9 +11,9 @@ import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import java.time.LocalDateTime;
 
 /**
- * Escenario mínimo compartido por los tests del dominio: el municipio de Quilmes con dos áreas.
- * Alumbrado atiende "Luminaria rota" en Bernal y Quilmes Centro; Obras Públicas atiende "Bache" en Bernal.
- * Ezpeleta no tiene ningún área con jurisdicción.
+ * Escenario mínimo compartido por los tests del dominio: dos municipios. Quilmes tiene Alumbrado, que atiende
+ * "Luminaria rota", y Obras Públicas, que atiende "Bache". Avellaneda solo tiene su propia Obras Públicas: una
+ * luminaria en Avellaneda no tiene área.
  */
 public class DatosDePrueba {
 
@@ -22,9 +21,7 @@ public class DatosDePrueba {
 
     public final Municipio quilmes = conId(new Municipio("Quilmes", "Buenos Aires"), 1L);
 
-    public final Barrio bernal = conId(new Barrio("Bernal", quilmes), 1L);
-    public final Barrio quilmesCentro = conId(new Barrio("Quilmes Centro", quilmes), 2L);
-    public final Barrio ezpeleta = conId(new Barrio("Ezpeleta", quilmes), 3L);
+    public final Municipio avellaneda = conId(new Municipio("Avellaneda", "Buenos Aires"), 2L);
 
     public final Categoria luminaria =
             conId(new Categoria("Luminaria rota", "Farol apagado o dañado", 48, Prioridad.MEDIA), 1L);
@@ -35,6 +32,8 @@ public class DatosDePrueba {
             conId(new AreaMunicipal("Alumbrado", "alumbrado@quilmes.gob.ar", quilmes), 1L);
     public final AreaMunicipal obrasPublicas =
             conId(new AreaMunicipal("Obras Públicas", "obras@quilmes.gob.ar", quilmes), 2L);
+    public final AreaMunicipal obrasAvellaneda =
+            conId(new AreaMunicipal("Obras Públicas", "obras@avellaneda.gob.ar", avellaneda), 3L);
 
     public final Ciudadano ana =
             conId(new Ciudadano("30111222", "Ana", "Pérez", "ana.perez@mail.com", "1140001111"), 1L);
@@ -49,15 +48,13 @@ public class DatosDePrueba {
 
     public DatosDePrueba() {
         alumbrado.agregarCategoria(luminaria);
-        alumbrado.agregarBarrio(bernal);
-        alumbrado.agregarBarrio(quilmesCentro);
         obrasPublicas.agregarCategoria(bache);
-        obrasPublicas.agregarBarrio(bernal);
+        obrasAvellaneda.agregarCategoria(bache);
     }
 
-    /** Reclamo de Ana por una luminaria en Bernal, recién ingresado, con 48 horas de plazo. */
+    /** Reclamo de Ana por una luminaria en Quilmes, recién ingresado, con 48 horas de plazo. */
     public Reclamo reclamoIngresado() {
-        return new Reclamo("REC-TEST0001", ana, luminaria, bernal, "Farol apagado frente a la plaza",
+        return new Reclamo("REC-TEST0001", ana, luminaria, quilmes, "Farol apagado frente a la plaza",
                 "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(48));
     }
 

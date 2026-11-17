@@ -31,7 +31,7 @@ export const RECLAMO_DE_PRUEBA = {
   correoCiudadano: 'ana@example.org',
   contrasena: 'demo1234',
   categoriaId: 1, // Luminaria rota, prioridad base MEDIA
-  barrioId: 2, // Bernal: lo cubre Alumbrado
+  municipioId: 1, // Quilmes: lo cubre Alumbrado
   direccion: 'Belgrano 450',
   descripcion:
     'Verificación de la demo: el farol de la esquina está apagado hace tres noches y la cuadra queda a oscuras.',
@@ -156,10 +156,8 @@ export async function verificarDemo(config, informar = () => {}) {
   // 2. Georef: sugerencias para la dirección. Sin Internet el alta sigue, con la ubicación pendiente.
   let sugerencia = null
   await paso(anotar, 'Georef (API externa)', async () => {
-    const parametros = new URLSearchParams({
-      direccion: RECLAMO_DE_PRUEBA.direccion,
-      barrioId: String(RECLAMO_DE_PRUEBA.barrioId),
-    })
+    // Desde el PR 25 se busca en todos los municipios; se elige una sugerencia de Quilmes.
+    const parametros = new URLSearchParams({ direccion: RECLAMO_DE_PRUEBA.direccion })
     const respuesta = await http.json(`${config.backendUrl}/api/ubicaciones/sugerencias?${parametros}`)
     if (!respuesta.disponible) {
       return [AVISO, 'Georef no respondió (¿sin Internet?): el reclamo se crea con la ubicación pendiente']
@@ -167,7 +165,10 @@ export async function verificarDemo(config, informar = () => {}) {
     if (!respuesta.sugerencias?.length) {
       return [AVISO, `Georef no encontró "${RECLAMO_DE_PRUEBA.direccion}": la ubicación queda pendiente`]
     }
-    sugerencia = respuesta.sugerencias[0]
+    sugerencia = respuesta.sugerencias.find((opcion) => opcion.municipio?.id === RECLAMO_DE_PRUEBA.municipioId)
+    if (!sugerencia) {
+      return [AVISO, `Georef no encontró "${RECLAMO_DE_PRUEBA.direccion}" en Quilmes: la ubicación queda pendiente`]
+    }
     return [OK, `${respuesta.sugerencias.length} sugerencias; se elige "${sugerencia.direccionNormalizada}"`]
   })
 
@@ -176,7 +177,7 @@ export async function verificarDemo(config, informar = () => {}) {
   await paso(anotar, 'Alta del reclamo', async () => {
     const cuerpo = {
       categoriaId: RECLAMO_DE_PRUEBA.categoriaId,
-      barrioId: RECLAMO_DE_PRUEBA.barrioId,
+      municipioId: RECLAMO_DE_PRUEBA.municipioId,
       descripcion: RECLAMO_DE_PRUEBA.descripcion,
       direccion: RECLAMO_DE_PRUEBA.direccion,
     }
@@ -305,7 +306,7 @@ export function revisarArea(reclamo) {
     return [FALLA, 'asignación pendiente: el servicio de cobertura no respondió']
   }
   if (!reclamo.area) {
-    return [FALLA, `estado ${reclamo.estado} sin área: la cobertura no devolvió ninguna para Luminaria en Bernal`]
+    return [FALLA, `estado ${reclamo.estado} sin área: la cobertura no devolvió ninguna para Luminaria en Quilmes`]
   }
   return [OK, `${reclamo.estado}, área ${reclamo.area.nombre}`]
 }

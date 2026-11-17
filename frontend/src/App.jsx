@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { listarAreas, listarBarrios, listarCategorias } from './api/catalogos.js'
+import { listarAreas, listarCategorias, listarMunicipios } from './api/catalogos.js'
 import { alVencerSesion } from './api/cliente.js'
 import { cerrarSesion, usuarioActual } from './api/sesion.js'
 import { AvisoError, AvisoExito } from './componentes/Aviso.jsx'
@@ -46,9 +46,9 @@ export default function App() {
   const [sesion, setSesion] = useState({ estado: 'cargando' })
   const catalogos = useCarga(
     () =>
-      Promise.all([listarCategorias(), listarBarrios(), listarAreas()]).then(([categorias, barrios, areas]) => ({
+      Promise.all([listarCategorias(), listarMunicipios(), listarAreas()]).then(([categorias, municipios, areas]) => ({
         categorias,
-        barrios,
+        municipios,
         areas,
       })),
     [],
@@ -137,13 +137,13 @@ export default function App() {
               {verTableroPublico ? 'Ocultar el tablero público' : 'Ver el tablero público, sin iniciar sesión'}
             </button>
             {verTableroPublico && (
-              <TableroPublico barrios={catalogos.datos.barrios} categorias={catalogos.datos.categorias} />
+              <TableroPublico municipios={catalogos.datos.municipios} categorias={catalogos.datos.categorias} />
             )}
           </div>
         )}
 
         {usuario && vista.nombre === 'tablero' && (
-          <Tablero usuario={usuario} barrios={catalogos.datos.barrios} categorias={catalogos.datos.categorias} />
+          <Tablero usuario={usuario} municipios={catalogos.datos.municipios} categorias={catalogos.datos.categorias} />
         )}
 
         {usuario && vista.nombre === 'reclamos' && (
@@ -187,7 +187,7 @@ export default function App() {
           usuario.telefonoVerificado && (
           <FormularioReclamo
             categorias={catalogos.datos.categorias}
-            barrios={catalogos.datos.barrios}
+            municipios={catalogos.datos.municipios}
             onApoyado={(numero) =>
               setVista({
                 nombre: 'reclamos',
@@ -199,7 +199,8 @@ export default function App() {
                 reclamo.numero,
                 reclamo.area
                   ? `Reclamo creado y asignado a ${reclamo.area.nombre}.`
-                  : 'Reclamo creado. Ningún área cubre esa categoría en ese barrio: un administrador lo va a asignar.',
+                  : `Reclamo creado. Ningún área de ${reclamo.municipio.nombre} atiende esa categoría: un ` +
+                    'administrador lo va a asignar.',
               )
             }
           />

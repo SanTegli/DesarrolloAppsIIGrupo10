@@ -27,7 +27,7 @@ import org.springframework.security.web.savedrequest.NullRequestCache;
  * autorización, cierre de sesión) resuelve su parte y pasa el pedido al siguiente.
  *
  * <ul>
- *   <li><b>Rutas abiertas:</b> login, registro, los catálogos públicos (categorías, barrios, áreas) y Swagger.</li>
+ *   <li><b>Rutas abiertas:</b> login, registro, los catálogos públicos (categorías, municipios, áreas) y Swagger.</li>
  *   <li><b>Todo lo demás de /api</b> exige sesión. Qué puede hacer cada rol lo sigue decidiendo el dominio.</li>
  *   <li><b>CSRF:</b> token en la cookie {@code XSRF-TOKEN}, devuelto en el encabezado {@code X-XSRF-TOKEN}.</li>
  * </ul>
@@ -47,7 +47,7 @@ public class ConfiguracionSeguridad {
                 .securityContext(contexto -> contexto.securityContextRepository(contextos))
                 .authorizeHttpRequests(rutas -> rutas
                         .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/registro").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/api/categorias", "/api/barrios", "/api/areas").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/api/categorias", "/api/municipios", "/api/areas").permitAll()
                         // Tablero público (PR 18): solo cifras, sin datos personales.
                         .requestMatchers(HttpMethod.GET, "/api/dashboard/publico").permitAll()
                         .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs", "/v3/api-docs/**",

@@ -15,15 +15,16 @@ export const MAXIMO_FOTO = 5 * 1024 * 1024
 
 /**
  * Alta de un reclamo. El área no se elige: la asigna el backend con la estrategia activa.
- * La dirección se puede buscar en el mapa: si hay varias interpretaciones, el ciudadano elige una. Es
- * opcional: sin elegir, el reclamo se crea igual y la ubicación queda pendiente.
+ * La dirección se busca en el mapa en todos los municipios: si hay varias interpretaciones, el ciudadano elige
+ * una, y con eso queda elegido el municipio del reclamo. Es opcional: sin elegir (o si el mapa no responde), el
+ * ciudadano elige el municipio de la lista, el reclamo se crea igual y la ubicación queda pendiente.
  * La foto es obligatoria: es la prueba del problema.
  * Si el ciudadano marcó el punto en el mapa, antes de crear se buscan reclamos abiertos parecidos a pocos
  * metros: si es el mismo problema, lo apoya en lugar de crear otro.
  */
-export default function FormularioReclamo({ categorias, barrios, onCreado, onApoyado = () => {} }) {
+export default function FormularioReclamo({ categorias, municipios, onCreado, onApoyado = () => {} }) {
   const [categoriaId, setCategoriaId] = useState('')
-  const [barrioId, setBarrioId] = useState('')
+  const [municipioManual, setMunicipioManual] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [direccion, setDireccion] = useState('')
   const [busqueda, setBusqueda] = useState(null)
@@ -57,10 +58,9 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
   }
 
   const categoria = categorias.find((candidata) => String(candidata.id) === categoriaId)
-  const barrio = barrios.find((candidato) => String(candidato.id) === barrioId)
-  const puedeBuscar = barrioId !== '' && direccion.trim().length >= MINIMO_BUSQUEDA && !buscando
+  const puedeBuscar = direccion.trim().length >= MINIMO_BUSQUEDA && !buscando
 
-  // Una búsqueda vale para la dirección y el barrio con que se hizo.
+  // Una búsqueda vale para la dirección con que se hizo.
   function olvidarBusqueda() {
     setBusqueda(null)
     setElegida(NINGUNA)
@@ -70,7 +70,7 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
     setBuscando(true)
     olvidarBusqueda()
     try {
-      setBusqueda(await sugerirUbicaciones(direccion.trim(), Number(barrioId)))
+      setBusqueda(await sugerirUbicaciones(direccion.trim()))
     } catch (fallo) {
       setBusqueda({ error: fallo })
     } finally {
@@ -79,6 +79,8 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
   }
 
   const sugerencia = elegida === NINGUNA ? null : busqueda?.sugerencias?.[Number(elegida)]
+  // La sugerencia elegida trae su municipio; sin sugerencia, el que el vecino elige de la lista.
+  const municipioId = sugerencia ? sugerencia.municipio.id : Number(municipioManual)
   const clave = sugerencia ? `${categoriaId}|${sugerencia.latitud}|${sugerencia.longitud}` : null
   const candidatosVisibles = duplicados && duplicados.clave === clave ? duplicados.candidatos : null
 
@@ -126,7 +128,7 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
     try {
       const reclamo = await crearReclamo({
         categoriaId: Number(categoriaId),
-        barrioId: Number(barrioId),
+        municipioId,
         descripcion: descripcion.trim(),
         direccion: direccion.trim(),
         foto,
@@ -167,25 +169,6 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
         )}
       </label>
 
-      <label>
-        <span>Barrio</span>
-        <select
-          value={barrioId}
-          onChange={(evento) => {
-            setBarrioId(evento.target.value)
-            olvidarBusqueda()
-          }}
-          required
-        >
-          <option value="">Elegí un barrio</option>
-          {barrios.map((opcion) => (
-            <option key={opcion.id} value={opcion.id}>
-              {opcion.nombre}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <div className="campo-direccion">
         <label>
           <span>Dirección</span>
@@ -207,15 +190,31 @@ export default function FormularioReclamo({ categorias, barrios, onCreado, onApo
       </div>
       {!busqueda && (
         <small className="ayuda-campo">
-          Opcional: buscá la dirección para que el reclamo quede marcado en el mapa. Elegí antes el barrio.
+          Buscá la dirección para que el reclamo quede marcado en el mapa: la buscamos en todos los municipios.
         </small>
       )}
-      <ResultadoBusqueda
-        busqueda={busqueda}
-        municipio={barrio?.municipio}
-        elegida={elegida}
-        onElegir={setElegida}
-      />
+      <ResultadoBusqueda busqueda={busqueda} elegida={elegida} onElegir={setElegida} />
+
+      {sugerencia ? (
+        <p className="municipio-elegido">
+          Municipio: <strong>{sugerencia.municipio.nombre}</strong>, según la dirección elegida.
+        </p>
+      ) : (
+        <div className="campo-municipio">
+          <label>
+            <span>Municipio</span>
+            <select value={municipioManual} onChange={(evento) => setMunicipioManual(evento.target.value)} required>
+              <option value="">Elegí el municipio</option>
+              {municipios.map((opcion) => (
+                <option key={opcion.id} value={opcion.id}>
+                  {opcion.nombre}
+                </option>
+              ))}
+            </select>
+          </label>
+          <small className="ayuda-campo">Si elegís la dirección en el mapa, el municipio sale de ahí.</small>
+        </div>
+      )}
 
       <label>
         <span>Descripción del problema</span>
@@ -284,7 +283,7 @@ function useVistaPrevia(archivo) {
 }
 
 /** Las sugerencias del mapa, o por qué no hay. */
-function ResultadoBusqueda({ busqueda, municipio, elegida, onElegir }) {
+function ResultadoBusqueda({ busqueda, elegida, onElegir }) {
   if (!busqueda) {
     return null
   }
@@ -294,15 +293,16 @@ function ResultadoBusqueda({ busqueda, municipio, elegida, onElegir }) {
   if (!busqueda.disponible) {
     return (
       <p className="aviso-ubicacion" role="status">
-        El mapa no responde en este momento. Podés crear el reclamo igual: la ubicación queda pendiente.
+        El mapa no responde en este momento. Elegí el municipio de la lista y creá el reclamo igual: la ubicación
+        queda pendiente.
       </p>
     )
   }
   if (busqueda.sugerencias.length === 0) {
     return (
       <p className="aviso-ubicacion" role="status">
-        No encontramos esa dirección{municipio ? ` en ${municipio}` : ''}. Revisá la calle y la altura, o creá el
-        reclamo sin marcarlo en el mapa.
+        No encontramos esa dirección en ningún municipio. Revisá la calle y la altura, o elegí el municipio de la
+        lista y creá el reclamo sin marcarlo en el mapa.
       </p>
     )
   }
@@ -320,7 +320,10 @@ function ResultadoBusqueda({ busqueda, municipio, elegida, onElegir }) {
                 checked={elegida === String(indice)}
                 onChange={(evento) => onElegir(evento.target.value)}
               />
-              <span>{sugerencia.direccionNormalizada}</span>
+              <span>
+                {sugerencia.direccionNormalizada}
+                <small className="municipio-sugerencia"> · {sugerencia.municipio.nombre}</small>
+              </span>
             </label>
             <a
               href={enlaceMapa(sugerencia.latitud, sugerencia.longitud)}

@@ -13,5 +13,5 @@ public record TableroGestionResponse(
         @Schema(description = "Pendientes sin área; null para un agente") Long sinAsignar,
         @Schema(description = "Vencidos sobre pendientes, con un decimal; null sin pendientes (sin casos)")
         Double porcentajeVencidos,
-        @Schema(description = "Por área y barrio, primero los que tienen más vencidos") List<FilaTableroResponse> filas) {
+        @Schema(description = "Por área y municipio, primero los que tienen más vencidos") List<FilaTableroResponse> filas) {
 }

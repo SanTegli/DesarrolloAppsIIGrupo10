@@ -16,7 +16,9 @@ import ar.edu.uade.reclamos.dominio.estrategia.EstrategiaAsignacion;
 import ar.edu.uade.reclamos.dominio.integracion.CatalogoCobertura;
 import ar.edu.uade.reclamos.dominio.integracion.ServicioExternoNoDisponibleException;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
+import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.EstadoReclamo;
+import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -36,10 +38,9 @@ class ServicioAsignacionTest {
     private ServicioAsignacion servicio;
 
     @BeforeEach
-    void areasQueCubrenElBarrio() {
+    void areasDelMunicipioQueAtiendenLaCategoria() {
         for (AreaMunicipal area : List.of(e.area, e.otraArea)) {
             area.agregarCategoria(e.categoria);
-            area.agregarBarrio(e.barrio);
         }
         var areas = new DoblesEnMemoria.Areas(e.area, e.otraArea);
         servicio = new ServicioAsignacion(areas, new CoberturaLocal(areas), ultimaCandidata);
@@ -49,7 +50,7 @@ class ServicioAsignacionTest {
     void laAsignacionAutomaticaUsaElAreaQueEligeLaEstrategia() {
         Reclamo reclamo = e.ingresado();
 
-        boolean asignado = servicio.asignarAutomaticamente(reclamo, 1L, 1L, ahora);
+        boolean asignado = servicio.asignarAutomaticamente(reclamo, ahora);
 
         assertTrue(asignado);
         assertEquals(EstadoReclamo.ASIGNADO, reclamo.getEstado());
@@ -61,9 +62,11 @@ class ServicioAsignacionTest {
 
     @Test
     void sinAreasCandidatasElReclamoQuedaIngresado() {
-        Reclamo reclamo = e.ingresado();
+        Categoria residuos = new Categoria("Residuos", "Basura", 72, Prioridad.MEDIA);
+        residuos.setId(99L);
+        Reclamo reclamo = e.factory.crear(e.ciudadano, residuos, e.municipio, "Basura en la esquina", "Belgrano 450");
 
-        boolean asignado = servicio.asignarAutomaticamente(reclamo, 99L, 1L, ahora);
+        boolean asignado = servicio.asignarAutomaticamente(reclamo, ahora);
 
         assertFalse(asignado);
         assertEquals(EstadoReclamo.INGRESADO, reclamo.getEstado());
@@ -77,7 +80,7 @@ class ServicioAsignacionTest {
         e.otraArea.desactivar();
         Reclamo reclamo = e.ingresado();
 
-        servicio.asignarAutomaticamente(reclamo, 1L, 1L, ahora);
+        servicio.asignarAutomaticamente(reclamo, ahora);
 
         assertSame(e.area, reclamo.getArea());
     }
@@ -117,27 +120,27 @@ class ServicioAsignacionTest {
     }
 
     @Test
-    void elCatalogoRecibeMunicipioBarrioYCategoriaDelReclamo() {
+    void elCatalogoRecibeMunicipioYCategoriaDelReclamo() {
         List<List<Long>> consultas = new ArrayList<>();
-        CatalogoCobertura registrador = (municipioId, barrioId, categoriaId) -> {
-            consultas.add(List.of(municipioId, barrioId, categoriaId));
+        CatalogoCobertura registrador = (municipioId, categoriaId) -> {
+            consultas.add(List.of(municipioId, categoriaId));
             return List.of(e.area);
         };
         var conRegistro = new ServicioAsignacion(new DoblesEnMemoria.Areas(e.area), registrador, ultimaCandidata);
 
-        assertTrue(conRegistro.asignarAutomaticamente(e.ingresado(), 1L, 1L, ahora));
-        assertEquals(List.of(List.of(e.municipio.getId(), 1L, 1L)), consultas);
+        assertTrue(conRegistro.asignarAutomaticamente(e.ingresado(), ahora));
+        assertEquals(List.of(List.of(e.municipio.getId(), e.categoria.getId())), consultas);
     }
 
     @Test
     void siLaCoberturaNoRespondeElReclamoQuedaIngresadoConLaAsignacionPendiente() {
-        CatalogoCobertura caida = (municipioId, barrioId, categoriaId) -> {
+        CatalogoCobertura caida = (municipioId, categoriaId) -> {
             throw new ServicioExternoNoDisponibleException("Tiempo agotado");
         };
         var sinCobertura = new ServicioAsignacion(new DoblesEnMemoria.Areas(e.area), caida, ultimaCandidata);
         Reclamo reclamo = e.ingresado();
 
-        assertFalse(sinCobertura.asignarAutomaticamente(reclamo, 1L, 1L, ahora));
+        assertFalse(sinCobertura.asignarAutomaticamente(reclamo, ahora));
         assertEquals(EstadoReclamo.INGRESADO, reclamo.getEstado());
         assertTrue(reclamo.isAsignacionPendiente());
         assertNull(reclamo.getArea());
@@ -146,10 +149,10 @@ class ServicioAsignacionTest {
 
     @Test
     void sinAreasCandidatasNoQuedaMarcadaLaAsignacionPendiente() {
-        var sinAreas = new ServicioAsignacion(new DoblesEnMemoria.Areas(), (m, b, c) -> List.of(), ultimaCandidata);
+        var sinAreas = new ServicioAsignacion(new DoblesEnMemoria.Areas(), (m, c) -> List.of(), ultimaCandidata);
         Reclamo reclamo = e.ingresado();
 
-        assertFalse(sinAreas.asignarAutomaticamente(reclamo, 1L, 1L, ahora));
+        assertFalse(sinAreas.asignarAutomaticamente(reclamo, ahora));
         assertFalse(reclamo.isAsignacionPendiente());
     }
 }

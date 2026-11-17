@@ -9,13 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
@@ -67,12 +65,11 @@ class PrioridadPorIAIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
 
-    private Long barrio;
+    private Long municipio;
     private Long categoria;
     private Long ciudadano;
 
@@ -90,21 +87,19 @@ class PrioridadPorIAIntegrationTest {
     void escenario() {
         PEDIDOS.clear();
         new TransactionTemplate(transacciones).executeWithoutResult(tx -> {
-            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_barrio",
-                    "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias", "municipios")) {
+            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_categoria",
+                    "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria luminaria = categorias.guardar(
                     new Categoria("Luminaria rota", "Farol apagado o dañado", 48, Prioridad.MEDIA));
             AreaMunicipal alumbrado = new AreaMunicipal("Alumbrado", "alumbrado@example.org", quilmes);
-            alumbrado.agregarBarrio(bernal);
             alumbrado.agregarCategoria(luminaria);
             areas.guardar(alumbrado);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
                     verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000")));
-            barrio = bernal.getId();
+            municipio = quilmes.getId();
             categoria = luminaria.getId();
             ciudadano = ana.getId();
         });
@@ -154,8 +149,8 @@ class PrioridadPorIAIntegrationTest {
 
     private ResultActions crearReclamo() throws Exception {
         return mvc.perform(alta("""
-                        {"categoriaId": %d, "barrioId": %d, "descripcion": "Poste con cables expuestos",
-                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)).with(como(ciudadano)));
+                        {"categoriaId": %d, "municipioId": %d, "descripcion": "Poste con cables expuestos",
+                         "direccion": "Belgrano 450"}""".formatted(categoria, municipio)).with(como(ciudadano)));
     }
 
     private static HttpServer iniciarServidor() {

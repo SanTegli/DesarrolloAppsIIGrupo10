@@ -7,8 +7,8 @@ export default function PanelAdministracion({ usuario, areas, onAbrir }) {
     <div className="administracion">
       <h2>Reclamos sin asignar</h2>
       <p className="ayuda">
-        Ningún área activa atiende su categoría en ese barrio. Abrí cada reclamo para asignarle un área o
-        rechazarlo.
+        Ningún área activa de su municipio atiende su categoría. Abrí cada reclamo para asignarle un área de ese
+        municipio o rechazarlo.
       </p>
       <ListaReclamos
         usuario={usuario}
@@ -23,8 +23,8 @@ export default function PanelAdministracion({ usuario, areas, onAbrir }) {
           <thead>
             <tr>
               <th>Área</th>
+              <th>Municipio</th>
               <th>Categorías que atiende</th>
-              <th>Barrios con jurisdicción</th>
               <th>Activa</th>
             </tr>
           </thead>
@@ -32,8 +32,8 @@ export default function PanelAdministracion({ usuario, areas, onAbrir }) {
             {areas.map((area) => (
               <tr key={area.id}>
                 <td>{area.nombre}</td>
+                <td>{area.municipio.nombre}</td>
                 <td>{area.categorias.map((categoria) => categoria.nombre).join(', ')}</td>
-                <td>{area.barrios.map((barrio) => barrio.nombre).join(', ')}</td>
                 <td>{area.activa ? 'Sí' : 'No'}</td>
               </tr>
             ))}

@@ -6,24 +6,17 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 
 class CatalogosYUsuariosRepositoryJpaTest extends PersistenciaTestBase {
-    @Test void recuperaCatalogosYFiltraBarriosPorMunicipio() {
+    @Test void recuperaCatalogosYMunicipiosEnOrden() {
         prepararDatos();
         Municipio otro = municipios.guardar(new Municipio("Berazategui", "Buenos Aires"));
-        barrios.guardar(new Barrio("Centro", otro));
-        Barrio anterior = barrios.guardar(new Barrio("Avellaneda", municipio));
         categorias.guardar(new Categoria("Alumbrado", null, 48, Prioridad.MEDIA));
         flushYLimpiar();
 
         assertThat(municipios.buscarPorId(municipio.getId()).orElseThrow().getNombre()).isEqualTo("Quilmes");
-        assertThat(municipios.buscarTodos()).hasSize(2);
-        assertThat(barrios.buscarPorId(barrio.getId()).orElseThrow().getMunicipio()).isEqualTo(municipio);
-        assertThat(barrios.buscarPorMunicipio(municipio.getId())).extracting(Barrio::getId)
-                .containsExactly(anterior.getId(), barrio.getId());
-        assertThat(barrios.buscarTodos()).extracting(Barrio::getNombre).isSorted();
+        assertThat(municipios.buscarTodos()).extracting(Municipio::getId).containsExactly(municipio.getId(), otro.getId());
         assertThat(categorias.buscarPorId(categoria.getId()).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.BAJA);
         assertThat(categorias.buscarTodas()).extracting(Categoria::getNombre).containsExactly("Alumbrado", "Bache");
         assertThat(municipios.buscarPorId(-1L)).isEmpty();
-        assertThat(barrios.buscarPorId(-1L)).isEmpty();
         assertThat(categorias.buscarPorId(-1L)).isEmpty();
         assertThat(areas.buscarPorId(-1L)).isEmpty();
     }

@@ -67,15 +67,15 @@ public class GestionReclamosFacade {
         return cuentas.registrarCiudadano(dni, nombre, apellido, email, contrasena);
     }
 
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion) {
-        return escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion);
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion) {
+        return escritura.crear(usuarioId, categoriaId, municipioId, descripcion, direccion);
     }
 
     /** Alta con la sugerencia de ubicación que eligió el ciudadano, o {@code null} si no eligió ninguna. */
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          UbicacionElegida ubicacion) {
-        return escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion,
-                ubicaciones.confirmar(barrioId, ubicacion));
+        return escritura.crear(usuarioId, categoriaId, municipioId, descripcion, direccion,
+                ubicaciones.confirmar(municipioId, ubicacion));
     }
 
     /**
@@ -83,13 +83,13 @@ public class GestionReclamosFacade {
      * del alta; se confirma cuando el reclamo ya está en la base y se descarta si el alta falla. Así nunca queda
      * un archivo huérfano ni un reclamo que apunte a un archivo a medio escribir.
      */
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          UbicacionElegida ubicacion, FotoSubida foto) {
         String referencia = fotos.preparar(foto);
         Reclamo reclamo;
         try {
-            reclamo = escritura.crear(usuarioId, categoriaId, barrioId, descripcion, direccion,
-                    ubicaciones.confirmar(barrioId, ubicacion), referencia);
+            reclamo = escritura.crear(usuarioId, categoriaId, municipioId, descripcion, direccion,
+                    ubicaciones.confirmar(municipioId, ubicacion), referencia);
         } catch (RuntimeException error) {
             fotos.descartar(referencia);
             throw error;
@@ -131,8 +131,8 @@ public class GestionReclamosFacade {
     }
 
     /** Tablero público: no necesita sesión ni tiene datos personales. */
-    public TableroPublico tableroPublico(LocalDate desde, LocalDate hasta, Long barrioId, Long categoriaId) {
-        return tablero.publico(desde, hasta, barrioId, categoriaId);
+    public TableroPublico tableroPublico(LocalDate desde, LocalDate hasta, Long municipioId, Long categoriaId) {
+        return tablero.publico(desde, hasta, municipioId, categoriaId);
     }
 
     /** Tablero de gestión: agentes (su área) y administradores (todas). */
@@ -146,8 +146,8 @@ public class GestionReclamosFacade {
     }
 
     /** Sugerencias del geocodificador para la dirección, antes del alta. */
-    public SugerenciasUbicacion sugerirUbicaciones(String direccion, Long barrioId) {
-        return ubicaciones.sugerir(direccion, barrioId);
+    public SugerenciasUbicacion sugerirUbicaciones(String direccion) {
+        return ubicaciones.sugerir(direccion);
     }
 
     public Reclamo asignar(Long usuarioId, String numero, Long areaId, String observacion) {
@@ -214,8 +214,8 @@ public class GestionReclamosFacade {
         return catalogos.categorias();
     }
 
-    public List<Barrio> barrios() {
-        return catalogos.barrios();
+    public List<Municipio> municipios() {
+        return catalogos.municipios();
     }
 
     public List<AreaMunicipal> areas() {

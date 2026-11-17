@@ -24,13 +24,11 @@ abstract class PersistenciaTestBase {
     @Autowired ReclamoRepository reclamos;
     @Autowired UsuarioRepository usuarios;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired NotificacionRepository notificaciones;
 
     Municipio municipio;
-    Barrio barrio;
     Categoria categoria;
     AreaMunicipal area;
     Ciudadano ciudadano;
@@ -38,10 +36,8 @@ abstract class PersistenciaTestBase {
 
     void prepararDatos() {
         municipio = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-        barrio = barrios.guardar(new Barrio("Bernal", municipio));
         categoria = categorias.guardar(new Categoria("Bache", "Pozo", 120, Prioridad.BAJA));
         area = new AreaMunicipal("Obras Públicas", "obras@example.org", municipio);
-        area.agregarBarrio(barrio);
         area.agregarCategoria(categoria);
         area = areas.guardar(area);
         ciudadano = (Ciudadano) usuarios.guardar(
@@ -52,7 +48,7 @@ abstract class PersistenciaTestBase {
 
     Reclamo nuevoReclamo() {
         return new ReclamoFactory(Clock.fixed(Instant.parse("2026-10-05T10:00:00Z"), ZoneOffset.UTC))
-                .crear(ciudadano, categoria, barrio, "Pozo profundo", "Belgrano 450");
+                .crear(ciudadano, categoria, municipio, "Pozo profundo", "Belgrano 450");
     }
 
     void flushYLimpiar() {

@@ -2,7 +2,7 @@ package ar.edu.uade.reclamos.aplicacion.integracion;
 
 import ar.edu.uade.reclamos.dominio.integracion.Geocodificador;
 import ar.edu.uade.reclamos.dominio.integracion.SugerenciaUbicacion;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
+import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -10,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * <b>Proxy de caché</b> de un {@link Geocodificador}: tiene la misma interfaz y responde de memoria las
@@ -18,7 +19,8 @@ import java.util.Map;
  * Nominatim, su política de uso exige este tipo de caché.
  *
  * <p>Las fallas no se guardan: la próxima consulta vuelve a intentar. Guarda como máximo {@code maximo}
- * consultas y descarta primero la usada hace más tiempo.
+ * consultas y descarta primero la usada hace más tiempo. La ubicación inversa ({@link #municipioEn}) no se
+ * guarda: se pide una vez por alta, con las coordenadas que eligió el ciudadano.
  */
 public class GeocodificadorConCache implements Geocodificador {
 
@@ -42,8 +44,8 @@ public class GeocodificadorConCache implements Geocodificador {
     }
 
     @Override
-    public List<SugerenciaUbicacion> sugerir(String direccion, Barrio barrio) {
-        String clave = barrio.getMunicipio().getId() + "|"
+    public List<SugerenciaUbicacion> sugerir(String direccion, Municipio municipio) {
+        String clave = municipio.getId() + "|"
                 + direccion.strip().toLowerCase(Locale.ROOT).replaceAll("\\s+", " ");
         synchronized (guardadas) {
             Guardada guardada = guardadas.get(clave);
@@ -51,11 +53,16 @@ public class GeocodificadorConCache implements Geocodificador {
                 return guardada.sugerencias();
             }
         }
-        List<SugerenciaUbicacion> sugerencias = real.sugerir(direccion, barrio);
+        List<SugerenciaUbicacion> sugerencias = real.sugerir(direccion, municipio);
         synchronized (guardadas) {
             guardadas.put(clave, new Guardada(List.copyOf(sugerencias), reloj.instant().plus(duracion)));
         }
         return sugerencias;
+    }
+
+    @Override
+    public Optional<String> municipioEn(double latitud, double longitud) {
+        return real.municipioEn(latitud, longitud);
     }
 
     int cantidadGuardada() {

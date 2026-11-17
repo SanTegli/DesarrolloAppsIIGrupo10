@@ -29,22 +29,28 @@ const VIGENCIA_CODIGO_SEGUNDOS = 10 * 60
 const MAXIMO_REAPERTURAS = 1
 const PLAZO_REAPERTURA_SEGUNDOS = 7 * 24 * 3600
 
-// Datos semilla acordados en el contrato.
-const barrios = [
-  { id: 1, nombre: 'Quilmes Centro', municipio: 'Quilmes' },
-  { id: 2, nombre: 'Bernal', municipio: 'Quilmes' },
-  { id: 3, nombre: 'Ezpeleta', municipio: 'Quilmes' },
+// Datos semilla acordados en el contrato (datos-dev.sql, PR 25: municipios en vez de barrios).
+const municipios = [
+  { id: 1, nombre: 'Quilmes', provincia: 'Buenos Aires' },
+  { id: 2, nombre: 'Avellaneda', provincia: 'Buenos Aires' },
+  { id: 3, nombre: 'Berazategui', provincia: 'Buenos Aires' },
 ]
 const categorias = [
   { id: 1, nombre: 'Luminaria rota', descripcion: 'Farol apagado o dañado', slaHoras: 48, prioridadBase: 'MEDIA' },
   { id: 2, nombre: 'Bache', descripcion: 'Pozo en la calzada', slaHoras: 120, prioridadBase: 'BAJA' },
   { id: 3, nombre: 'Residuos', descripcion: 'Residuos en la vía pública', slaHoras: 72, prioridadBase: 'MEDIA' },
 ]
+// Cada área es de un municipio. Avellaneda no tiene Alumbrado: una luminaria ahí queda sin asignar.
 const areas = [
-  { id: 1, nombre: 'Alumbrado', activa: true, categorias: [1], barrios: [1, 2] },
-  { id: 2, nombre: 'Obras Públicas', activa: true, categorias: [2], barrios: [1, 2, 3] },
-  { id: 3, nombre: 'Higiene Urbana', activa: true, categorias: [3], barrios: [1, 2] },
-  { id: 4, nombre: 'Mantenimiento Vial', activa: true, categorias: [2], barrios: [2] },
+  { id: 1, nombre: 'Alumbrado', activa: true, municipioId: 1, categorias: [1] },
+  { id: 2, nombre: 'Obras Públicas', activa: true, municipioId: 1, categorias: [2] },
+  { id: 3, nombre: 'Higiene Urbana', activa: true, municipioId: 1, categorias: [3] },
+  { id: 4, nombre: 'Mantenimiento Vial', activa: true, municipioId: 1, categorias: [2] },
+  { id: 5, nombre: 'Obras Públicas', activa: true, municipioId: 2, categorias: [2] },
+  { id: 6, nombre: 'Higiene Urbana', activa: true, municipioId: 2, categorias: [3] },
+  { id: 7, nombre: 'Alumbrado', activa: true, municipioId: 3, categorias: [1] },
+  { id: 8, nombre: 'Obras Públicas', activa: true, municipioId: 3, categorias: [2] },
+  { id: 9, nombre: 'Higiene Urbana', activa: true, municipioId: 3, categorias: [3] },
 ]
 // Solo es una ayuda de desarrollo: las contraseñas quedan en memoria y en texto. El backend guarda BCrypt.
 const CONTRASENA_SEMILLA = 'demo1234'
@@ -56,6 +62,7 @@ const usuarios = [
   { id: 5, nombreCompleto: 'Fabián Luna', rol: 'AGENTE_MUNICIPAL', areaId: 3, email: 'fabian@example.org', dni: '27555666' },
   { id: 6, nombreCompleto: 'Gabriela Paz', rol: 'AGENTE_MUNICIPAL', areaId: 4, email: 'gabriela@example.org', dni: '28666777' },
   { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', areaId: null, email: 'elena@example.org', dni: '20555666' },
+  { id: 8, nombreCompleto: 'Hugo Medina', rol: 'AGENTE_MUNICIPAL', areaId: 5, email: 'hugo@example.org', dni: '29777888' },
 ].map((usuario) => ({ ...usuario, contrasena: CONTRASENA_SEMILLA, telefono: null, bloqueado: false }))
 // Como el UPDATE de datos-dev.sql: Ana y Bruno ya verificaron el teléfono.
 usuarios[0].telefono = '+5491100000001'
@@ -73,29 +80,34 @@ const MAXIMO_FOTO = 5 * 1024 * 1024
 const apoyos = new Set()
 const DUPLICADOS = { radioMetros: 50, radioMaximoMetros: 200, maximoCandidatos: 5 }
 
-// Respuestas fijas en lugar de Georef: "Belgrano" devuelve dos opciones, "caido" simula Georef sin responder
-// y cualquier otra dirección, ninguna. Las coordenadas son las que devolvió Georef para Belgrano 450.
+// Respuestas fijas en lugar de Georef, como si se buscara en cada municipio: "Belgrano" devuelve dos opciones
+// en Quilmes y una en Avellaneda, "caido" simula Georef sin responder y cualquier otra dirección, ninguna. Las
+// de Quilmes son las coordenadas que devolvió Georef para Belgrano 450.
+const QUILMES = { id: 1, nombre: 'Quilmes' }
+const AVELLANEDA = { id: 2, nombre: 'Avellaneda' }
 const SUGERENCIAS_BELGRANO = [
-  { direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires', latitud: -34.73614578, longitud: -58.3228998575 },
-  { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.75816353, longitud: -58.29744745 },
+  { direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires', latitud: -34.73614578, longitud: -58.3228998575, municipio: QUILMES },
+  { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.75816353, longitud: -58.29744745, municipio: QUILMES },
+  { direccionNormalizada: 'BELGRANO 450, Wilde, Avellaneda, Buenos Aires', latitud: -34.7012, longitud: -58.3181, municipio: AVELLANEDA },
 ]
-// Recuadro de Quilmes, igual que reclamos.geocodificacion.recuadros en application.yml.
-const RECUADRO_QUILMES = { latitudMinima: -34.82, latitudMaxima: -34.66, longitudMinima: -58.38, longitudMaxima: -58.17 }
+// Igual que reclamos.geocodificacion.recuadros en application.yml.
+const RECUADROS = {
+  1: { latitudMinima: -34.82, latitudMaxima: -34.66, longitudMinima: -58.38, longitudMaxima: -58.17 },
+  2: { latitudMinima: -34.73, latitudMaxima: -34.62, longitudMinima: -58.41, longitudMaxima: -58.24 },
+  3: { latitudMinima: -34.92, latitudMaxima: -34.72, longitudMinima: -58.28, longitudMaxima: -58.02 },
+}
 
 function sugerirUbicaciones(parametros) {
   const direccion = (parametros.get('direccion') ?? '').trim()
-  const barrioId = Number(parametros.get('barrioId'))
-  const detalles = []
-  if (direccion.length < 3 || direccion.length > 200) detalles.push('direccion: entre 3 y 200 caracteres')
-  if (!Number.isInteger(barrioId) || barrioId <= 0) detalles.push('barrioId: es obligatorio')
-  if (detalles.length) throw invalido('Los parametros recibidos no son validos.', detalles)
-  buscar(barrios, barrioId, 'barrio')
+  if (direccion.length < 3 || direccion.length > 200) {
+    throw invalido('Los parametros recibidos no son validos.', ['direccion: entre 3 y 200 caracteres'])
+  }
   if (/caido/i.test(direccion)) return { disponible: false, sugerencias: [] }
   return { disponible: true, sugerencias: /belgrano/i.test(direccion) ? SUGERENCIAS_BELGRANO : [] }
 }
 
 // Igual que ServicioUbicaciones.confirmar: sin elección queda pendiente; fuera del municipio, 400.
-function confirmarUbicacion(ubicacion) {
+function confirmarUbicacion(municipio, ubicacion) {
   if (ubicacion === undefined || ubicacion === null) {
     return { estado: 'PENDIENTE', latitud: null, longitud: null, direccionNormalizada: null, proveedor: null }
   }
@@ -103,9 +115,9 @@ function confirmarUbicacion(ubicacion) {
   if (!Number.isFinite(latitud) || !Number.isFinite(longitud) || typeof direccionNormalizada !== 'string' || !direccionNormalizada.trim()) {
     throw invalido('Los datos recibidos no son validos.', ['ubicacion: latitud, longitud y direccionNormalizada son obligatorias'])
   }
-  const r = RECUADRO_QUILMES
-  if (latitud < r.latitudMinima || latitud > r.latitudMaxima || longitud < r.longitudMinima || longitud > r.longitudMaxima) {
-    throw invalido('La ubicación elegida queda fuera de Quilmes.')
+  const r = RECUADROS[municipio.id]
+  if (r && (latitud < r.latitudMinima || latitud > r.latitudMaxima || longitud < r.longitudMinima || longitud > r.longitudMaxima)) {
+    throw invalido(`La ubicación elegida queda fuera de ${municipio.nombre}.`)
   }
   return { estado: 'CONFIRMADA', latitud, longitud, direccionNormalizada: direccionNormalizada.trim(), proveedor: 'georef' }
 }
@@ -317,12 +329,12 @@ function tableroPublico(consulta) {
   if (!fecha.test(desde) || !fecha.test(hasta)) throw invalido('Los parametros recibidos no son validos.')
   if (desde > hasta) throw invalido('La fecha desde no puede ser posterior a la fecha hasta.')
   if (sumarDias(desde, 365) < hasta) throw invalido('El período puede tener como máximo 366 días.')
-  const barrioId = consulta.get('barrioId') ? Number(consulta.get('barrioId')) : null
+  const municipioId = consulta.get('municipioId') ? Number(consulta.get('municipioId')) : null
   const categoriaId = consulta.get('categoriaId') ? Number(consulta.get('categoriaId')) : null
-  if (barrioId) buscar(barrios, barrioId, 'barrio')
+  if (municipioId) buscar(municipios, municipioId, 'municipio')
   if (categoriaId) buscar(categorias, categoriaId, 'categoría')
   const filtrados = reclamos.filter(
-    (r) => (!barrioId || r.barrioId === barrioId) && (!categoriaId || r.categoriaId === categoriaId),
+    (r) => (!municipioId || r.municipioId === municipioId) && (!categoriaId || r.categoriaId === categoriaId),
   )
   const hay = (...estados) => filtrados.filter((r) => estados.includes(r.estado)).length
   const pendientes = hay(...PENDIENTES)
@@ -332,7 +344,7 @@ function tableroPublico(consulta) {
   return {
     desde,
     hasta,
-    barrioId,
+    municipioId,
     categoriaId,
     creadosEnPeriodo: filtrados.filter((r) => r.fechaCreacion >= desde && r.fechaCreacion < finExclusivo).length,
     pendientes,
@@ -351,10 +363,10 @@ function tableroGestion(usuario) {
   const filas = new Map()
   for (const r of reclamos) {
     if (!PENDIENTES.includes(r.estado) || (areaId && r.areaId !== areaId)) continue
-    const clave = `${r.areaId ?? '-'}|${r.barrioId}`
+    const clave = `${r.areaId ?? '-'}|${r.municipioId}`
     const fila = filas.get(clave) ?? {
       area: referencia(areas.find((a) => a.id === r.areaId)),
-      barrio: referencia(barrios.find((b) => b.id === r.barrioId)),
+      municipio: referencia(municipios.find((m) => m.id === r.municipioId)),
       pendientes: 0,
       vencidos: 0,
     }
@@ -367,7 +379,7 @@ function tableroGestion(usuario) {
       b.vencidos - a.vencidos ||
       b.pendientes - a.pendientes ||
       (a.area?.nombre ?? '').localeCompare(b.area?.nombre ?? '') ||
-      a.barrio.nombre.localeCompare(b.barrio.nombre),
+      a.municipio.nombre.localeCompare(b.municipio.nombre),
   )
   const pendientes = lista.reduce((total, fila) => total + fila.pendientes, 0)
   const vencidos = lista.reduce((total, fila) => total + fila.vencidos, 0)
@@ -477,7 +489,7 @@ function resumen(reclamo) {
     fechaCreacion: reclamo.fechaCreacion,
     fechaLimite: reclamo.fechaLimite,
     categoria: referencia(categorias.find((c) => c.id === reclamo.categoriaId)),
-    barrio: referencia(barrios.find((b) => b.id === reclamo.barrioId)),
+    municipio: referencia(municipios.find((m) => m.id === reclamo.municipioId)),
     ciudadano: referenciaUsuario(usuarios.find((u) => u.id === reclamo.ciudadanoId)),
     area: referencia(areas.find((a) => a.id === reclamo.areaId)),
   }
@@ -553,7 +565,7 @@ const pendientes = (areaId) =>
 function crear(usuario, cuerpo) {
   const detalles = []
   if (!Number.isInteger(cuerpo.categoriaId) || cuerpo.categoriaId <= 0) detalles.push('categoriaId: es obligatorio')
-  if (!Number.isInteger(cuerpo.barrioId) || cuerpo.barrioId <= 0) detalles.push('barrioId: es obligatorio')
+  if (!Number.isInteger(cuerpo.municipioId) || cuerpo.municipioId <= 0) detalles.push('municipioId: es obligatorio')
   if (typeof cuerpo.descripcion !== 'string' || !cuerpo.descripcion.trim() || cuerpo.descripcion.length > 1000) {
     detalles.push('descripcion: es obligatoria, hasta 1000 caracteres')
   }
@@ -564,8 +576,8 @@ function crear(usuario, cuerpo) {
   if (usuario.rol !== 'CIUDADANO') throw denegado('Solo un ciudadano puede crear reclamos.')
   controlarUso(usuario, true)
   const categoria = buscar(categorias, cuerpo.categoriaId, 'categoría')
-  const barrio = buscar(barrios, cuerpo.barrioId, 'barrio')
-  const ubicacion = confirmarUbicacion(cuerpo.ubicacion)
+  const municipio = buscar(municipios, cuerpo.municipioId, 'municipio')
+  const ubicacion = confirmarUbicacion(municipio, cuerpo.ubicacion)
 
   const fecha = ahora()
   // Igual que PrioridadPorPalabrasClave: solo cambia el origen si la palabra sube la prioridad.
@@ -591,7 +603,7 @@ function crear(usuario, cuerpo) {
     fechaCreacion: fecha,
     fechaLimite: sumarSegundos(fecha, SLA_SEGUNDOS ?? categoria.slaHoras * 3600),
     categoriaId: categoria.id,
-    barrioId: barrio.id,
+    municipioId: municipio.id,
     ciudadanoId: usuario.id,
     areaId: null,
     agenteId: null,
@@ -601,7 +613,7 @@ function crear(usuario, cuerpo) {
   notificar(reclamo, usuario.id, `Tu reclamo ${reclamo.numero} fue ingresado.`, fecha)
 
   const candidatas = areas
-    .filter((a) => a.activa && a.categorias.includes(categoria.id) && a.barrios.includes(barrio.id))
+    .filter((a) => a.activa && a.categorias.includes(categoria.id) && a.municipioId === municipio.id)
     .sort((a, b) =>
       ESTRATEGIA_ASIGNACION === 'carga-trabajo' ? pendientes(a.id) - pendientes(b.id) || a.id - b.id : a.id - b.id,
     )
@@ -659,6 +671,10 @@ function asignar(usuario, reclamo, cuerpo) {
   validarTransicion(reclamo.estado, 'ASIGNADO', usuario.rol)
   if (!area.activa) throw regla(`El área ${area.nombre} no está activa.`)
   if (reclamo.areaId === area.id) throw regla(`El reclamo ya está asignado al área ${area.nombre}.`)
+  if (area.municipioId !== reclamo.municipioId) {
+    const nombre = (id) => municipios.find((m) => m.id === id).nombre
+    throw regla(`El área ${area.nombre} es de ${nombre(area.municipioId)} y el reclamo es de ${nombre(reclamo.municipioId)}.`)
+  }
   const anterior = reclamo.estado
   const fecha = ahora()
   reclamo.areaId = area.id
@@ -752,14 +768,14 @@ async function atender(peticion, contexto) {
 
   if (metodo === 'GET' && partes.length === 2) {
     if (partes[1] === 'categorias') return [200, categorias]
-    if (partes[1] === 'barrios') return [200, barrios]
+    if (partes[1] === 'municipios') return [200, municipios]
     if (partes[1] === 'areas') {
       const lista = areas.map((a) => ({
         id: a.id,
         nombre: a.nombre,
         activa: a.activa,
+        municipio: referencia(municipios.find((m) => m.id === a.municipioId)),
         categorias: a.categorias.map((id) => referencia(categorias.find((c) => c.id === id))),
-        barrios: a.barrios.map((id) => referencia(barrios.find((b) => b.id === id))),
       }))
       return [200, lista]
     }
@@ -914,14 +930,18 @@ createServer(async (peticion, respuesta) => {
 })
 setInterval(marcarVencidos, INTERVALO_VENCIMIENTOS_MS)
 
-// Reclamo de Bruno ya cargado, para ver un posible duplicado al reclamar en Belgrano 450, Bernal.
+// Reclamo de Bruno ya cargado, para ver un posible duplicado al reclamar en Belgrano 450, Bernal (Quilmes).
 {
   const sembrado = crear(usuarios[1], {
     categoriaId: 1,
-    barrioId: 2,
+    municipioId: 1,
     descripcion: 'El farol frente a la plaza está apagado hace dos noches y el poste quedó inclinado.',
     direccion: 'Belgrano 450',
-    ubicacion: { ...SUGERENCIAS_BELGRANO[0], latitud: SUGERENCIAS_BELGRANO[0].latitud + 0.00012 },
+    ubicacion: {
+      direccionNormalizada: SUGERENCIAS_BELGRANO[0].direccionNormalizada,
+      latitud: SUGERENCIAS_BELGRANO[0].latitud + 0.00012,
+      longitud: SUGERENCIAS_BELGRANO[0].longitud,
+    },
   })
   const ejemplo = new URL('../../docs/evidencias/fotos/farol-ejemplo.jpg', import.meta.url)
   if (existsSync(ejemplo)) {

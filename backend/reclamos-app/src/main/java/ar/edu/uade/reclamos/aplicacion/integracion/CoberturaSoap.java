@@ -76,9 +76,8 @@ public class CoberturaSoap implements CatalogoCobertura {
     }
 
     @Override
-    public List<AreaMunicipal> buscarCandidatas(Long municipioId, Long barrioId, Long categoriaId) {
-        ConsultarCoberturaResponse respuesta = consultar(new ConsultarCoberturaRequest(municipioId, barrioId,
-                categoriaId));
+    public List<AreaMunicipal> buscarCandidatas(Long municipioId, Long categoriaId) {
+        ConsultarCoberturaResponse respuesta = consultar(new ConsultarCoberturaRequest(municipioId, categoriaId));
         List<AreaMunicipal> candidatas = new ArrayList<>();
         respuesta.getAreas().stream().map(AreaCubierta::getId).distinct().sorted().forEach(id -> {
             Optional<AreaMunicipal> area = areas.buscarPorId(id);

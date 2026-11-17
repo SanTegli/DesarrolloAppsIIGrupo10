@@ -313,13 +313,13 @@ Después de cambiar código, volver a ejecutar `docker compose up --build` para 
 
 Después de que Hibernate actualiza el esquema (`ddl-auto: update`), Spring ejecuta `backend/reclamos-persistencia/src/main/resources/db/datos-dev.sql`, en UTF-8. Compose crea la base y usuarios MySQL, pero la semilla del dominio se carga al iniciar Spring.
 
-Se crea el municipio **Quilmes**, provincia **Buenos Aires**, con estos datos ficticios:
+Desde el PR 25 los reclamos son por **municipio**, no por barrio. Se crean tres municipios de la provincia de **Buenos Aires**, con estos datos ficticios:
 
-| ID de barrio | Nombre |
+| ID de municipio | Nombre |
 | --- | --- |
-| 1 | Quilmes Centro |
-| 2 | Bernal |
-| 3 | Ezpeleta |
+| 1 | Quilmes |
+| 2 | Avellaneda |
+| 3 | Berazategui |
 
 | ID de categoría | Nombre | SLA (horas) | Prioridad base |
 | --- | --- | --- | --- |
@@ -327,14 +327,19 @@ Se crea el municipio **Quilmes**, provincia **Buenos Aires**, con estos datos fi
 | 2 | Bache | 120 | BAJA |
 | 3 | Residuos | 72 | MEDIA |
 
-| ID de área | Nombre | Categoría atendida | Barrios cubiertos |
+| ID de área | Nombre | Municipio | Categoría atendida |
 | --- | --- | --- | --- |
-| 1 | Alumbrado | Luminaria rota | Quilmes Centro, Bernal |
-| 2 | Obras Públicas | Bache | Quilmes Centro, Bernal, Ezpeleta |
-| 3 | Higiene Urbana | Residuos | Quilmes Centro, Bernal |
-| 4 | Mantenimiento Vial | Bache | Bernal |
+| 1 | Alumbrado | Quilmes | Luminaria rota |
+| 2 | Obras Públicas | Quilmes | Bache |
+| 3 | Higiene Urbana | Quilmes | Residuos |
+| 4 | Mantenimiento Vial | Quilmes | Bache |
+| 5 | Obras Públicas | Avellaneda | Bache |
+| 6 | Higiene Urbana | Avellaneda | Residuos |
+| 7 | Alumbrado | Berazategui | Luminaria rota |
+| 8 | Obras Públicas | Berazategui | Bache |
+| 9 | Higiene Urbana | Berazategui | Residuos |
 
-Las cuatro áreas están activas. Las relaciones se guardan en `area_barrio` y `area_categoria`.
+Las nueve áreas están activas. Cada área atiende sus categorías **solo en su municipio**: la relación con las categorías se guarda en `area_categoria`. Avellaneda no tiene Alumbrado a propósito, para probar un reclamo sin área.
 
 | ID de usuario | Nombre | Email para entrar | Rol | Área |
 | --- | --- | --- | --- | --- |
@@ -345,10 +350,13 @@ Las cuatro áreas están activas. Las relaciones se guardan en `area_barrio` y `
 | 5 | Fabián Luna | `fabian@example.org` | AGENTE_MUNICIPAL | Higiene Urbana |
 | 6 | Gabriela Paz | `gabriela@example.org` | AGENTE_MUNICIPAL | Mantenimiento Vial |
 | 7 | Elena Ruiz | `elena@example.org` | ADMINISTRADOR | — |
+| 8 | Hugo Medina | `hugo@example.org` | AGENTE_MUNICIPAL | Obras Públicas (Avellaneda) |
 
-Los siete entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. Ana y Bruno ya tienen el teléfono verificado, con los números ficticios `+5491100000001` y `+5491100000002`, para poder crear reclamos sin pasar por la verificación. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
+Los ocho entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. Ana y Bruno ya tienen el teléfono verificado, con los números ficticios `+5491100000001` y `+5491100000002`, para poder crear reclamos sin pasar por la verificación. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
 
-No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v1`** al completar la semilla. El script se invoca en cada arranque de `dev`, pero sus inserciones quedan condicionadas a la ausencia del marcador: la semilla se aplica **una sola vez por base** y las modificaciones posteriores no se restauran en cada reinicio.
+No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v2`** al completar la semilla.
+
+**Base creada antes del PR 25.** La semilla nueva no reemplaza la de barrios: hay que borrar la base una vez, con `docker compose down -v` (se pierden los reclamos de prueba) y volver a levantar todo. Sin eso, el alta falla porque la tabla `reclamos` todavía tiene la columna `barrio_id`. El script se invoca en cada arranque de `dev`, pero sus inserciones quedan condicionadas a la ausencia del marcador: la semilla se aplica **una sola vez por base** y las modificaciones posteriores no se restauran en cada reinicio.
 
 En una base existente sin marcador se completan registros y relaciones faltantes sin sobrescribir IDs existentes. Una base nueva vuelve a cargar la semilla. Los ejemplos siguientes presuponen una base recién inicializada, sin cambios manuales en sus IDs o jurisdicciones.
 
@@ -358,7 +366,7 @@ Abrir otra PowerShell mientras Spring sigue ejecutándose. Los catálogos son p�
 
 ```powershell
 Invoke-RestMethod http://localhost:8080/api/categorias
-Invoke-RestMethod http://localhost:8080/api/barrios
+Invoke-RestMethod http://localhost:8080/api/municipios
 Invoke-RestMethod http://localhost:8080/api/areas
 ```
 
@@ -390,7 +398,7 @@ Invoke-RestMethod http://localhost:8080/api/reclamos -WebSession $ana.Sesion
 
 ### Crear y consultar un reclamo
 
-`CrearReclamoRequest` lleva `categoriaId`, `barrioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
+`CrearReclamoRequest` lleva `categoriaId`, `municipioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
 
 Desde el PR 16 el alta lleva **foto obligatoria** y va como `multipart/form-data`: la parte `reclamo` con el JSON (tipo `application/json`) y la parte `foto` (JPEG o PNG, hasta 5 MB). `Invoke-RestMethod -Form` no deja poner el tipo de la parte `reclamo`, así que esta función arma el formulario con `HttpClient` y usa las cookies de la sesión de `Entrar`. Hay una foto de ejemplo en `docs/evidencias/fotos/farol-ejemplo.jpg`.
 
@@ -421,7 +429,7 @@ Desde la raíz del repositorio:
 ```powershell
 $reclamo = @{
     categoriaId = 1
-    barrioId = 2
+    municipioId = 1
     descripcion = "Farol apagado frente a la plaza"
     direccion = "Belgrano 450"
 }
@@ -441,7 +449,7 @@ El POST responde **201 Created**, con `Location: /api/reclamos/{numero}`. Con la
 
 Sin el encabezado `X-XSRF-TOKEN`, el POST responde `403 CSRF_INVALIDO`: es la protección que evita que otro sitio cree reclamos con la sesión del vecino.
 
-Para probar falta de cobertura, usar categoría 1 y barrio 3: queda `INGRESADO`, `area: null`, un historial y una notificación de ingreso; también responde 201. El administrador puede asignarlo manualmente.
+Para probar falta de cobertura, usar categoría 1 (Luminaria rota) y municipio 2 (Avellaneda): queda `INGRESADO`, `area: null`, un historial y una notificación de ingreso; también responde 201. El administrador puede asignarlo manualmente.
 
 ### Probar toma, resolución y cierre
 
@@ -509,7 +517,7 @@ cd servicios
 .\mvnw.cmd -pl servicio-cobertura spring-boot:run
 ```
 
-Esperar `Started ServicioCoberturaApplication` y el mensaje `Catálogo de cobertura versión 1 cargado ... 4 áreas`. Abrir `http://localhost:8081/ws/cobertura.wsdl` en el navegador: es el contrato. Para hacer una consulta, usar el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano). Bache (2) en Bernal (2) responde Obras Públicas y Mantenimiento Vial; con `categoriaId` 99 responde un SOAP Fault `No existe la categoría 99`.
+Esperar `Started ServicioCoberturaApplication` y el mensaje `Catálogo de cobertura versión 2 cargado ... 9 áreas`. Abrir `http://localhost:8081/ws/cobertura.wsdl` en el navegador: es el contrato. Para hacer una consulta, usar el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano). Bache (2) en Quilmes (1) responde Obras Públicas y Mantenimiento Vial; con `categoriaId` 99 responde un SOAP Fault `No existe la categoría 99`.
 
 Para que el backend use el servicio, reiniciarlo con la variable puesta, en la terminal del backend:
 
@@ -518,7 +526,7 @@ $env:RECLAMOS_COBERTURA_ORIGEN="soap"
 .\mvnw.cmd -pl reclamos-app spring-boot:run
 ```
 
-Crear un reclamo "Bache" en Bernal: queda `ASIGNADO` y en el log del servicio aparece la línea `ConsultarCobertura municipio=1 barrio=2 categoria=2: 2 áreas`. Después detener el servicio con **Ctrl+C** y crear otro: el alta igual responde 201, el reclamo queda `INGRESADO` con `asignacionPendiente: true` y el detalle muestra que el servicio de cobertura no respondió. El administrador lo asigna a mano.
+Crear un reclamo "Bache" en Quilmes: queda `ASIGNADO` y en el log del servicio aparece la línea `ConsultarCobertura municipio=1 categoria=2: 2 áreas`. El mismo "Bache" en Avellaneda queda en Obras Públicas de Avellaneda (`municipio=2 ... 1 áreas`). Después detener el servicio con **Ctrl+C** y crear otro: el alta igual responde 201, el reclamo queda `INGRESADO` con `asignacionPendiente: true` y el detalle muestra que el servicio de cobertura no respondió. El administrador lo asigna a mano.
 
 Para volver a la cobertura local: `Remove-Item Env:RECLAMOS_COBERTURA_ORIGEN` y reiniciar el backend.
 
@@ -559,12 +567,14 @@ No necesita clave ni ningún servicio extra: el backend consulta Georef, la API 
 
 ```powershell
 $ana = Entrar "ana@example.org"   # la función de la sección 10
-Invoke-RestMethod "http://localhost:8080/api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2" -WebSession $ana.Sesion | ConvertTo-Json -Depth 4
+Invoke-RestMethod "http://localhost:8080/api/ubicaciones/sugerencias?direccion=Belgrano%20450" -WebSession $ana.Sesion | ConvertTo-Json -Depth 4
 ```
 
-Responde `disponible: true` y las sugerencias con coordenadas dentro de Quilmes; para Belgrano 450 hay más de una, porque la calle existe en varias localidades. Con una dirección inventada, la lista vuelve vacía. Sin Internet responde `disponible: false`: no es un error.
+El backend busca la dirección en los tres municipios a la vez y responde `disponible: true` con las sugerencias que tienen coordenadas, cada una con su `municipio`; para Belgrano 450 hay varias, porque la calle existe en Quilmes, en Avellaneda y en Berazategui. Con una dirección inventada, la lista vuelve vacía. Sin Internet responde `disponible: false`: no es un error.
 
-En la interfaz, como Ana Pérez: **Crear reclamo**, elegir el barrio, escribir la dirección y tocar **Buscar en el mapa**. Elegir una opción y crear el reclamo: el detalle muestra la dirección normalizada y el enlace **Ver en Google Maps**. Si no se elige ninguna, el reclamo se crea igual y el detalle dice "Sin marcar en el mapa".
+En la interfaz, como Ana Pérez: **Crear reclamo**, escribir la dirección y tocar **Buscar en el mapa**. Cada opción dice de qué municipio es; al elegir una, el formulario muestra "Municipio: Quilmes, según la dirección elegida". Crear el reclamo: el detalle muestra la dirección normalizada y el enlace **Ver en Google Maps**. Si no se elige ninguna (o el mapa no responde), aparece la lista **Municipio** para elegirlo a mano; el reclamo se crea igual y el detalle dice "Sin marcar en el mapa".
+
+En el alta, el backend le pregunta a Georef en qué partido cae el punto elegido (`GET /ubicacion`) y rechaza la ubicación si no es el del reclamo. Si Georef no responde en ese momento, alcanza con el recuadro de coordenadas del municipio.
 
 ### Probar los avisos por correo
 
@@ -617,11 +627,11 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 
 Necesita reclamos con la ubicación marcada en el mapa: sin coordenadas no hay cercanía.
 
-1. Como Ana Pérez, crear un reclamo de **Luminaria rota** en **Bernal**, dirección "Belgrano 450", tocar **Buscar en el mapa** y elegir la sugerencia de Bernal Oeste.
+1. Como Ana Pérez, crear un reclamo de **Luminaria rota**, dirección "Belgrano 450", tocar **Buscar en el mapa** y elegir la sugerencia de Bernal Oeste (Quilmes).
 2. Salir y entrar como Bruno Díaz. Hacer lo mismo: misma categoría, misma dirección y misma sugerencia. Al tocar **Crear reclamo** aparece **¿Es alguno de estos?** con el reclamo de Ana, su foto y la distancia, sin su nombre.
 3. **Es el mismo: apoyar** no crea un reclamo: vuelve a **Mis reclamos** con el aviso. En el detalle de Ana aparece "1 vecino apoya este reclamo". **Es otro problema: continuar** crea el reclamo de Bruno igual.
 
-Con la API simulada (`npm run mock`) ya hay un reclamo de Bruno en Belgrano 450, Bernal: alcanza con el paso 1 como Ana.
+Con la API simulada (`npm run mock`) ya hay un reclamo de Bruno en Belgrano 450, Bernal (Quilmes): alcanza con el paso 1 como Ana.
 
 Por API, con las sesiones de `Entrar`:
 
@@ -647,7 +657,7 @@ Por API:
 
 ```powershell
 Invoke-RestMethod "http://localhost:8080/api/dashboard/publico"
-Invoke-RestMethod "http://localhost:8080/api/dashboard/publico?desde=2026-10-01&hasta=2026-10-31&barrioId=2"
+Invoke-RestMethod "http://localhost:8080/api/dashboard/publico?desde=2026-10-01&hasta=2026-10-31&municipioId=1"
 $elena = Entrar "elena@example.org"
 Invoke-RestMethod "http://localhost:8080/api/dashboard/gestion" -WebSession $elena.Sesion | ConvertTo-Json -Depth 5
 ```
@@ -678,8 +688,8 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
 | GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle; cualquier ciudadano ve la de un posible duplicado abierto. |
 | GET | `/api/reclamos/candidatos-duplicados` | Reclamos abiertos de la categoría cerca del punto (`categoriaId`, `latitud`, `longitud`; opcionales `radio` y `limite`), sin datos del autor. |
-| GET | `/api/dashboard/publico` | Tablero público, sin sesión: creados en el período (`desde`, `hasta`) y pendientes, resueltos y cerrados de hoy, con filtros `barrioId` y `categoriaId`. |
-| GET | `/api/dashboard/gestion` | Tablero de gestión: pendientes, vencidos, sin asignar y tabla por área y barrio. Agentes (su área) y administradores. |
+| GET | `/api/dashboard/publico` | Tablero público, sin sesión: creados en el período (`desde`, `hasta`) y pendientes, resueltos y cerrados de hoy, con filtros `municipioId` y `categoriaId`. |
+| GET | `/api/dashboard/gestion` | Tablero de gestión: pendientes, vencidos, sin asignar y tabla por área y municipio. Agentes (su área) y administradores. |
 | POST / DELETE | `/api/reclamos/{numero}/apoyo` | Apoyar o retirar el apoyo a un reclamo de otro vecino. Idempotentes. Solo ciudadanos. |
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
@@ -695,9 +705,9 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | POST | `/api/auth/registro` | Crear la cuenta de un ciudadano: `dni`, `nombre`, `apellido`, `email` y `contrasena`. |
 | POST | `/api/auth/logout` | Cerrar la sesión. Responde `204`. |
 | GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |
-| GET | `/api/barrios` | Listar barrios y nombre de municipio. |
+| GET | `/api/municipios` | Listar los municipios (id, nombre y provincia). |
 | GET | `/api/areas` | Listar áreas, estado activo y cobertura. |
-| GET | `/api/ubicaciones/sugerencias` | Buscar una dirección en el mapa (Georef) dentro del municipio del barrio. Parámetros `direccion` y `barrioId`. |
+| GET | `/api/ubicaciones/sugerencias` | Buscar una dirección en el mapa (Georef) en todos los municipios. Parámetro `direccion`; cada sugerencia trae su `municipio`. |
 | GET | `/swagger-ui.html` | Swagger UI: documentación de todos los endpoints y un formulario para probarlos. |
 | GET | `/v3/api-docs.yaml` | Contrato OpenAPI de la API. |
 
@@ -713,7 +723,7 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | 403 | `CUENTA_BLOQUEADA` | Un ciudadano bloqueado intenta crear, reabrir o verificar el teléfono. |
 | 413 | `ARCHIVO_DEMASIADO_GRANDE` | La foto pesa más de 5 MB o mide más de 4000 píxeles de lado. |
 | 429 | `LIMITE_EXCEDIDO` | Más de 5 reclamos en 24 horas o más de 3 códigos de verificación en una hora. |
-| 404 | `RECURSO_NO_ENCONTRADO` | Usuario, reclamo, categoría, barrio, área o ruta inexistente. |
+| 404 | `RECURSO_NO_ENCONTRADO` | Usuario, reclamo, categoría, municipio, área o ruta inexistente. |
 | 409 | `REGLA_NEGOCIO` | Transición inexistente, ciudadano inactivo al crear, área inactiva o igual a la actual al asignar, reapertura fuera de límite o número verificado en otra cuenta. |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo al mismo tiempo; volver a cargarlo. |
 | 405 | `METODO_NO_PERMITIDO` | Método HTTP no admitido por el recurso. |
@@ -869,7 +879,7 @@ Para `m19-tablero-cuenta-a-mano.png`, la cuenta por estado, al lado de la captur
 docker compose exec mysql mysql -u reclamos -p reclamos -e "SELECT estado, COUNT(*) FROM reclamos WHERE fecha_creacion >= NOW() - INTERVAL 30 DAY GROUP BY estado;"
 ```
 
-Para `m09-soap-consulta.png`, la consulta y el Fault con el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano), contra `http://localhost:8081/ws`: una con Bache (2) en Bernal (2) y otra con `categoriaId` 99.
+Para `m09-soap-consulta.png`, la consulta y el Fault con el ejemplo de PowerShell de [`docs/contratos/README.md`](docs/contratos/README.md#probarlo-a-mano), contra `http://localhost:8081/ws`: una con Bache (2) en Quilmes (1) y otra con `categoriaId` 99.
 
 Para `m18-respuestas-api.txt`, los casos "solo por API" de la sección 10 (crear como agente: `403`; `PATCH` de una transición inexistente: `409`; un reclamo que no existe: `404`; un alta sin descripción: `400`). Copiar cada respuesta al archivo.
 
@@ -904,8 +914,8 @@ $env:RECLAMOS_ASIGNACION_ESTRATEGIA="carga-trabajo"
 
 En otra terminal, `cd frontend` y `npm run dev`. Después, en `http://localhost:5173`, como Ana:
 
-1. Crear "Luminaria rota" en Bernal con la palabra "peligro" en la descripción: sale con prioridad `ALTA` y origen palabras clave (CP04).
-2. Crear dos "Bache" en Bernal. Las dos áreas que lo cubren son Obras Públicas y Mantenimiento Vial: cada uno va a la que tiene menos reclamos pendientes en ese momento, así que se reparten (CP05). Además, `servicio-cobertura` no recibe ninguna consulta: la cobertura es local (CP69).
+1. Crear "Luminaria rota" en Quilmes con la palabra "peligro" en la descripción: sale con prioridad `ALTA` y origen palabras clave (CP04).
+2. Crear dos "Bache" en Quilmes. Las dos áreas que lo cubren son Obras Públicas y Mantenimiento Vial: cada uno va a la que tiene menos reclamos pendientes en ese momento, así que se reparten (CP05). Además, `servicio-cobertura` no recibe ninguna consulta: la cobertura es local (CP69).
 
 Capturar los detalles como `m07-estrategias.png` y `m16-cobertura-local.png`. Cortar el backend y el frontend con `Ctrl+C` y volver a Docker:
 
@@ -913,7 +923,7 @@ Capturar los detalles como `m07-estrategias.png` y `m16-cobertura-local.png`. Co
 docker compose up -d backend frontend
 ```
 
-Crear el mismo "Bache" en Bernal desde `http://localhost:5173`: queda en Obras Públicas y la consulta aparece en el log del servicio SOAP:
+Crear el mismo "Bache" en Quilmes desde `http://localhost:5173`: queda en Obras Públicas y la consulta aparece en el log del servicio SOAP:
 
 ```powershell
 docker compose logs servicio-cobertura 2>&1 | Select-String "ConsultarCobertura|cobertura" | Out-File -Encoding utf8 "docs\evidencias\sistema-real\m17-cobertura-soap.txt"

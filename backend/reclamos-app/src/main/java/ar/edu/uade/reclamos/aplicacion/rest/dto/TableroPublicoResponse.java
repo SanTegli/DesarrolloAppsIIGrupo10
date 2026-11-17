@@ -7,7 +7,7 @@ import java.time.LocalDate;
 public record TableroPublicoResponse(
         LocalDate desde,
         LocalDate hasta,
-        Long barrioId,
+        Long municipioId,
         Long categoriaId,
         @Schema(description = "Reclamos creados en el período, los dos días incluidos") long creadosEnPeriodo,
         @Schema(description = "Hoy en INGRESADO, ASIGNADO o EN_PROCESO") long pendientes,

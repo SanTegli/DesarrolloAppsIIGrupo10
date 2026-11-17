@@ -6,7 +6,7 @@ import java.util.Optional;
 
 public interface AreaMunicipalRepository {
 
-    /** Guarda el área con sus relaciones a barrios y categorías. */
+    /** Guarda el área con sus categorías. */
     AreaMunicipal guardar(AreaMunicipal area);
 
     Optional<AreaMunicipal> buscarPorId(Long id);
@@ -15,8 +15,8 @@ public interface AreaMunicipalRepository {
     List<AreaMunicipal> buscarTodas();
 
     /**
-     * Áreas activas que atienden la categoría y tienen jurisdicción sobre el barrio, ordenadas por id.
-     * Es la entrada de {@code EstrategiaAsignacion}.
+     * Áreas activas del municipio que atienden la categoría, ordenadas por id. Es la entrada de
+     * {@code EstrategiaAsignacion}.
      */
-    List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long barrioId);
+    List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long municipioId);
 }

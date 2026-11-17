@@ -2,9 +2,9 @@ package ar.edu.uade.reclamos.dominio.fabrica;
 
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
 import ar.edu.uade.reclamos.comun.validacion.Validador;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import java.time.Clock;
 import java.time.LocalDateTime;
@@ -32,17 +32,17 @@ public class ReclamoFactory {
         this.reloj = reloj;
     }
 
-    public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Barrio barrio, String descripcion,
+    public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Municipio municipio, String descripcion,
                          String direccion) {
         Validador.requerirNoNulo(ciudadano, "ciudadano");
         Validador.requerirNoNulo(categoria, "categoría");
-        Validador.requerirNoNulo(barrio, "barrio");
+        Validador.requerirNoNulo(municipio, "municipio");
         if (!ciudadano.isActivo()) {
             throw new ReglaNegocioException("El ciudadano está inactivo y no puede crear reclamos.");
         }
         LocalDateTime ahora = LocalDateTime.now(reloj).truncatedTo(ChronoUnit.SECONDS);
         LocalDateTime fechaLimite = ahora.plusHours(categoria.getSlaHoras());
-        return new Reclamo(generarNumero(), ciudadano, categoria, barrio, descripcion, direccion,
+        return new Reclamo(generarNumero(), ciudadano, categoria, municipio, descripcion, direccion,
                 categoria.getPrioridadBase(), ahora, fechaLimite);
     }
 

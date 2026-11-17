@@ -19,7 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * El catálogo de este servicio y la semilla del backend usan los mismos ids. Si alguien agrega un barrio,
+ * El catálogo de este servicio y la semilla del backend usan los mismos ids. Si alguien agrega un municipio,
  * una categoría o un área en uno solo de los dos, el backend recibiría ids que no conoce; este test lo
  * detecta en la integración continua.
  *
@@ -54,17 +54,6 @@ class CatalogoSincronizadoTest {
     }
 
     @Test
-    void mismosBarriosEnElMismoMunicipio() {
-        Map<Long, String> enSemilla = new TreeMap<>();
-        semilla.get("barrios").forEach(fila -> enSemilla.put(id(fila.get(0)), texto(fila.get(1)) + " @" + fila.get(2)));
-        Map<Long, String> enCatalogo = new TreeMap<>();
-        catalogo.municipios().forEach(municipio -> municipio.barrios().forEach(
-                barrio -> enCatalogo.put(barrio.id(), barrio.nombre() + " @" + municipio.id())));
-
-        assertThat(enCatalogo).isEqualTo(enSemilla);
-    }
-
-    @Test
     void mismasCategorias() {
         Map<Long, String> enSemilla = new TreeMap<>();
         semilla.get("categorias").forEach(fila -> enSemilla.put(id(fila.get(0)), texto(fila.get(1))));
@@ -86,15 +75,11 @@ class CatalogoSincronizadoTest {
     }
 
     @Test
-    void mismaCoberturaDeBarriosYCategorias() {
-        Set<String> barriosEnCatalogo = new TreeSet<>();
+    void mismasCategoriasEnCadaArea() {
         Set<String> categoriasEnCatalogo = new TreeSet<>();
-        catalogo.areas().forEach(area -> {
-            area.barrios().forEach(barrio -> barriosEnCatalogo.add(area.id() + "-" + barrio));
-            area.categorias().forEach(categoria -> categoriasEnCatalogo.add(area.id() + "-" + categoria));
-        });
+        catalogo.areas().forEach(
+                area -> area.categorias().forEach(categoria -> categoriasEnCatalogo.add(area.id() + "-" + categoria)));
 
-        assertThat(barriosEnCatalogo).isEqualTo(pares("area_barrio"));
         assertThat(categoriasEnCatalogo).isEqualTo(pares("area_categoria"));
     }
 

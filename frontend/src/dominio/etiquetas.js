@@ -27,6 +27,14 @@ export const ORIGENES_PRIORIDAD = {
   PENDIENTE_IA: 'por categoría (la IA lo está revisando)',
 }
 
+/**
+ * Cada municipio tiene sus propias áreas, y varias se llaman igual ("Alumbrado"): en las listas que mezclan
+ * municipios, el nombre lleva el municipio.
+ */
+export function nombreDeArea(area) {
+  return area.municipio ? `${area.nombre} (${area.municipio.nombre})` : area.nombre
+}
+
 /** "Alta, por palabras clave. La descripción menciona "peligro"." */
 export function describirPrioridad({ prioridad, origenPrioridad, motivoPrioridad }) {
   const texto = `${PRIORIDADES[prioridad] ?? prioridad}, ${ORIGENES_PRIORIDAD[origenPrioridad] ?? ORIGENES_PRIORIDAD.CATEGORIA}`

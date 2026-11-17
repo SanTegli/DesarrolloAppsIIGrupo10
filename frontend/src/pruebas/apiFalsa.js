@@ -83,17 +83,24 @@ export const USUARIOS = [
   { id: 7, nombreCompleto: 'Elena Ruiz', rol: 'ADMINISTRADOR', area: null, telefonoVerificado: null, bloqueado: false },
 ]
 
+const QUILMES = { id: 1, nombre: 'Quilmes' }
+const AVELLANEDA = { id: 2, nombre: 'Avellaneda' }
+
 export const AREAS = [
-  { id: 1, nombre: 'Alumbrado', activa: true, categorias: [{ id: 1, nombre: 'Luminaria rota' }], barrios: [{ id: 2, nombre: 'Bernal' }] },
-  { id: 2, nombre: 'Obras Públicas', activa: true, categorias: [{ id: 2, nombre: 'Bache' }], barrios: [{ id: 2, nombre: 'Bernal' }] },
-  { id: 3, nombre: 'Higiene Urbana', activa: false, categorias: [{ id: 3, nombre: 'Residuos' }], barrios: [{ id: 2, nombre: 'Bernal' }] },
+  { id: 1, nombre: 'Alumbrado', activa: true, municipio: QUILMES, categorias: [{ id: 1, nombre: 'Luminaria rota' }] },
+  { id: 2, nombre: 'Obras Públicas', activa: true, municipio: QUILMES, categorias: [{ id: 2, nombre: 'Bache' }] },
+  { id: 3, nombre: 'Higiene Urbana', activa: false, municipio: QUILMES, categorias: [{ id: 3, nombre: 'Residuos' }] },
+  { id: 5, nombre: 'Obras Públicas', activa: true, municipio: AVELLANEDA, categorias: [{ id: 2, nombre: 'Bache' }] },
 ]
 
 export const CATEGORIAS = [
   { id: 1, nombre: 'Luminaria rota', descripcion: 'Farol apagado o dañado', slaHoras: 48, prioridadBase: 'MEDIA' },
 ]
 
-export const BARRIOS = [{ id: 2, nombre: 'Bernal', municipio: 'Quilmes' }]
+export const MUNICIPIOS = [
+  { id: 1, nombre: 'Quilmes', provincia: 'Buenos Aires' },
+  { id: 2, nombre: 'Avellaneda', provincia: 'Buenos Aires' },
+]
 
 /** Un archivo de imagen para subir en los tests (el contenido no importa: la interfaz no lo decodifica). */
 export function archivoFoto({ nombre = 'farol.jpg', tipo = 'image/jpeg', tamano = 2048 } = {}) {
@@ -121,7 +128,7 @@ export function reclamo(cambios = {}) {
     fechaCreacion: '2026-10-05T10:00:00',
     fechaLimite: '2026-10-07T10:00:00',
     categoria: { id: 1, nombre: 'Luminaria rota' },
-    barrio: { id: 2, nombre: 'Bernal' },
+    municipio: { id: 1, nombre: 'Quilmes' },
     ciudadano: { id: 1, nombreCompleto: 'Ana Pérez' },
     area: { id: 1, nombre: 'Alumbrado' },
     agente: null,

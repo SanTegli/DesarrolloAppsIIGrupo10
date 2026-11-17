@@ -13,14 +13,14 @@ import java.util.List;
 public interface ConsultasTablero {
 
     /** Reclamos creados en {@code [desde, hasta)}. */
-    long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long barrioId, Long categoriaId);
+    long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long municipioId, Long categoriaId);
 
     /** Cuántos reclamos hay hoy en cada estado. Los estados sin reclamos no aparecen. */
-    List<ConteoPorEstado> contarPorEstado(Long barrioId, Long categoriaId);
+    List<ConteoPorEstado> contarPorEstado(Long municipioId, Long categoriaId);
 
     /**
-     * Reclamos pendientes (INGRESADO, ASIGNADO o EN_PROCESO) por área y barrio, con cuántos pasaron su fecha
+     * Reclamos pendientes (INGRESADO, ASIGNADO o EN_PROCESO) por área y municipio, con cuántos pasaron su fecha
      * límite a {@code ahora}. Los INGRESADO van en la fila sin área. Con {@code areaId}, solo esa área.
      */
-    List<FilaPendientes> pendientesPorAreaYBarrio(LocalDateTime ahora, Long areaId);
+    List<FilaPendientes> pendientesPorAreaYMunicipio(LocalDateTime ahora, Long areaId);
 }

@@ -38,7 +38,7 @@ class ReclamoFactoryTest {
     @Test
     @DisplayName("Crea un reclamo consistente: número, estado, fechas, prioridad e historial")
     void creaUnReclamoConsistente() {
-        Reclamo reclamo = factory.crear(datos.ana, datos.luminaria, datos.bernal,
+        Reclamo reclamo = factory.crear(datos.ana, datos.luminaria, datos.quilmes,
                 "Farol apagado frente a la plaza", "Belgrano 450");
 
         assertTrue(reclamo.getNumero().matches("REC-[0-9A-F]{8}"), "número: " + reclamo.getNumero());
@@ -47,7 +47,7 @@ class ReclamoFactoryTest {
         assertEquals(Prioridad.MEDIA, reclamo.getPrioridad());
         assertSame(datos.ana, reclamo.getCiudadano());
         assertSame(datos.luminaria, reclamo.getCategoria());
-        assertSame(datos.bernal, reclamo.getBarrio());
+        assertSame(datos.quilmes, reclamo.getMunicipio());
         assertNull(reclamo.getArea());
         assertNull(reclamo.getId(), "el id lo asigna la persistencia");
         assertEquals(1, reclamo.getHistorial().size());
@@ -57,8 +57,8 @@ class ReclamoFactoryTest {
     @Test
     @DisplayName("La fecha límite es la de creación más el SLA de la categoría")
     void fechaLimiteSegunSla() {
-        Reclamo luminaria = factory.crear(datos.ana, datos.luminaria, datos.bernal, "Farol apagado", "Belgrano 450");
-        Reclamo bache = factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120");
+        Reclamo luminaria = factory.crear(datos.ana, datos.luminaria, datos.quilmes, "Farol apagado", "Belgrano 450");
+        Reclamo bache = factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120");
 
         assertEquals(CREACION.plusHours(48), luminaria.getFechaLimite());
         assertEquals(CREACION.plusHours(120), bache.getFechaLimite());
@@ -67,7 +67,7 @@ class ReclamoFactoryTest {
     @Test
     @DisplayName("La prioridad inicial es la base de la categoría")
     void prioridadBaseDeLaCategoria() {
-        Reclamo bache = factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120");
+        Reclamo bache = factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120");
 
         assertEquals(Prioridad.BAJA, bache.getPrioridad());
     }
@@ -75,8 +75,8 @@ class ReclamoFactoryTest {
     @Test
     @DisplayName("Cada reclamo recibe un número distinto")
     void numerosDistintos() {
-        Reclamo uno = factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120");
-        Reclamo otro = factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120");
+        Reclamo uno = factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120");
+        Reclamo otro = factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120");
 
         assertNotEquals(uno.getNumero(), otro.getNumero());
     }
@@ -84,25 +84,25 @@ class ReclamoFactoryTest {
     @Test
     @DisplayName("Descripción y dirección se guardan sin espacios sobrantes")
     void limpiaLosTextos() {
-        Reclamo reclamo = factory.crear(datos.ana, datos.bache, datos.bernal, "  Pozo profundo ", " Zapiola 120  ");
+        Reclamo reclamo = factory.crear(datos.ana, datos.bache, datos.quilmes, "  Pozo profundo ", " Zapiola 120  ");
 
         assertEquals("Pozo profundo", reclamo.getDescripcion());
         assertEquals("Zapiola 120", reclamo.getDireccion());
     }
 
     @Test
-    @DisplayName("Sin ciudadano, categoría, barrio, descripción o dirección no hay reclamo")
+    @DisplayName("Sin ciudadano, categoría, municipio, descripción o dirección no hay reclamo")
     void datosObligatorios() {
         assertThrows(DatosInvalidosException.class,
-                () -> factory.crear(null, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120"));
+                () -> factory.crear(null, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120"));
         assertThrows(DatosInvalidosException.class,
-                () -> factory.crear(datos.ana, null, datos.bernal, "Pozo profundo", "Zapiola 120"));
+                () -> factory.crear(datos.ana, null, datos.quilmes, "Pozo profundo", "Zapiola 120"));
         assertThrows(DatosInvalidosException.class,
                 () -> factory.crear(datos.ana, datos.bache, null, "Pozo profundo", "Zapiola 120"));
         assertThrows(DatosInvalidosException.class,
-                () -> factory.crear(datos.ana, datos.bache, datos.bernal, "", "Zapiola 120"));
+                () -> factory.crear(datos.ana, datos.bache, datos.quilmes, "", "Zapiola 120"));
         assertThrows(DatosInvalidosException.class,
-                () -> factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "  "));
+                () -> factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "  "));
     }
 
     @Test
@@ -111,6 +111,6 @@ class ReclamoFactoryTest {
         datos.ana.desactivar();
 
         assertThrows(ReglaNegocioException.class,
-                () -> factory.crear(datos.ana, datos.bache, datos.bernal, "Pozo profundo", "Zapiola 120"));
+                () -> factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120"));
     }
 }

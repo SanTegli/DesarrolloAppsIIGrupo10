@@ -12,7 +12,7 @@
 
     <artifactId>servicio-cobertura</artifactId>
     <name>Reclamos - Servicio SOAP de cobertura</name>
-    <description>Dice qué áreas municipales cubren una categoría en un barrio. SOAP con WSDL publicado.</description>
+    <description>Dice qué áreas de un municipio atienden una categoría. SOAP con WSDL publicado.</description>
 
     <dependencies>
         <dependency>

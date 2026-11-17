@@ -7,5 +7,5 @@ import java.time.LocalDateTime;
 public record ResumenReclamoResponse(String numero, String direccion, EstadoReclamo estado,
                                      Prioridad prioridad, boolean vencido, boolean asignacionPendiente,
                                      LocalDateTime fechaCreacion, LocalDateTime fechaLimite,
-                                     ReferenciaResponse categoria, ReferenciaResponse barrio,
+                                     ReferenciaResponse categoria, ReferenciaResponse municipio,
                                      UsuarioReferenciaResponse ciudadano, ReferenciaResponse area) { }

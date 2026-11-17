@@ -17,27 +17,27 @@ El servicio corre en el puerto 8081. El WSDL se genera del XSD (contract-first) 
 
 | Elemento del WSDL | Valor |
 | --- | --- |
-| Namespace | `http://uade.edu.ar/reclamos/cobertura/v1` |
+| Namespace | `http://uade.edu.ar/reclamos/cobertura/v2` |
 | `portType` | `CoberturaPort`, una operación: `ConsultarCobertura` |
 | `service` | `CoberturaService` |
 | Mensajes | `ConsultarCoberturaRequest` y `ConsultarCoberturaResponse` |
 
-El `/v1` del namespace es la versión del contrato. Un cambio incompatible publica `/v2` al lado, en lugar
-de modificar este. `cobertura.xsd` en esta carpeta es copia exacta del que usa el servicio
+El `/v2` del namespace es la versión del contrato. La versión 1 pedía también el barrio; el PR 25 la reemplazó
+por la 2 porque los reclamos pasaron a ser por municipio. Como los dos lados se despliegan juntos, la 1 no
+quedó publicada. Un cambio incompatible futuro publicaría `/v3`. `cobertura.xsd` en esta carpeta es copia exacta del que usa el servicio
 (`ContratoPublicadoTest` lo controla), y `cobertura.wsdl` lo regenera `ServicioSoapHttpTest` en cada
 corrida de tests: si cambió, se commitea junto con el código.
 
 ### Petición y respuesta
 
-`ConsultarCobertura` para Bache (categoría 2) en Bernal (barrio 2) de Quilmes (municipio 1):
+`ConsultarCobertura` para Bache (categoría 2) en Quilmes (municipio 1):
 
 ```xml
 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                  xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v1">
+                  xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v2">
   <soapenv:Body>
     <cob:ConsultarCoberturaRequest>
       <cob:municipioId>1</cob:municipioId>
-      <cob:barrioId>2</cob:barrioId>
       <cob:categoriaId>2</cob:categoriaId>
     </cob:ConsultarCoberturaRequest>
   </soapenv:Body>
@@ -47,7 +47,7 @@ corrida de tests: si cambió, se commitea junto con el código.
 ```xml
 <SOAP-ENV:Envelope xmlns:SOAP-ENV="http://schemas.xmlsoap.org/soap/envelope/">
   <SOAP-ENV:Body>
-    <ns2:ConsultarCoberturaResponse xmlns:ns2="http://uade.edu.ar/reclamos/cobertura/v1">
+    <ns2:ConsultarCoberturaResponse xmlns:ns2="http://uade.edu.ar/reclamos/cobertura/v2">
       <ns2:area><ns2:id>2</ns2:id><ns2:nombre>Obras Públicas</ns2:nombre></ns2:area>
       <ns2:area><ns2:id>4</ns2:id><ns2:nombre>Mantenimiento Vial</ns2:nombre></ns2:area>
     </ns2:ConsultarCoberturaResponse>
@@ -61,9 +61,9 @@ El prefijo de los elementos (`cob:`, `ns2:`) lo elige cada lado; lo que cuenta e
 
 | Caso | Respuesta | Qué hace el backend |
 | --- | --- | --- |
-| Hay áreas que cubren la combinación | HTTP 200 con un `area` por cada una, ordenadas por id | Carga cada área de su base, descarta las inactivas y la estrategia elige |
+| Hay áreas del municipio que atienden la categoría | HTTP 200 con un `area` por cada una, ordenadas por id | Carga cada área de su base, descarta las inactivas y la estrategia elige |
 | Ninguna área la cubre | HTTP 200 sin elementos `area`. No es un error | El reclamo queda `INGRESADO`, como con la cobertura local |
-| Id inexistente o barrio de otro municipio | HTTP 500 con SOAP Fault `SOAP-ENV:Client` y el motivo, por ejemplo `No existe el barrio 99` | `INGRESADO` con `asignacionPendiente: true` |
+| Municipio o categoría inexistente | HTTP 500 con SOAP Fault `SOAP-ENV:Client` y el motivo, por ejemplo `No existe el municipio 99` | `INGRESADO` con `asignacionPendiente: true` |
 | Id que no cumple el XSD (cero, negativo, texto) o falta un campo | SOAP Fault `SOAP-ENV:Client`: `El pedido no cumple el contrato cobertura.xsd`. No llega al catálogo | Igual que el anterior |
 | El servicio no contesta en `reclamos.cobertura.tiempo-limite` (2 segundos) | — | `INGRESADO` con `asignacionPendiente: true` |
 
@@ -73,9 +73,9 @@ Con el servicio levantado ([cómo](../../servicios/README.md)), en PowerShell:
 
 ```powershell
 $sobre = @'
-<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v1">
+<soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/" xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v2">
   <soapenv:Body><cob:ConsultarCoberturaRequest>
-    <cob:municipioId>1</cob:municipioId><cob:barrioId>2</cob:barrioId><cob:categoriaId>2</cob:categoriaId>
+    <cob:municipioId>1</cob:municipioId><cob:categoriaId>2</cob:categoriaId>
   </cob:ConsultarCoberturaRequest></soapenv:Body>
 </soapenv:Envelope>
 '@
@@ -88,7 +88,7 @@ petición a partir del WSDL.
 
 ### Quién es dueño de qué
 
-El servicio SOAP es el dueño de la cobertura: qué área atiende qué categoría en qué barrio. La guarda en
+El servicio SOAP es el dueño de la cobertura: qué área de cada municipio atiende qué categoría. La guarda en
 [`cobertura.json`](../../servicios/servicio-cobertura/src/main/resources/cobertura.json), con los mismos ids
 que la semilla del backend; `CatalogoSincronizadoTest` falla si alguien cambia uno solo de los dos. El
 backend conserva los datos de cada área (nombre, email, si está activa) y su propia tabla de cobertura, que

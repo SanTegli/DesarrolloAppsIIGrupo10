@@ -11,14 +11,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import ar.edu.uade.reclamos.aplicacion.mensajeria.BrokerMensajes;
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.MensajeSaliente;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MensajeSalienteRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
@@ -78,7 +76,6 @@ class ReevaluacionPrioridadIntegrationTest {
     @Autowired ObjectMapper json;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
@@ -86,7 +83,7 @@ class ReevaluacionPrioridadIntegrationTest {
     @Autowired ServicioReevaluacionPrioridad reevaluacion;
     @MockitoBean BrokerMensajes broker;
 
-    private Long barrio;
+    private Long municipio;
     private Long categoria;
     private Long ciudadano;
 
@@ -105,22 +102,19 @@ class ReevaluacionPrioridadIntegrationTest {
         respuesta = Respuesta.ERROR;
         new TransactionTemplate(transacciones).executeWithoutResult(tx -> {
             for (String tabla : List.of("mensajes_salientes", "notificaciones", "historial_estados", "reclamos",
-                    "area_barrio", "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias",
-                    "municipios")) {
+                    "area_categoria", "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria luminaria = categorias.guardar(
                     new Categoria("Luminaria rota", "Farol apagado o dañado", 48, Prioridad.MEDIA));
             AreaMunicipal alumbrado = new AreaMunicipal("Alumbrado", "alumbrado@example.org", quilmes);
-            alumbrado.agregarBarrio(bernal);
             alumbrado.agregarCategoria(luminaria);
             areas.guardar(alumbrado);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
                     verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", "1155550000")));
             usuarios.guardar(new AgenteMunicipal("30333444", "Carla", "Gómez", "carla@example.org", null, alumbrado));
-            barrio = bernal.getId();
+            municipio = quilmes.getId();
             categoria = luminaria.getId();
             ciudadano = ana.getId();
         });
@@ -205,8 +199,8 @@ class ReevaluacionPrioridadIntegrationTest {
 
     private String crearReclamo() throws Exception {
         String cuerpo = mvc.perform(alta("""
-                        {"categoriaId": %d, "barrioId": %d, "descripcion": "Cables colgando del poste",
-                         "direccion": "Belgrano 450"}""".formatted(categoria, barrio)).with(como(ciudadano)))
+                        {"categoriaId": %d, "municipioId": %d, "descripcion": "Cables colgando del poste",
+                         "direccion": "Belgrano 450"}""".formatted(categoria, municipio)).with(como(ciudadano)))
                 .andExpect(status().isCreated())
                 .andReturn().getResponse().getContentAsString(StandardCharsets.UTF_8);
         return json.readTree(cuerpo).get("numero").asText();

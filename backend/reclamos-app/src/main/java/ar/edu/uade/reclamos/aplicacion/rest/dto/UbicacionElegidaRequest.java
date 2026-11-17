@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 
 /**
  * La sugerencia de {@code GET /api/ubicaciones/sugerencias} que eligió el ciudadano. El backend comprueba que
- * caiga dentro del municipio del barrio.
+ * caiga dentro del municipio del reclamo.
  */
 public record UbicacionElegidaRequest(
         @Schema(example = "-34.73614578") @NotNull @DecimalMin("-90") @DecimalMax("90") Double latitud,

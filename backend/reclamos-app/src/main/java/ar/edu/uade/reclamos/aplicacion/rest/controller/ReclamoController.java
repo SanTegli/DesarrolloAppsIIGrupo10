@@ -59,7 +59,7 @@ public class ReclamoController {
             @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
             @Valid @RequestPart("reclamo") CrearReclamoRequest request,
             @RequestPart("foto") MultipartFile foto) throws IOException {
-        Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.barrioId(),
+        Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.municipioId(),
                 request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()),
                 new FotoSubida(foto.getBytes()));
         return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))

@@ -17,7 +17,7 @@ tags:
 - name: Verificación del teléfono
   description: Código de un solo uso confirmado por Telegram
 - name: Catálogos
-  description: "Categorías, barrios y áreas"
+  description: "Categorías, municipios y áreas"
 - name: Sesión
   description: "Login, registro, usuario actual y cierre de sesión"
 - name: Avisos
@@ -65,7 +65,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -123,7 +124,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -203,7 +205,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -269,7 +272,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -325,7 +329,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -380,7 +385,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -438,7 +444,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -485,7 +492,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -544,7 +552,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -610,7 +619,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -672,7 +682,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -734,7 +745,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -786,7 +798,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -844,7 +857,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -866,9 +880,10 @@ paths:
       tags:
       - Ubicaciones
       summary: Buscar la dirección de un reclamo
-      description: "Consulta la dirección en el geocodificador, dentro del municipio\
-        \ del barrio, y devuelve las opciones con coordenadas. Si el geocodificador\
-        \ no responde, devuelve disponible: false."
+      description: "Consulta la dirección en el geocodificador, una vez por municipio,\
+        \ y devuelve las opciones con coordenadas y su municipio: elegir una define\
+        \ el municipio del reclamo. Si el geocodificador no responde para ningún municipio,\
+        \ devuelve disponible: false."
       operationId: sugerencias
       parameters:
       - name: direccion
@@ -878,13 +893,6 @@ paths:
           type: string
           maxLength: 200
           minLength: 3
-      - name: barrioId
-        in: query
-        required: true
-        schema:
-          type: integer
-          format: int64
-          exclusiveMinimum: 0
       responses:
         "200":
           description: OK
@@ -912,7 +920,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -968,7 +977,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1026,7 +1036,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1083,7 +1094,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1175,7 +1187,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1227,7 +1240,63 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/municipios:
+    get:
+      tags:
+      - Catálogos
+      summary: Listar municipios
+      description: Los municipios donde se pueden hacer reclamos. La interfaz los
+        ofrece para elegir a mano cuando el mapa no responde.
+      operationId: municipios
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MunicipioResponse"
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1268,7 +1337,7 @@ paths:
         schema:
           type: string
           format: date
-      - name: barrioId
+      - name: municipioId
         in: query
         required: false
         schema:
@@ -1309,7 +1378,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1331,7 +1401,7 @@ paths:
       tags:
       - Tableros
       summary: "Tablero de gestión: pendientes, vencidos y sin asignar por área y\
-        \ barrio"
+        \ municipio"
       description: Para agentes (su área) y administradores (todas). Un ciudadano
         recibe 403.
       operationId: gestion
@@ -1362,7 +1432,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1414,59 +1485,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Error inesperado (ERROR_INTERNO)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-  /api/barrios:
-    get:
-      tags:
-      - Catálogos
-      summary: Listar barrios
-      operationId: barrios
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/BarrioResponse"
-        "400":
-          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: "El rol no puede hacer la operación o el reclamo no es suyo\
-            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1517,7 +1537,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1538,7 +1559,7 @@ paths:
     get:
       tags:
       - Catálogos
-      summary: Listar áreas con su cobertura
+      summary: Listar áreas con su municipio y sus categorías
       operationId: areas
       responses:
         "200":
@@ -1569,7 +1590,8 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
         "404":
-          description: "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)"
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
           content:
             application/json:
               schema:
@@ -1651,7 +1673,7 @@ components:
         categoriaId:
           type: integer
           format: int64
-        barrioId:
+        municipioId:
           type: integer
           format: int64
         descripcion:
@@ -1665,10 +1687,10 @@ components:
         ubicacion:
           $ref: "#/components/schemas/UbicacionElegidaRequest"
       required:
-      - barrioId
       - categoriaId
       - descripcion
       - direccion
+      - municipioId
     UbicacionElegidaRequest:
       type: object
       properties:
@@ -1778,7 +1800,7 @@ components:
           format: date-time
         categoria:
           $ref: "#/components/schemas/ReferenciaResponse"
-        barrio:
+        municipio:
           $ref: "#/components/schemas/ReferenciaResponse"
         ciudadano:
           $ref: "#/components/schemas/UsuarioReferenciaResponse"
@@ -1942,16 +1964,18 @@ components:
           type: number
           format: double
           example: -58.3228998575
+        municipio:
+          $ref: "#/components/schemas/ReferenciaResponse"
     SugerenciasUbicacionResponse:
       type: object
       properties:
         disponible:
           type: boolean
-          description: false si el geocodificador no respondió
+          description: false si el geocodificador no respondió para ningún municipio
         sugerencias:
           type: array
-          description: Hasta 5 opciones con coordenadas dentro del municipio; vacía
-            si no se encontró
+          description: "Hasta 5 opciones con coordenadas, cada una con su municipio;\
+            \ vacía si no se encontró"
           items:
             $ref: "#/components/schemas/SugerenciaUbicacionResponse"
     ResumenReclamoResponse:
@@ -1990,7 +2014,7 @@ components:
           format: date-time
         categoria:
           $ref: "#/components/schemas/ReferenciaResponse"
-        barrio:
+        municipio:
           $ref: "#/components/schemas/ReferenciaResponse"
         ciudadano:
           $ref: "#/components/schemas/UsuarioReferenciaResponse"
@@ -2068,6 +2092,19 @@ components:
         fechaEnvio:
           type: string
           format: date-time
+    MunicipioResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        nombre:
+          type: string
+          example: Quilmes
+        provincia:
+          type: string
+          example: Buenos Aires
     TableroPublicoResponse:
       type: object
       properties:
@@ -2077,7 +2114,7 @@ components:
         hasta:
           type: string
           format: date
-        barrioId:
+        municipioId:
           type: integer
           format: int64
         categoriaId:
@@ -2116,7 +2153,7 @@ components:
         area:
           $ref: "#/components/schemas/ReferenciaResponse"
           description: null para los reclamos todavía sin área
-        barrio:
+        municipio:
           $ref: "#/components/schemas/ReferenciaResponse"
         pendientes:
           type: integer
@@ -2151,7 +2188,7 @@ components:
             \ (sin casos)"
         filas:
           type: array
-          description: "Por área y barrio, primero los que tienen más vencidos"
+          description: "Por área y municipio, primero los que tienen más vencidos"
           items:
             $ref: "#/components/schemas/FilaTableroResponse"
     CategoriaResponse:
@@ -2174,16 +2211,6 @@ components:
           - MEDIA
           - ALTA
           - CRITICA
-    BarrioResponse:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        nombre:
-          type: string
-        municipio:
-          type: string
     AreaResponse:
       type: object
       properties:
@@ -2194,11 +2221,9 @@ components:
           type: string
         activa:
           type: boolean
+        municipio:
+          $ref: "#/components/schemas/ReferenciaResponse"
         categorias:
-          type: array
-          items:
-            $ref: "#/components/schemas/ReferenciaResponse"
-        barrios:
           type: array
           items:
             $ref: "#/components/schemas/ReferenciaResponse"

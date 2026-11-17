@@ -22,7 +22,7 @@ dependen tres personas a la vez.
 | Número de reclamo | `REC-` más ocho caracteres hexadecimales en mayúscula: `REC-4F2A91BC` |
 
 Todo `/api` exige sesión, salvo el login, el registro y los catálogos públicos (`/api/categorias`,
-`/api/barrios` y `/api/areas`), que la interfaz necesita antes de que alguien entre. Sin sesión, la respuesta
+`/api/municipios` y `/api/areas`), que la interfaz necesita antes de que alguien entre. Sin sesión, la respuesta
 es `401 NO_AUTENTICADO`. Qué puede hacer cada usuario lo decide su rol, guardado en la base: la sesión solo
 dice quién es.
 
@@ -62,7 +62,7 @@ Todos los errores tienen la misma forma:
 | 403 | `TELEFONO_NO_VERIFICADO` | Un ciudadano sin teléfono verificado intenta crear o reabrir un reclamo | `UsoRestringidoException` |
 | 403 | `CUENTA_BLOQUEADA` | Un ciudadano con la cuenta bloqueada intenta crear, reabrir o verificar el teléfono | `UsoRestringidoException` |
 | 403 | `CSRF_INVALIDO` | Un `POST` o `PATCH` sin el encabezado `X-XSRF-TOKEN`, o con un valor distinto al de la cookie | `RespuestasDeSeguridad` (Spring Security) |
-| 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, barrio, categoría o área | `RecursoNoEncontradoException` |
+| 404 | `RECURSO_NO_ENCONTRADO` | No existe el usuario, reclamo, municipio, categoría o área | `RecursoNoEncontradoException` |
 | 409 | `REGLA_NEGOCIO` | Transición de estado inexistente u otra regla del negocio | `ReglaNegocioException` |
 | 409 | `CONFLICTO_CONCURRENTE` | Otra operación modificó el mismo reclamo mientras se procesaba esta; hay que volver a cargarlo | Bloqueo optimista de JPA |
 | 413 | `ARCHIVO_DEMASIADO_GRANDE` | La foto pesa más de 5 MB o mide más de 4000 píxeles de lado | `ArchivoDemasiadoGrandeException` o el límite de Spring |
@@ -102,7 +102,7 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
   "fechaCreacion": "2026-10-05T10:00:00",
   "fechaLimite": "2026-10-07T10:00:00",
   "categoria": { "id": 1, "nombre": "Luminaria rota" },
-  "barrio": { "id": 2, "nombre": "Bernal" },
+  "municipio": { "id": 1, "nombre": "Quilmes" },
   "ciudadano": { "id": 1, "nombreCompleto": "Ana Pérez" },
   "area": { "id": 1, "nombre": "Alumbrado" },
   "agente": null,
@@ -163,7 +163,7 @@ Lo devuelve el listado. Es el reclamo sin `historial` y sin `descripcion` comple
   "fechaCreacion": "2026-10-05T10:00:00",
   "fechaLimite": "2026-10-07T10:00:00",
   "categoria": { "id": 1, "nombre": "Luminaria rota" },
-  "barrio": { "id": 2, "nombre": "Bernal" },
+  "municipio": { "id": 1, "nombre": "Quilmes" },
   "ciudadano": { "id": 1, "nombreCompleto": "Ana Pérez" },
   "area": { "id": 1, "nombre": "Alumbrado" }
 }
@@ -195,7 +195,7 @@ El JSON de la parte `reclamo`:
 ```json
 {
   "categoriaId": 1,
-  "barrioId": 2,
+  "municipioId": 1,
   "descripcion": "Farol apagado frente a la plaza",
   "direccion": "Belgrano 450",
   "ubicacion": {
@@ -209,10 +209,10 @@ El JSON de la parte `reclamo`:
 | Campo | Regla |
 | --- | --- |
 | `categoriaId` | Obligatorio; debe existir |
-| `barrioId` | Obligatorio; debe existir |
+| `municipioId` | Obligatorio; debe existir. Es el `municipio.id` de la sugerencia elegida o, si el mapa no respondió o el vecino no eligió ninguna, el que eligió de [la lista](#get-apimunicipios) |
 | `descripcion` | Obligatoria, hasta 1000 caracteres |
 | `direccion` | Obligatoria, hasta 200 caracteres. Es lo que escribió el ciudadano y se guarda siempre |
-| `ubicacion` | Opcional: la sugerencia de [`GET /api/ubicaciones/sugerencias`](#get-apiubicacionessugerencias--buscar-la-dirección-en-el-mapa) que eligió el ciudadano, con sus tres campos. Las coordenadas tienen que caer dentro del recuadro del municipio del barrio. Sin `ubicacion`, el reclamo queda con la ubicación `PENDIENTE` |
+| `ubicacion` | Opcional: la sugerencia de [`GET /api/ubicaciones/sugerencias`](#get-apiubicacionessugerencias--buscar-la-dirección-en-el-mapa) que eligió el ciudadano, con sus tres campos. Las coordenadas tienen que caer en el municipio del reclamo: primero se mira el recuadro del municipio y después Georef confirma el partido con `GET /ubicacion` (si Georef no responde, alcanza el recuadro). Sin `ubicacion`, el reclamo queda con la ubicación `PENDIENTE` |
 
 Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y el objeto Reclamo.
 
@@ -229,19 +229,20 @@ Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y e
 
 **Otros resultados del alta:**
 
-- Si un área activa atiende la categoría y tiene jurisdicción sobre el barrio, el reclamo vuelve
-  `ASIGNADO` con esa área.
+- Si un área activa del municipio atiende la categoría, el reclamo vuelve `ASIGNADO` con esa área. Cada
+  municipio tiene sus áreas: el Alumbrado de Quilmes no atiende reclamos de Avellaneda.
 - Si ninguna lo cubre, vuelve `INGRESADO` con `area: null`. Sigue siendo `201`.
 
 Errores:
 
 - `400`:
-  - Datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de Quilmes.`).
+  - Datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de Quilmes.` o, si
+    Georef la ubica en otro, `La ubicación elegida queda en Avellaneda, no en Quilmes.`).
   - Sin foto (`El reclamo necesita una foto del problema.`).
   - Un archivo que no es JPEG ni PNG.
 - `403 ACCESO_DENEGADO`: el usuario no es ciudadano.
 - `403 TELEFONO_NO_VERIFICADO` y `403 CUENTA_BLOQUEADA`.
-- `404`: usuario, barrio o categoría inexistente.
+- `404`: usuario, municipio o categoría inexistente.
 - `413 ARCHIVO_DEMASIADO_GRANDE`: la foto pesa más de 5 MB o mide más de 4000 píxeles de lado.
 - `415`: el alta llega como JSON solo, sin multipart.
 - `429 LIMITE_EXCEDIDO`: límite diario.
@@ -406,8 +407,8 @@ Solo `ADMINISTRADOR`. Sirve para un reclamo `INGRESADO` (asignación manual) o `
 Respuesta `200 OK` con el objeto Reclamo actualizado.
 
 Errores: `400` falta `areaId`; `403` el usuario no es administrador; `404` reclamo, usuario o área
-inexistente; `409` el reclamo no está `INGRESADO` ni `ASIGNADO`, el área está inactiva o ya es el
-área actual.
+inexistente; `409` el reclamo no está `INGRESADO` ni `ASIGNADO`, el área está inactiva, ya es el
+área actual o es de otro municipio (`El área Alumbrado es de Quilmes y el reclamo es de Avellaneda.`).
 
 ### `GET /api/reclamos/{numero}/notificaciones` — avisos generados
 
@@ -526,13 +527,13 @@ completo ([arquitectura](arquitectura.md#tableros)).
 | Parámetro | Regla |
 | --- | --- |
 | `desde`, `hasta` | Días `AAAA-MM-DD`, los dos incluidos. Sin ellos, los últimos 30 días hasta hoy. Hasta 366 días |
-| `barrioId`, `categoriaId` | Filtran todas las cifras; tienen que existir |
+| `municipioId`, `categoriaId` | Filtran todas las cifras; tienen que existir |
 
 ```json
 {
   "desde": "2026-10-05",
   "hasta": "2026-11-03",
-  "barrioId": null,
+  "municipioId": null,
   "categoriaId": null,
   "creadosEnPeriodo": 5,
   "pendientes": 3,
@@ -551,7 +552,7 @@ completo ([arquitectura](arquitectura.md#tableros)).
   cancelados y rechazados no cuentan. **Es `null` si no hay ninguno**: la interfaz muestra "sin casos", no un
   porcentaje.
 
-Errores: `400` fechas mal escritas, `desde` posterior a `hasta` o período de más de 366 días; `404` barrio o
+Errores: `400` fechas mal escritas, `desde` posterior a `hasta` o período de más de 366 días; `404` municipio o
 categoría inexistente.
 
 ### `GET /api/dashboard/gestion` — tablero de gestión
@@ -568,8 +569,8 @@ Solo `ADMINISTRADOR` (todas las áreas) y `AGENTE_MUNICIPAL` (la suya). Un ciuda
   "sinAsignar": 1,
   "porcentajeVencidos": 66.7,
   "filas": [
-    { "area": { "id": 1, "nombre": "Alumbrado" }, "barrio": { "id": 2, "nombre": "Bernal" }, "pendientes": 2, "vencidos": 1 },
-    { "area": null, "barrio": { "id": 2, "nombre": "Bernal" }, "pendientes": 1, "vencidos": 1 }
+    { "area": { "id": 1, "nombre": "Alumbrado" }, "municipio": { "id": 1, "nombre": "Quilmes" }, "pendientes": 2, "vencidos": 1 },
+    { "area": null, "municipio": { "id": 2, "nombre": "Avellaneda" }, "pendientes": 1, "vencidos": 1 }
   ]
 }
 ```
@@ -578,13 +579,13 @@ Solo `ADMINISTRADOR` (todas las áreas) y `AGENTE_MUNICIPAL` (la suya). Un ciuda
   todavía no los haya marcado.
 - `sinAsignar` son los pendientes sin área (`INGRESADO`). Es `null` para un agente.
 - `area` es el área del agente; `null` para el administrador.
-- `filas` agrupa por área y barrio, primero las que tienen más vencidos. `area: null` es la fila de los que
+- `filas` agrupa por área y municipio, primero las que tienen más vencidos. `area: null` es la fila de los que
   todavía no tienen área.
 - `porcentajeVencidos` es `null` sin pendientes ("sin casos").
 
 ## Consultas de apoyo
 
-Las categorías, los barrios y las áreas son públicos: la interfaz los pide antes del login.
+Las categorías, los municipios y las áreas son públicos: la interfaz los pide antes del login.
 
 ### `GET /api/usuarios` y `GET /api/usuarios/{id}`
 
@@ -622,17 +623,23 @@ teléfono (`403 CUENTA_BLOQUEADA`). Errores: `403` si no es administrador, `404`
 ]
 ```
 
-### `GET /api/barrios`
+### `GET /api/municipios`
+
+Los municipios donde se pueden hacer reclamos (PR 25: reemplaza a `GET /api/barrios`). La interfaz los ofrece
+para elegir a mano cuando el mapa no responde o el vecino no elige ninguna dirección.
 
 ```json
 [
-  { "id": 2, "nombre": "Bernal", "municipio": "Quilmes" }
+  { "id": 1, "nombre": "Quilmes", "provincia": "Buenos Aires" },
+  { "id": 2, "nombre": "Avellaneda", "provincia": "Buenos Aires" },
+  { "id": 3, "nombre": "Berazategui", "provincia": "Buenos Aires" }
 ]
 ```
 
 ### `GET /api/areas`
 
-Para el formulario de asignación manual.
+Para el formulario de asignación manual. Cada área es de un municipio, que es su jurisdicción: la interfaz
+ofrece solo las del municipio del reclamo, y el backend rechaza con `409` las de otro.
 
 ```json
 [
@@ -640,8 +647,8 @@ Para el formulario de asignación manual.
     "id": 1,
     "nombre": "Alumbrado",
     "activa": true,
-    "categorias": [{ "id": 1, "nombre": "Luminaria rota" }],
-    "barrios": [{ "id": 1, "nombre": "Quilmes Centro" }, { "id": 2, "nombre": "Bernal" }]
+    "municipio": { "id": 1, "nombre": "Quilmes" },
+    "categorias": [{ "id": 1, "nombre": "Luminaria rota" }]
   }
 ]
 ```
@@ -651,15 +658,15 @@ Para el formulario de asignación manual.
 ### `GET /api/ubicaciones/sugerencias` — buscar la dirección en el mapa
 
 Antes del alta. El backend busca la dirección en [Georef](https://www.argentina.gob.ar/georef), la API
-oficial de normalización de direcciones, dentro del municipio y la provincia del barrio. Exige sesión,
-porque cada búsqueda consulta una API externa.
+oficial de normalización de direcciones, **una vez por municipio** y en paralelo. Cada sugerencia dice de qué
+municipio es: elegirla define el municipio del reclamo. Exige sesión, porque cada búsqueda consulta una API
+externa.
 
-`GET /api/ubicaciones/sugerencias?direccion=Belgrano%20450&barrioId=2`
+`GET /api/ubicaciones/sugerencias?direccion=Belgrano%20450`
 
 | Parámetro | Regla |
 | --- | --- |
 | `direccion` | Obligatoria, de 3 a 200 caracteres |
-| `barrioId` | Obligatorio; debe existir |
 
 ```json
 {
@@ -668,35 +675,36 @@ porque cada búsqueda consulta una API externa.
     {
       "direccionNormalizada": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires",
       "latitud": -34.73614578,
-      "longitud": -58.3228998575
+      "longitud": -58.3228998575,
+      "municipio": { "id": 1, "nombre": "Quilmes" }
     }
   ]
 }
 ```
 
-- Devuelve hasta 5 sugerencias, solo las que tienen coordenadas dentro del recuadro del municipio. Una
-  dirección puede ser ambigua (Belgrano 450 existe en Bernal Oeste y en Quilmes): el ciudadano elige.
+- Devuelve hasta 5 sugerencias, solo las que tienen coordenadas dentro del recuadro de su municipio. Una
+  dirección puede ser ambigua (hay un Belgrano 450 en cada municipio): el ciudadano elige.
 - `sugerencias` vacía con `disponible: true`: Georef no encontró la dirección.
-- `disponible: false`: Georef no respondió en 3 segundos o respondió un error. **No es un error HTTP**: el
-  reclamo se puede crear igual, sin `ubicacion`.
+- `disponible: false`: Georef no respondió en 3 segundos, o respondió un error, para ningún municipio. **No
+  es un error HTTP**: el ciudadano elige el municipio de la lista y el reclamo se crea igual, sin `ubicacion`.
+  Si falló para algunos municipios, devuelve lo que encontró en los demás.
 - La misma búsqueda en el mismo municipio se responde de memoria durante 10 minutos, sin volver a Georef.
 
-Errores: `400` parámetros inválidos, `404` barrio inexistente.
+Errores: `400` parámetros inválidos.
 
 El enlace a Google Maps lo arma la interfaz con las coordenadas
 (`https://www.google.com/maps/search/?api=1&query=<latitud>%2C<longitud>`); no hace falta clave.
 
 ## Datos semilla acordados
 
-El PR 2 carga estos datos con estos ids; los mocks del frontend usan los mismos.
+El PR 2 carga estos datos con estos ids; los mocks del frontend usan los mismos. Desde el PR 25 la semilla
+es por municipio (`datos-dev-v2`): una base anterior se borra una vez con `docker compose down -v`.
 
-Municipio: Quilmes, provincia de Buenos Aires.
-
-| Id | Barrio |
-| --- | --- |
-| 1 | Quilmes Centro |
-| 2 | Bernal |
-| 3 | Ezpeleta |
+| Id | Municipio | Provincia |
+| --- | --- | --- |
+| 1 | Quilmes | Buenos Aires |
+| 2 | Avellaneda | Buenos Aires |
+| 3 | Berazategui | Buenos Aires |
 
 | Id | Categoría | SLA en horas | Prioridad base |
 | --- | --- | --- | --- |
@@ -704,12 +712,17 @@ Municipio: Quilmes, provincia de Buenos Aires.
 | 2 | Bache | 120 | BAJA |
 | 3 | Residuos | 72 | MEDIA |
 
-| Id | Área | Categorías | Barrios |
+| Id | Área | Municipio | Categorías |
 | --- | --- | --- | --- |
-| 1 | Alumbrado | Luminaria rota | Quilmes Centro, Bernal |
-| 2 | Obras Públicas | Bache | Quilmes Centro, Bernal, Ezpeleta |
-| 3 | Higiene Urbana | Residuos | Quilmes Centro, Bernal |
-| 4 | Mantenimiento Vial | Bache | Bernal |
+| 1 | Alumbrado | Quilmes | Luminaria rota |
+| 2 | Obras Públicas | Quilmes | Bache |
+| 3 | Higiene Urbana | Quilmes | Residuos |
+| 4 | Mantenimiento Vial | Quilmes | Bache |
+| 5 | Obras Públicas | Avellaneda | Bache |
+| 6 | Higiene Urbana | Avellaneda | Residuos |
+| 7 | Alumbrado | Berazategui | Luminaria rota |
+| 8 | Obras Públicas | Berazategui | Bache |
+| 9 | Higiene Urbana | Berazategui | Residuos |
 
 | Id | Usuario | Email para entrar | Rol | Área |
 | --- | --- | --- | --- | --- |
@@ -720,8 +733,9 @@ Municipio: Quilmes, provincia de Buenos Aires.
 | 5 | Fabián Luna | `fabian@example.org` | Agente | Higiene Urbana |
 | 6 | Gabriela Paz | `gabriela@example.org` | Agente | Mantenimiento Vial |
 | 7 | Elena Ruiz | `elena@example.org` | Administrador | |
+| 8 | Hugo Medina | `hugo@example.org` | Agente | Obras Públicas (Avellaneda) |
 
-Los siete entran con la contraseña de desarrollo **`demo1234`**. Es solo para la semilla local: la base
+Los ocho entran con la contraseña de desarrollo **`demo1234`**. Es solo para la semilla local: la base
 guarda su hash BCrypt. Ana (`+5491100000001`) y Bruno (`+5491100000002`) ya tienen el teléfono
 verificado, con números ficticios, para crear reclamos sin pasar por la verificación.
 
@@ -729,6 +743,7 @@ Con esta semilla se pueden demostrar los casos que dependen del territorio:
 
 | Caso | Reclamo | Resultado esperado |
 | --- | --- | --- |
-| Asignación automática | Luminaria rota en Bernal | `ASIGNADO` a Alumbrado |
-| Sin área compatible | Luminaria rota o Residuos en Ezpeleta | `INGRESADO`; el administrador asigna a mano |
-| Dos áreas candidatas | Bache en Bernal | Obras Públicas o Mantenimiento Vial, según la estrategia de asignación activa |
+| Asignación automática | Luminaria rota en Quilmes | `ASIGNADO` a Alumbrado (1) |
+| El mismo pedido en otro municipio | Bache en Avellaneda | `ASIGNADO` a Obras Públicas de Avellaneda (5), no a la de Quilmes |
+| Sin área compatible | Luminaria rota en Avellaneda | `INGRESADO`; el administrador asigna a mano un área de Avellaneda |
+| Dos áreas candidatas | Bache en Quilmes | Obras Públicas o Mantenimiento Vial, según la estrategia de asignación activa |

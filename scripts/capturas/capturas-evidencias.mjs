@@ -61,7 +61,7 @@ export const CAPTURAS = {
   '14-ciudadano-reabre': ['CP52', 'Ana reabre el reclamo resuelto con un motivo'],
   '15-ciudadano-cerrado': ['CP08, CP52', 'Ana confirma la segunda solución: historial completo y la reapertura ya no se ofrece'],
   '16-avisos': ['CP14', 'Avisos que recibió Ana'],
-  '17-admin-sin-asignar': ['CP06, CP18', 'Residuos en Ezpeleta: ningún área lo cubre y queda para la administración'],
+  '17-admin-sin-asignar': ['CP06, CP18', 'Luminaria en Avellaneda: ningún área de ese municipio la cubre y queda para la administración'],
   '18-admin-asignacion-manual': ['CP06', 'Elena asigna el área a mano'],
   '19-admin-cuenta-bloqueada': ['CP51', 'Elena bloquea la cuenta de Bruno'],
   '20-ciudadano-bloqueado': ['CP51', 'Bruno, bloqueado, no puede crear reclamos'],
@@ -131,17 +131,27 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     await p.getByRole('navigation').waitFor()
   }
 
-  /** Completa el alta. Con dirección busca en Georef y elige la primera sugerencia. */
-  async function completarAlta(p, { categoria, barrio, descripcion, foto = FOTO, buscar = true }) {
+  /**
+   * Completa el alta. Con buscar, busca la dirección en Georef (en todos los municipios) y elige la primera
+   * sugerencia del municipio pedido: el municipio sale de ahí. Sin buscar, lo elige de la lista.
+   */
+  async function completarAlta(p, { categoria, municipio, descripcion, foto = FOTO, buscar = true }) {
     await pestana(p, 'Crear reclamo')
     await p.getByLabel(/Categoría/).selectOption({ label: categoria })
-    await p.getByLabel('Barrio').selectOption({ label: barrio })
     await p.getByLabel('Dirección').fill(DIRECCION)
+    let elegida = false
     if (buscar) {
       await p.getByRole('button', { name: 'Buscar en el mapa' }).click()
-      const primera = p.getByRole('radio').first()
-      await primera.waitFor({ timeout: 15000 })
-      await primera.check()
+      const opciones = p.getByRole('radio')
+      await opciones.first().waitFor({ timeout: 15000 })
+      const delMunicipio = p.getByRole('radio', { name: new RegExp(`·\\s*${municipio}\\s*$`) }).first()
+      if (await delMunicipio.count()) {
+        await delMunicipio.check()
+        elegida = true
+      }
+    }
+    if (!elegida) {
+      await p.getByLabel('Municipio').selectOption({ label: municipio })
     }
     await p.getByLabel(/Descripción del problema/).fill(descripcion)
     await p.getByLabel('Foto del problema').setInputFiles(foto)
@@ -226,7 +236,7 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     await entrar(p, 'ana@example.org')
     await completarAlta(p, {
       categoria: 'Luminaria rota',
-      barrio: 'Bernal',
+      municipio: 'Quilmes',
       descripcion: `Evidencia ${sello}: salen chispas del farol de la esquina y la cuadra queda a oscuras.`,
     })
     await p.getByRole('img', { name: 'Vista previa de la foto elegida' }).waitFor()
@@ -265,7 +275,7 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     await entrar(bruno, 'bruno@example.org')
     await completarAlta(bruno, {
       categoria: 'Bache',
-      barrio: 'Bernal',
+      municipio: 'Quilmes',
       descripcion: `Evidencia ${sello}: pozo grande en la esquina, los autos frenan de golpe para esquivarlo.`,
     })
     estado.bache = await crear(bruno)
@@ -276,7 +286,7 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     }
     await completarAlta(ana, {
       categoria: 'Bache',
-      barrio: 'Bernal',
+      municipio: 'Quilmes',
       descripcion: 'Hay un bache enorme en la esquina de la plaza.',
     })
     await crear(ana, {
@@ -349,9 +359,9 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
       await entrar(ana, 'ana@example.org')
     }
     await completarAlta(ana, {
-      categoria: 'Residuos',
-      barrio: 'Ezpeleta',
-      descripcion: `Evidencia ${sello}: bolsas de residuos acumuladas en la esquina desde el fin de semana.`,
+      categoria: 'Luminaria rota',
+      municipio: 'Avellaneda',
+      descripcion: `Evidencia ${sello}: el farol de la esquina está apagado hace una semana.`,
       buscar: false,
     })
     estado.residuos = await crear(ana)
@@ -365,8 +375,8 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     const selector = elena.locator('form.asignacion select')
     await selector.waitFor()
     const opciones = await selector.locator('option').allTextContents()
-    await selector.selectOption({ label: opciones.includes('Higiene Urbana') ? 'Higiene Urbana' : opciones[1] })
-    await elena.getByLabel(/Observación/).fill('Ezpeleta todavía no está en la cobertura: lo toma Higiene Urbana.')
+    await selector.selectOption({ label: opciones.includes('Obras Públicas') ? 'Obras Públicas' : opciones[1] })
+    await elena.getByLabel(/Observación/).fill('Avellaneda no tiene Alumbrado: lo toma Obras Públicas de Avellaneda.')
     await elena.locator('form.asignacion button[type="submit"]').click()
     await elena.getByText(/quedó asignado a/).first().waitFor()
     await captura(elena, '18-admin-asignacion-manual')

@@ -7,8 +7,8 @@ const ruta = (numero) => `/reclamos/${encodeURIComponent(numero)}`
  * `foto` con el archivo (obligatoria). `ubicacion` es la sugerencia elegida del mapa; sin ella, el reclamo queda
  * con la ubicación pendiente.
  */
-export function crearReclamo({ categoriaId, barrioId, descripcion, direccion, ubicacion, foto }) {
-  const reclamo = { categoriaId, barrioId, descripcion, direccion }
+export function crearReclamo({ categoriaId, municipioId, descripcion, direccion, ubicacion, foto }) {
+  const reclamo = { categoriaId, municipioId, descripcion, direccion }
   if (ubicacion) {
     reclamo.ubicacion = ubicacion
   }

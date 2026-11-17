@@ -20,13 +20,13 @@ class ReclamoServiceTest {
     private final EscenarioAplicacion e = new EscenarioAplicacion();
     private final UsuarioRepository usuarios = mock(UsuarioRepository.class);
     private final CategoriaRepository categorias = mock(CategoriaRepository.class);
-    private final BarrioRepository barrios = mock(BarrioRepository.class);
+    private final MunicipioRepository municipios = mock(MunicipioRepository.class);
     private final AreaMunicipalRepository areas = mock(AreaMunicipalRepository.class);
     private final ReclamoRepository reclamos = mock(ReclamoRepository.class);
     private final EstrategiaPrioridad prioridad = mock(EstrategiaPrioridad.class);
     private final EstrategiaAsignacion asignacion = mock(EstrategiaAsignacion.class);
     private final PublicadorEventos eventos = mock(PublicadorEventos.class);
-    private final ReclamoService servicio = new ReclamoService(usuarios, categorias, barrios,
+    private final ReclamoService servicio = new ReclamoService(usuarios, categorias, municipios,
             reclamos, e.factory, prioridad, new ServicioAsignacion(areas, new CoberturaLocal(areas), asignacion), new PermisosReclamo(),
             e.reloj, eventos);
 
@@ -40,7 +40,7 @@ class ReclamoServiceTest {
 
     private void prepararCreacion() {
         when(categorias.buscarPorId(1L)).thenReturn(Optional.of(e.categoria));
-        when(barrios.buscarPorId(1L)).thenReturn(Optional.of(e.barrio));
+        when(municipios.buscarPorId(1L)).thenReturn(Optional.of(e.municipio));
         when(prioridad.calcular(any())).thenReturn(
                 new PrioridadCalculada(Prioridad.CRITICA, OrigenPrioridad.IA, "Riesgo para peatones"));
     }
@@ -71,10 +71,10 @@ class ReclamoServiceTest {
         assertThat(resultado.getFechaLimite()).isEqualTo(resultado.getFechaCreacion().plusHours(48));
         assertThat(resultado.getHistorial()).hasSize(2);
         assertThat(resultado.getHistorial().get(1).getUsuario()).isNull();
-        var orden = inOrder(usuarios, categorias, barrios, prioridad, areas, asignacion, reclamos, eventos);
+        var orden = inOrder(usuarios, categorias, municipios, prioridad, areas, asignacion, reclamos, eventos);
         orden.verify(usuarios).buscarPorId(1L);
         orden.verify(categorias).buscarPorId(1L);
-        orden.verify(barrios).buscarPorId(1L);
+        orden.verify(municipios).buscarPorId(1L);
         orden.verify(prioridad).calcular(resultado);
         orden.verify(areas).buscarCandidatas(1L, 1L);
         orden.verify(asignacion).seleccionarArea(resultado, List.of(e.area));
@@ -117,7 +117,7 @@ class ReclamoServiceTest {
             assertThatThrownBy(() -> servicio.crear(id, 1L, 1L, "Pozo", "Calle"))
                     .isInstanceOf(AccesoDenegadoException.class);
         }
-        verifyNoInteractions(categorias, barrios, areas, reclamos);
+        verifyNoInteractions(categorias, municipios, areas, reclamos);
     }
 
     @Test

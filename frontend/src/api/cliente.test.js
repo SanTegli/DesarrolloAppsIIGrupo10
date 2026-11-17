@@ -69,7 +69,7 @@ describe('cliente HTTP', () => {
 
     const creado = await crearReclamo({
       categoriaId: 1,
-      barrioId: 2,
+      municipioId: 1,
       descripcion: 'Farol apagado',
       direccion: 'Belgrano 450',
       foto: archivoFoto(),
@@ -83,7 +83,7 @@ describe('cliente HTTP', () => {
         multipart: true,
         tipoReclamo: 'application/json',
         categoriaId: 1,
-        barrioId: 2,
+        municipioId: 1,
         descripcion: 'Farol apagado',
         direccion: 'Belgrano 450',
         foto: { nombre: 'farol.jpg', tipo: 'image/jpeg' },

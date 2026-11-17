@@ -52,7 +52,7 @@ class ConsultaReclamosServiceTest {
     void administradorListaTodosYCombinaFiltros() {
         Reclamo ingresado = e.ingresado();
         Reclamo asignado = e.asignado();
-        Reclamo ajeno = e.factory.crear(e.otroCiudadano, e.categoria, e.barrio, "Pozo", "Calle");
+        Reclamo ajeno = e.factory.crear(e.otroCiudadano, e.categoria, e.municipio, "Pozo", "Calle");
         ajeno.asignarArea(e.area, null, null, java.time.LocalDateTime.now(e.reloj));
         when(reclamos.buscarTodos()).thenReturn(List.of(ingresado, asignado, ajeno));
         when(reclamos.buscarPorArea(1L)).thenReturn(List.of(asignado, ajeno));

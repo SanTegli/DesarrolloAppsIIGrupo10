@@ -52,14 +52,13 @@ class DuplicadosYApoyosIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
     @Autowired ReclamoRepository reclamos;
 
     private record Datos(Long ana, Long bruno, Long laura, Long carla, Long elena, Long luminaria, Long bache,
-                         Long barrio) { }
+                         Long municipio) { }
 
     private Datos datos;
 
@@ -67,16 +66,13 @@ class DuplicadosYApoyosIntegrationTest {
     void escenario() {
         datos = new TransactionTemplate(transacciones).execute(tx -> {
             for (String tabla : List.of("apoyos", "codigos_verificacion", "notificaciones", "historial_estados",
-                    "reclamos", "area_barrio", "area_categoria", "usuarios", "areas_municipales", "barrios",
-                    "categorias", "municipios")) {
+                    "reclamos", "area_categoria", "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria luminaria = categorias.guardar(new Categoria("Luminaria rota", "Farol", 48, Prioridad.MEDIA));
             Categoria bache = categorias.guardar(new Categoria("Bache", "Pozo", 120, Prioridad.BAJA));
             AreaMunicipal alumbrado = new AreaMunicipal("Alumbrado", "alumbrado@example.org", quilmes);
-            alumbrado.agregarBarrio(bernal);
             alumbrado.agregarCategoria(luminaria);
             alumbrado = areas.guardar(alumbrado);
             Usuario ana = usuarios.guardar(verificado(new Ciudadano("30111222", "Ana", "Perez", "ana@example.org", null)));
@@ -87,7 +83,7 @@ class DuplicadosYApoyosIntegrationTest {
                     null, alumbrado));
             Usuario elena = usuarios.guardar(new Administrador("20555666", "Elena", "Ruiz", "elena@example.org", null));
             return new Datos(ana.getId(), bruno.getId(), laura.getId(), carla.getId(), elena.getId(),
-                    luminaria.getId(), bache.getId(), bernal.getId());
+                    luminaria.getId(), bache.getId(), quilmes.getId());
         });
     }
 
@@ -224,17 +220,17 @@ class DuplicadosYApoyosIntegrationTest {
 
     private String crear(Long usuario, Long categoria, double latitud, double longitud) throws Exception {
         String cuerpo = """
-                {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol apagado", "direccion": "Belgrano 450",
+                {"categoriaId": %d, "municipioId": %d, "descripcion": "Farol apagado", "direccion": "Belgrano 450",
                  "ubicacion": {"latitud": %s, "longitud": %s, "direccionNormalizada": "GRL BELGRANO 450, Bernal"}}"""
-                .formatted(categoria, datos.barrio(), latitud, longitud);
+                .formatted(categoria, datos.municipio(), latitud, longitud);
         return leer(mvc.perform(alta(cuerpo).with(como(usuario))).andExpect(status().isCreated()))
                 .get("numero").asText();
     }
 
     private void crearSinUbicacion(Long usuario, Long categoria) throws Exception {
         mvc.perform(alta("""
-                {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol", "direccion": "Belgrano 450"}"""
-                .formatted(categoria, datos.barrio())).with(como(usuario))).andExpect(status().isCreated());
+                {"categoriaId": %d, "municipioId": %d, "descripcion": "Farol", "direccion": "Belgrano 450"}"""
+                .formatted(categoria, datos.municipio())).with(como(usuario))).andExpect(status().isCreated());
     }
 
     private ResultActions candidatos(Long usuario, Long categoria, double latitud) throws Exception {

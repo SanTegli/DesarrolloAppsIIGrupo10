@@ -38,12 +38,12 @@ public class TableroController {
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
             @Parameter(description = "Último día, incluido (AAAA-MM-DD)")
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta,
-            @RequestParam(required = false) @Positive Long barrioId,
+            @RequestParam(required = false) @Positive Long municipioId,
             @RequestParam(required = false) @Positive Long categoriaId) {
-        return mapper.tableroPublico(facade.tableroPublico(desde, hasta, barrioId, categoriaId));
+        return mapper.tableroPublico(facade.tableroPublico(desde, hasta, municipioId, categoriaId));
     }
 
-    @Operation(summary = "Tablero de gestión: pendientes, vencidos y sin asignar por área y barrio",
+    @Operation(summary = "Tablero de gestión: pendientes, vencidos y sin asignar por área y municipio",
             description = "Para agentes (su área) y administradores (todas). Un ciudadano recibe 403.")
     @GetMapping("/gestion")
     public TableroGestionResponse gestion(
