@@ -1,13 +1,15 @@
 # Contrato de REST 2, servicio de prioridad con IA. Lo implementa servicios/servicio-prioridad (PR 10).
+# El PR 26 sumó la segunda operación, /api/categorias/sugerir.
 # Este archivo fue el acuerdo de partida; el contrato vigente es el que genera el código en
 # docs/openapi/prioridad.yaml (lo regenera OpenApiPrioridadTest) y Swagger UI en http://localhost:8082.
 openapi: 3.0.3
 info:
   title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
-  version: 1.0.0
+  version: 1.1.0
   description: >
     Sugiere la prioridad de un reclamo a partir de su categoría y su descripción usando un modelo de
-    lenguaje externo (Gemini u OpenAI). No recibe datos personales: ni nombre, ni email, ni DNI, ni foto.
+    lenguaje externo (Gemini u OpenAI). También sugiere la categoría de un reclamo cargado como
+    "Otro problema". No recibe datos personales: ni nombre, ni email, ni DNI, ni dirección, ni foto.
 servers:
   - url: http://localhost:8082
 paths:
@@ -60,8 +62,96 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/categorias/sugerir:
+    post:
+      summary: Sugerir la categoría de un reclamo de "Otro problema"
+      description: >
+        Elige una de las categorías recibidas, o ninguna (categoria null). Es una sugerencia: la
+        recategorización la decide un administrador del sistema de reclamos.
+      operationId: sugerir
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SugerenciaCategoriaRequest'
+            example:
+              categoriaPropuesta: Baldosas levantadas
+              descripcion: En la vereda de la escuela hay baldosas sueltas y ya se cayó una señora
+              categorias: [Luminaria rota, Bache, Residuos, Semáforo averiado, Árbol caído o con riesgo,
+                           Pérdida de agua, Vereda rota]
+      responses:
+        '200':
+          description: Categoría sugerida, o null si ninguna corresponde
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SugerenciaCategoriaResponse'
+              example:
+                categoria: Vereda rota
+                motivo: Las baldosas sueltas son un problema de la vereda.
+                proveedor: gemini
+                modelo: gemini-3.5-flash-lite
+        '400':
+          description: Entrada inválida (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: El modelo respondió una categoría que no estaba en la lista (RESPUESTA_INVALIDA)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Proveedor caído, sin clave o sin cuota (PROVEEDOR_NO_DISPONIBLE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    SugerenciaCategoriaRequest:
+      type: object
+      required: [categoriaPropuesta, descripcion, categorias]
+      properties:
+        categoriaPropuesta:
+          type: string
+          maxLength: 80
+          description: Lo que escribió el vecino al elegir "Otro problema"
+        descripcion:
+          type: string
+          maxLength: 1000
+        categorias:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: string
+            maxLength: 80
+    SugerenciaCategoriaResponse:
+      type: object
+      required: [motivo, proveedor, modelo]
+      properties:
+        categoria:
+          type: string
+          nullable: true
+          description: Una de las recibidas; null si ninguna corresponde
+        motivo:
+          type: string
+          maxLength: 300
+        proveedor:
+          type: string
+          enum: [gemini, openai, simulado]
+        modelo:
+          type: string
     EvaluacionRequest:
       type: object
       required: [categoria, descripcion]

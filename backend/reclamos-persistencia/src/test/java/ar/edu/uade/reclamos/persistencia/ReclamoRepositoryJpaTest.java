@@ -1,7 +1,11 @@
 package ar.edu.uade.reclamos.persistencia;
 
 import static org.assertj.core.api.Assertions.*;
+import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
 import ar.edu.uade.reclamos.dominio.modelo.*;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -163,5 +167,32 @@ class ReclamoRepositoryJpaTest extends PersistenciaTestBase {
         flushYLimpiar();
 
         assertThat(reclamos.buscarPorNumero(guardado.getNumero()).orElseThrow().getVersion()).isGreaterThan(inicial);
+    }
+
+    @Test void guardaLaPropuestaLaSugerenciaYLaRecategorizacionDeOtroProblema() {
+        Categoria otro = categorias.guardar(new Categoria("Otro problema", "Ninguna corresponde", 72,
+                Prioridad.MEDIA, true));
+        Administrador admin = (Administrador) usuarios.guardar(
+                new Administrador("20555666", "Elena", "Ruiz", "elena@example.org", null));
+        Reclamo nuevo = new ReclamoFactory(Clock.fixed(Instant.parse("2026-10-05T10:00:00Z"), ZoneOffset.UTC))
+                .crear(ciudadano, otro, municipio, "Baldosas sueltas", "Belgrano 450", "Baldosas levantadas");
+        nuevo.registrarSugerenciaCategoria(categoria, "Parece un pozo.");
+        reclamos.guardar(nuevo);
+        flushYLimpiar();
+
+        Reclamo recuperado = reclamos.buscarPorNumero(nuevo.getNumero()).orElseThrow();
+        assertThat(recuperado.getCategoria().esOtra()).isTrue();
+        assertThat(recuperado.getCategoriaPropuesta()).isEqualTo("Baldosas levantadas");
+        assertThat(recuperado.getCategoriaSugerida().getNombre()).isEqualTo("Bache");
+        assertThat(recuperado.getMotivoSugerencia()).isEqualTo("Parece un pozo.");
+
+        recuperado.recategorizar(recuperado.getCategoriaSugerida(), admin, null, AHORA.plusHours(1));
+        reclamos.guardar(recuperado);
+        flushYLimpiar();
+
+        Reclamo recategorizado = reclamos.buscarPorNumero(nuevo.getNumero()).orElseThrow();
+        assertThat(recategorizado.getCategoria().getId()).isEqualTo(categoria.getId());
+        assertThat(recategorizado.getHistorial()).hasSize(2);
+        assertThat(categorias.buscarPorId(otro.getId()).orElseThrow().esOtra()).isTrue();
     }
 }

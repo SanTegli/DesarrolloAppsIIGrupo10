@@ -93,8 +93,12 @@ export const AREAS = [
   { id: 5, nombre: 'Obras Públicas', activa: true, municipio: AVELLANEDA, categorias: [{ id: 2, nombre: 'Bache' }] },
 ]
 
+// "Otro problema" va primero a propósito: el formulario la tiene que mostrar al final.
 export const CATEGORIAS = [
-  { id: 1, nombre: 'Luminaria rota', descripcion: 'Farol apagado o dañado', slaHoras: 48, prioridadBase: 'MEDIA' },
+  { id: 8, nombre: 'Otro problema', descripcion: 'Ninguna categoría corresponde', slaHoras: 72, prioridadBase: 'MEDIA', otra: true },
+  { id: 1, nombre: 'Luminaria rota', descripcion: 'Farol apagado o dañado', slaHoras: 48, prioridadBase: 'MEDIA', otra: false },
+  { id: 2, nombre: 'Bache', descripcion: 'Pozo en la calzada', slaHoras: 120, prioridadBase: 'BAJA', otra: false },
+  { id: 7, nombre: 'Vereda rota', descripcion: 'Baldosas sueltas, levantadas o faltantes', slaHoras: 168, prioridadBase: 'BAJA', otra: false },
 ]
 
 export const MUNICIPIOS = [
@@ -137,6 +141,9 @@ export function reclamo(cambios = {}) {
       { estadoAnterior: 'INGRESADO', estadoNuevo: 'ASIGNADO', fecha: '2026-10-05T10:00:00', observacion: 'Asignación automática', usuario: null },
     ],
     accionesDisponibles: [],
+    categoriaPropuesta: null,
+    categoriaSugerida: null,
+    motivoSugerencia: null,
     ...cambios,
   }
 }

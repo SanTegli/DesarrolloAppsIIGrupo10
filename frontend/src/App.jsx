@@ -199,7 +199,10 @@ export default function App() {
                 reclamo.numero,
                 reclamo.area
                   ? `Reclamo creado y asignado a ${reclamo.area.nombre}.`
-                  : `Reclamo creado. Ningún área de ${reclamo.municipio.nombre} atiende esa categoría: un ` +
+                  : reclamo.categoriaPropuesta
+                    ? 'Reclamo creado. Un administrador le va a poner la categoría que corresponde y lo va a ' +
+                      'derivar al área.'
+                    : `Reclamo creado. Ningún área de ${reclamo.municipio.nombre} atiende esa categoría: un ` +
                     'administrador lo va a asignar.',
               )
             }
@@ -220,6 +223,7 @@ export default function App() {
             usuario={usuario}
             numero={vista.numero}
             areas={catalogos.datos.areas}
+            categorias={catalogos.datos.categorias}
             avisoInicial={vista.aviso}
             onVolver={() => setVista({ nombre: vista.origen === 'crear' ? 'reclamos' : vista.origen })}
           />

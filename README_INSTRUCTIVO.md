@@ -326,20 +326,27 @@ Desde el PR 25 los reclamos son por **municipio**, no por barrio. Se crean tres 
 | 1 | Luminaria rota | 48 | MEDIA |
 | 2 | Bache | 120 | BAJA |
 | 3 | Residuos | 72 | MEDIA |
+| 4 | Semáforo averiado | 24 | ALTA |
+| 5 | Árbol caído o con riesgo | 48 | ALTA |
+| 6 | Pérdida de agua | 48 | ALTA |
+| 7 | Vereda rota | 168 | BAJA |
+| 8 | Otro problema | 72 | MEDIA |
 
-| ID de área | Nombre | Municipio | Categoría atendida |
+Las categorías 4 a 8 llegaron con el PR 26. "Otro problema" es la que el vecino elige cuando ninguna le sirve: escribe qué tipo de problema es y un administrador lo recategoriza con la sugerencia de la IA (ver [Probar "Otro problema"](#probar-otro-problema)).
+
+| ID de área | Nombre | Municipio | Categorías atendidas |
 | --- | --- | --- | --- |
-| 1 | Alumbrado | Quilmes | Luminaria rota |
-| 2 | Obras Públicas | Quilmes | Bache |
-| 3 | Higiene Urbana | Quilmes | Residuos |
-| 4 | Mantenimiento Vial | Quilmes | Bache |
-| 5 | Obras Públicas | Avellaneda | Bache |
-| 6 | Higiene Urbana | Avellaneda | Residuos |
-| 7 | Alumbrado | Berazategui | Luminaria rota |
-| 8 | Obras Públicas | Berazategui | Bache |
-| 9 | Higiene Urbana | Berazategui | Residuos |
+| 1 | Alumbrado | Quilmes | Luminaria rota, Semáforo averiado |
+| 2 | Obras Públicas | Quilmes | Bache, Pérdida de agua, Vereda rota |
+| 3 | Higiene Urbana | Quilmes | Residuos, Árbol caído o con riesgo |
+| 4 | Mantenimiento Vial | Quilmes | Bache, Vereda rota |
+| 5 | Obras Públicas | Avellaneda | Bache, Pérdida de agua, Vereda rota |
+| 6 | Higiene Urbana | Avellaneda | Residuos, Árbol caído o con riesgo |
+| 7 | Alumbrado | Berazategui | Luminaria rota, Semáforo averiado |
+| 8 | Obras Públicas | Berazategui | Bache, Pérdida de agua, Vereda rota |
+| 9 | Higiene Urbana | Berazategui | Residuos, Árbol caído o con riesgo |
 
-Las nueve áreas están activas. Cada área atiende sus categorías **solo en su municipio**: la relación con las categorías se guarda en `area_categoria`. Avellaneda no tiene Alumbrado a propósito, para probar un reclamo sin área.
+Las nueve áreas están activas. Cada área atiende sus categorías **solo en su municipio**: la relación con las categorías se guarda en `area_categoria`. Avellaneda no tiene Alumbrado a propósito, para probar un reclamo sin área. "Otro problema" no la atiende ningún área.
 
 | ID de usuario | Nombre | Email para entrar | Rol | Área |
 | --- | --- | --- | --- | --- |
@@ -354,7 +361,7 @@ Las nueve áreas están activas. Cada área atiende sus categorías **solo en su
 
 Los ocho entran con la contraseña de desarrollo **`demo1234`**. La base guarda solo su hash BCrypt. Ana y Bruno ya tienen el teléfono verificado, con los números ficticios `+5491100000001` y `+5491100000002`, para poder crear reclamos sin pasar por la verificación. A diferencia del resto de la semilla, las contraseñas se cargan también en una base que ya existía: el script completa las que faltan sin pisar las que se hayan cambiado.
 
-No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v2`** al completar la semilla.
+No hay reclamos ni notificaciones precargados. La tabla técnica `inicializaciones` registra el identificador **`datos-dev-v2`** al completar la semilla, y **`categorias-pr26`** al cargar las categorías del PR 26. Ese segundo bloque tiene su propia marca para que una base del PR 25 reciba las categorías nuevas al arrancar, **sin borrarla**. La columna nueva `categorias.otra` la agrega Hibernate y queda en `false` en las filas que ya estaban.
 
 **Base creada antes del PR 25.** La semilla nueva no reemplaza la de barrios: hay que borrar la base una vez, con `docker compose down -v` (se pierden los reclamos de prueba) y volver a levantar todo. Sin eso, el alta falla porque la tabla `reclamos` todavía tiene la columna `barrio_id`. El script se invoca en cada arranque de `dev`, pero sus inserciones quedan condicionadas a la ausencia del marcador: la semilla se aplica **una sola vez por base** y las modificaciones posteriores no se restauran en cada reinicio.
 
@@ -398,7 +405,7 @@ Invoke-RestMethod http://localhost:8080/api/reclamos -WebSession $ana.Sesion
 
 ### Crear y consultar un reclamo
 
-`CrearReclamoRequest` lleva `categoriaId`, `municipioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
+`CrearReclamoRequest` lleva `categoriaId`, `municipioId`, `descripcion` y `direccion`, y opcionalmente `ubicacion` (ver «Probar la ubicación con Georef»). Con "Otro problema" (categoría 8) lleva además `categoriaPropuesta`, hasta 80 caracteres. Los IDs deben ser positivos y existir; descripción y dirección deben tener texto, con máximos de 1000 y 200 caracteres respectivamente. El ciudadano es el de la sesión.
 
 Desde el PR 16 el alta lleva **foto obligatoria** y va como `multipart/form-data`: la parte `reclamo` con el JSON (tipo `application/json`) y la parte `foto` (JPEG o PNG, hasta 5 MB). `Invoke-RestMethod -Form` no deja poner el tipo de la parte `reclamo`, así que esta función arma el formulario con `HttpClient` y usa las cookies de la sesión de `Entrar`. Hay una foto de ejemplo en `docs/evidencias/fotos/farol-ejemplo.jpg`.
 
@@ -644,6 +651,28 @@ Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/apoyo" -Method Del
 
 Apoyar dos veces deja un solo apoyo; Ana no puede apoyar su propio reclamo (`409`); un agente, tampoco (`403`). Quien apoya no puede ver el detalle del reclamo (`403`), pero sí la foto mientras siga abierto, porque es la de la tarjeta. Los parámetros `radio` (hasta 200 metros) y `limite` (hasta 5) son opcionales.
 
+### Probar "Otro problema"
+
+Con la demo levantada (la sugerencia necesita la mensajería y la estrategia `ia`, como en compose):
+
+1. Como Ana Pérez, **Crear reclamo** con la categoría **Otro problema**. Aparece "¿Qué tipo de problema es?": escribir "Baldosas levantadas". Descripción: "Hay baldosas sueltas en la vereda de la escuela". El reclamo queda **sin área**.
+2. Como Elena Ruiz, abrir el reclamo. En unos segundos aparece "La IA sugiere Vereda rota: …" y **Cambiar la categoría** ya la tiene elegida.
+3. **Recategorizar**. El reclamo pasa a Vereda rota y queda asignado a Obras Públicas de Quilmes. La fecha límite pasa a 7 días desde la creación y el historial suma "Categoría: Otro problema → Vereda rota.". Ana recibe el aviso.
+
+En RabbitMQ aparecen las colas `reclamos.categoria`, `reclamos.categoria.espera` y `reclamos.categoria.dlq`. Con `servicio-prioridad` detenido, la sugerencia se reintenta cada 20 s; después de cuatro intentos el detalle dice "La IA no respondió en 4 intentos: elegí la categoría a mano." y Elena elige sola.
+
+Por API, con las sesiones de `Entrar`:
+
+```powershell
+$elena = Entrar "elena@example.org"
+Invoke-RestMethod "http://localhost:8080/api/reclamos/$numero/categoria" -Method Patch -WebSession $elena.Sesion -Headers $elena.Csrf `
+  -ContentType "application/json" -Body '{"categoriaId": 7, "observacion": "Como sugirió la IA"}' | ConvertTo-Json -Depth 5
+```
+
+Con la sesión de Ana responde `403`; a "Otro problema" (`categoriaId: 8`) o con el reclamo ya asignado, `409`. Recategorizar sirve también para corregir un reclamo común que entró con la categoría equivocada, mientras no tenga área.
+
+Con la API simulada (`npm run mock`) el flujo es el mismo, pero la "IA" son reglas: sugiere la categoría cuyo nombre aparece en lo que escribió el vecino, a los 3 segundos.
+
 ### Probar los tableros
 
 En la interfaz, la pestaña **Tablero** está para todos los roles:
@@ -683,7 +712,7 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 
 | Método | Ruta | Uso |
 | --- | --- | --- |
-| POST | `/api/reclamos` | Crear como ciudadano: `multipart/form-data` con las partes `reclamo` (JSON) y `foto` (JPEG o PNG, hasta 5 MB). |
+| POST | `/api/reclamos` | Crear como ciudadano: `multipart/form-data` con las partes `reclamo` (JSON) y `foto` (JPEG o PNG, hasta 5 MB). Con "Otro problema", el JSON lleva `categoriaPropuesta`. |
 | GET | `/api/reclamos` | Listar según rol; filtro `estado` para todos, `areaId` y `ciudadanoId` solo administrador. |
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
 | GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle; cualquier ciudadano ve la de un posible duplicado abierto. |
@@ -693,6 +722,7 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | POST / DELETE | `/api/reclamos/{numero}/apoyo` | Apoyar o retirar el apoyo a un reclamo de otro vecino. Idempotentes. Solo ciudadanos. |
 | PATCH | `/api/reclamos/{numero}/estado` | Cambiar estado; tomar usa `EN_PROCESO`. |
 | PATCH | `/api/reclamos/{numero}/asignacion` | Asignar o reasignar como administrador. |
+| PATCH | `/api/reclamos/{numero}/categoria` | Recategorizar un reclamo sin área como administrador (`categoriaId`, `observacion` opcional). Después intenta asignarlo. |
 | GET | `/api/reclamos/{numero}/notificaciones` | Consultar avisos del reclamo con los mismos permisos del detalle. |
 | GET | `/api/notificaciones` | Bandeja de avisos del usuario de la sesión, del más nuevo al más viejo. |
 | GET | `/api/usuarios` | Listar usuarios. Solo administradores. |
@@ -704,7 +734,7 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | GET | `/api/auth/yo` | Usuario de la sesión; `401` sin sesión. |
 | POST | `/api/auth/registro` | Crear la cuenta de un ciudadano: `dni`, `nombre`, `apellido`, `email` y `contrasena`. |
 | POST | `/api/auth/logout` | Cerrar la sesión. Responde `204`. |
-| GET | `/api/categorias` | Listar categorías, SLA y prioridad base. |
+| GET | `/api/categorias` | Listar categorías, SLA, prioridad base y si es "Otro problema" (`otra`). |
 | GET | `/api/municipios` | Listar los municipios (id, nombre y provincia). |
 | GET | `/api/areas` | Listar áreas, estado activo y cobertura. |
 | GET | `/api/ubicaciones/sugerencias` | Buscar una dirección en el mapa (Georef) en todos los municipios. Parámetro `direccion`; cada sugerencia trae su `municipio`. |

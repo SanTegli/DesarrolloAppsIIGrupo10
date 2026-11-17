@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.aplicacion.prioridad;
 
+import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorIA;
 import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
 import ar.edu.uade.reclamos.aplicacion.integracion.SugerenciaPrioridad;
 import ar.edu.uade.reclamos.dominio.evento.PrioridadRevisada;
@@ -81,7 +82,7 @@ public class ServicioReevaluacionPrioridad {
         }
         SugerenciaPrioridad sugerencia;
         try {
-            sugerencia = ia.sugerir(reclamo.getCategoria().getNombre(), reclamo.getDescripcion());
+            sugerencia = ia.sugerir(PrioridadPorIA.categoriaParaLaIA(reclamo), reclamo.getDescripcion());
         } catch (ServicioExternoNoDisponibleException error) {
             return sinRespuesta(reclamo, intento, error);
         }

@@ -77,7 +77,7 @@ Cuando una transición no existe y además el rol no alcanza, gana el 409.
 
 ### Reclamo
 
-Lo devuelven la creación, la consulta por número, el cambio de estado y la asignación.
+Lo devuelven la creación, la consulta por número, el cambio de estado, la asignación y la recategorización.
 
 ```json
 {
@@ -122,7 +122,10 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
       "usuario": null
     }
   ],
-  "accionesDisponibles": ["CANCELADO"]
+  "accionesDisponibles": ["CANCELADO"],
+  "categoriaPropuesta": null,
+  "categoriaSugerida": null,
+  "motivoSugerencia": null
 }
 ```
 
@@ -147,6 +150,15 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
 - `accionesDisponibles` son los estados a los que **el usuario del encabezado** puede llevar este
   reclamo. El frontend muestra un botón por cada uno y no repite las reglas. Si incluye `ASIGNADO`,
   el usuario puede asignar o reasignar el área con el endpoint de asignación.
+- **"Otro problema" (PR 26):**
+  - `categoriaPropuesta` es qué tipo de problema escribió el vecino al elegir la categoría "Otro problema".
+    Es `null` en las demás y se conserva después de recategorizar.
+  - `categoriaSugerida` es la categoría que sugirió la IA, como `{ "id", "nombre" }`. Es `null` si la IA no
+    sugirió ninguna, si todavía no respondió o si el reclamo no es de "Otro problema".
+  - `motivoSugerencia` explica la sugerencia, o por qué no hay. Es `null` mientras la IA no respondió.
+  - Ejemplo: `"categoriaPropuesta": "Baldosas levantadas"`,
+    `"categoriaSugerida": { "id": 7, "nombre": "Vereda rota" }`,
+    `"motivoSugerencia": "Las baldosas sueltas son un problema de la vereda."`.
 
 ### Resumen de reclamo
 
@@ -202,7 +214,8 @@ El JSON de la parte `reclamo`:
     "latitud": -34.73614578,
     "longitud": -58.3228998575,
     "direccionNormalizada": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"
-  }
+  },
+  "categoriaPropuesta": null
 }
 ```
 
@@ -212,6 +225,7 @@ El JSON de la parte `reclamo`:
 | `municipioId` | Obligatorio; debe existir. Es el `municipio.id` de la sugerencia elegida o, si el mapa no respondió o el vecino no eligió ninguna, el que eligió de [la lista](#get-apimunicipios) |
 | `descripcion` | Obligatoria, hasta 1000 caracteres |
 | `direccion` | Obligatoria, hasta 200 caracteres. Es lo que escribió el ciudadano y se guarda siempre |
+| `categoriaPropuesta` | Hasta 80 caracteres. **Obligatoria si la categoría es "Otro problema"** (`otra: true` en [`GET /api/categorias`](#get-apicategorias)); en las demás se ignora. Es qué tipo de problema es, en palabras del vecino (PR 26) |
 | `ubicacion` | Opcional: la sugerencia de [`GET /api/ubicaciones/sugerencias`](#get-apiubicacionessugerencias--buscar-la-dirección-en-el-mapa) que eligió el ciudadano, con sus tres campos. Las coordenadas tienen que caer en el municipio del reclamo: primero se mira el recuadro del municipio y después Georef confirma el partido con `GET /ubicacion` (si Georef no responde, alcanza el recuadro). Sin `ubicacion`, el reclamo queda con la ubicación `PENDIENTE` |
 
 Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y el objeto Reclamo.
@@ -232,10 +246,15 @@ Respuesta `201 Created` con el encabezado `Location: /api/reclamos/{numero}` y e
 - Si un área activa del municipio atiende la categoría, el reclamo vuelve `ASIGNADO` con esa área. Cada
   municipio tiene sus áreas: el Alumbrado de Quilmes no atiende reclamos de Avellaneda.
 - Si ninguna lo cubre, vuelve `INGRESADO` con `area: null`. Sigue siendo `201`.
+- **"Otro problema" no la atiende ningún área:** el reclamo vuelve `INGRESADO`. Si la IA está activa, el alta
+  deja en la outbox un pedido de sugerencia de categoría ([cola `reclamos.categoria`](contratos/mensajes.md)).
+  Unos segundos después, `categoriaSugerida` y `motivoSugerencia` tienen la respuesta. Un administrador
+  recategoriza con [`PATCH .../categoria`](#patch-apireclamosnumerocategoria--recategorizar).
 
 Errores:
 
 - `400`:
+  - "Otro problema" sin `categoriaPropuesta` (`Elegiste "Otro problema": contanos qué tipo de problema es.`).
   - Datos inválidos o ubicación fuera del municipio (`La ubicación elegida queda fuera de Quilmes.` o, si
     Georef la ubica en otro, `La ubicación elegida queda en Avellaneda, no en Quilmes.`).
   - Sin foto (`El reclamo necesita una foto del problema.`).
@@ -409,6 +428,41 @@ Respuesta `200 OK` con el objeto Reclamo actualizado.
 Errores: `400` falta `areaId`; `403` el usuario no es administrador; `404` reclamo, usuario o área
 inexistente; `409` el reclamo no está `INGRESADO` ni `ASIGNADO`, el área está inactiva, ya es el
 área actual o es de otro municipio (`El área Alumbrado es de Quilmes y el reclamo es de Avellaneda.`).
+
+### `PATCH /api/reclamos/{numero}/categoria` — recategorizar
+
+PR 26. Solo `ADMINISTRADOR`, y solo con el reclamo `INGRESADO`, es decir, antes de que tenga área. Sirve sobre
+todo para los reclamos de "Otro problema", con la categoría que sugirió la IA. También corrige un reclamo que
+entró con la categoría equivocada.
+
+```json
+{
+  "categoriaId": 7,
+  "observacion": "Como sugirió la IA"
+}
+```
+
+- **El plazo** se vuelve a calcular desde la fecha de creación, con el SLA de la categoría nueva. Si con el plazo
+  nuevo todavía no venció, `vencido` vuelve a `false`.
+- **La prioridad no baja:** queda la mayor entre la actual y la prioridad base de la categoría nueva.
+- **El historial** suma un registro sin cambio de estado (`INGRESADO` a `INGRESADO`), con la observación
+  `Categoría: Otro problema → Vereda rota. Como sugirió la IA`.
+- **Asignación:** después, el sistema intenta asignarlo como en el alta. Si un área del municipio atiende la
+  categoría nueva, el reclamo vuelve `ASIGNADO`.
+- **Avisos:** el vecino recibe "Revisamos tu reclamo REC-…: paso de Otro problema a Vereda rota." Si quedó
+  asignado, también sale el aviso de asignación.
+
+Respuesta `200 OK` con el objeto Reclamo actualizado.
+
+Errores:
+
+- `400`: falta `categoriaId`.
+- `403`: el usuario no es administrador.
+- `404`: reclamo o categoría inexistente.
+- `409`:
+  - El reclamo ya tiene área.
+  - La categoría es la misma.
+  - La categoría nueva es "Otro problema".
 
 ### `GET /api/reclamos/{numero}/notificaciones` — avisos generados
 
@@ -619,9 +673,13 @@ teléfono (`403 CUENTA_BLOQUEADA`). Errores: `403` si no es administrador, `404`
 
 ```json
 [
-  { "id": 1, "nombre": "Luminaria rota", "descripcion": "Farol apagado o dañado", "slaHoras": 48, "prioridadBase": "MEDIA" }
+  { "id": 1, "nombre": "Luminaria rota", "descripcion": "Farol apagado o dañado", "slaHoras": 48, "prioridadBase": "MEDIA", "otra": false },
+  { "id": 8, "nombre": "Otro problema", "descripcion": "Ninguna categoría corresponde: el vecino escribe qué tipo de problema es", "slaHoras": 72, "prioridadBase": "MEDIA", "otra": true }
 ]
 ```
+
+`otra` (PR 26) marca la categoría "Otro problema": con ella, el alta pide `categoriaPropuesta`. La lista viene
+ordenada por nombre; la interfaz muestra "Otro problema" al final.
 
 ### `GET /api/municipios`
 
@@ -706,23 +764,33 @@ es por municipio (`datos-dev-v2`): una base anterior se borra una vez con `docke
 | 2 | Avellaneda | Buenos Aires |
 | 3 | Berazategui | Buenos Aires |
 
-| Id | Categoría | SLA en horas | Prioridad base |
-| --- | --- | --- | --- |
-| 1 | Luminaria rota | 48 | MEDIA |
-| 2 | Bache | 120 | BAJA |
-| 3 | Residuos | 72 | MEDIA |
+Las categorías 4 a 8 son del PR 26. Van en un bloque aparte de la semilla, con su propia marca
+(`categorias-pr26`): una base del PR 25 las recibe al arrancar, sin borrarla.
+
+| Id | Categoría | SLA en horas | Prioridad base | `otra` |
+| --- | --- | --- | --- | --- |
+| 1 | Luminaria rota | 48 | MEDIA | |
+| 2 | Bache | 120 | BAJA | |
+| 3 | Residuos | 72 | MEDIA | |
+| 4 | Semáforo averiado | 24 | ALTA | |
+| 5 | Árbol caído o con riesgo | 48 | ALTA | |
+| 6 | Pérdida de agua | 48 | ALTA | |
+| 7 | Vereda rota | 168 | BAJA | |
+| 8 | Otro problema | 72 | MEDIA | sí |
 
 | Id | Área | Municipio | Categorías |
 | --- | --- | --- | --- |
-| 1 | Alumbrado | Quilmes | Luminaria rota |
-| 2 | Obras Públicas | Quilmes | Bache |
-| 3 | Higiene Urbana | Quilmes | Residuos |
-| 4 | Mantenimiento Vial | Quilmes | Bache |
-| 5 | Obras Públicas | Avellaneda | Bache |
-| 6 | Higiene Urbana | Avellaneda | Residuos |
-| 7 | Alumbrado | Berazategui | Luminaria rota |
-| 8 | Obras Públicas | Berazategui | Bache |
-| 9 | Higiene Urbana | Berazategui | Residuos |
+| 1 | Alumbrado | Quilmes | Luminaria rota, Semáforo averiado |
+| 2 | Obras Públicas | Quilmes | Bache, Pérdida de agua, Vereda rota |
+| 3 | Higiene Urbana | Quilmes | Residuos, Árbol caído o con riesgo |
+| 4 | Mantenimiento Vial | Quilmes | Bache, Vereda rota |
+| 5 | Obras Públicas | Avellaneda | Bache, Pérdida de agua, Vereda rota |
+| 6 | Higiene Urbana | Avellaneda | Residuos, Árbol caído o con riesgo |
+| 7 | Alumbrado | Berazategui | Luminaria rota, Semáforo averiado |
+| 8 | Obras Públicas | Berazategui | Bache, Pérdida de agua, Vereda rota |
+| 9 | Higiene Urbana | Berazategui | Residuos, Árbol caído o con riesgo |
+
+"Otro problema" no la atiende ningún área.
 
 | Id | Usuario | Email para entrar | Rol | Área |
 | --- | --- | --- | --- | --- |
@@ -746,4 +814,5 @@ Con esta semilla se pueden demostrar los casos que dependen del territorio:
 | Asignación automática | Luminaria rota en Quilmes | `ASIGNADO` a Alumbrado (1) |
 | El mismo pedido en otro municipio | Bache en Avellaneda | `ASIGNADO` a Obras Públicas de Avellaneda (5), no a la de Quilmes |
 | Sin área compatible | Luminaria rota en Avellaneda | `INGRESADO`; el administrador asigna a mano un área de Avellaneda |
+| Otro problema | "Baldosas levantadas" en Quilmes | `INGRESADO`; la IA sugiere Vereda rota y, al recategorizar, queda `ASIGNADO` a Obras Públicas (2) |
 | Dos áreas candidatas | Bache en Quilmes | Obras Públicas o Mantenimiento Vial, según la estrategia de asignación activa |

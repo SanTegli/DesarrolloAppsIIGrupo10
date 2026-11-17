@@ -39,7 +39,7 @@ class OpenApiTest {
         List<String> rutas = new ArrayList<>();
         contrato.get("paths").fieldNames().forEachRemaining(rutas::add);
         assertThat(rutas).containsExactlyInAnyOrder("/api/reclamos", "/api/reclamos/{numero}",
-                "/api/reclamos/{numero}/estado", "/api/reclamos/{numero}/asignacion",
+                "/api/reclamos/{numero}/estado", "/api/reclamos/{numero}/asignacion", "/api/reclamos/{numero}/categoria",
                 "/api/reclamos/{numero}/notificaciones", "/api/notificaciones", "/api/usuarios",
                 "/api/usuarios/{id}", "/api/categorias", "/api/municipios", "/api/areas",
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
@@ -51,6 +51,10 @@ class OpenApiTest {
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("origenPrioridad")).isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("ubicacion")).isTrue();
         assertThat(contrato.at("/components/schemas/CrearReclamoRequest/properties").has("ubicacion")).isTrue();
+        assertThat(contrato.at("/components/schemas/CrearReclamoRequest/properties").has("categoriaPropuesta"))
+                .isTrue();
+        assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("categoriaSugerida")).isTrue();
+        assertThat(contrato.at("/components/schemas/CategoriaResponse/properties").has("otra")).isTrue();
         assertThat(contrato.at("/components/schemas/SugerenciasUbicacionResponse/properties").has("disponible"))
                 .isTrue();
 

@@ -61,7 +61,7 @@ public class ReclamoController {
             @RequestPart("foto") MultipartFile foto) throws IOException {
         Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.municipioId(),
                 request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()),
-                new FotoSubida(foto.getBytes()));
+                new FotoSubida(foto.getBytes()), request.categoriaPropuesta());
         return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
                 .body(respuesta(usuario.id(), reclamo));
     }
@@ -150,6 +150,22 @@ public class ReclamoController {
                                    @Valid @RequestBody AsignarReclamoRequest request) {
         return respuesta(usuario.id(),
                 facade.asignar(usuario.id(), numero, request.areaId(), request.observacion()));
+    }
+
+    /**
+     * PR 26: solo administradores y solo mientras el reclamo no tiene área. Con la categoría nueva, el sistema
+     * intenta asignarlo automáticamente.
+     */
+    @Operation(summary = "Cambiar la categoría de un reclamo sin área (solo administradores)")
+    @ApiResponse(responseCode = "409", description = "El reclamo ya tiene área, o la categoría es la misma o es "
+            + "\"Otro problema\" (REGLA_NEGOCIO)")
+    @PatchMapping("/{numero}/categoria")
+    public ReclamoResponse recategorizar(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable String numero,
+            @Valid @RequestBody RecategorizarReclamoRequest request) {
+        return respuesta(usuario.id(),
+                facade.recategorizar(usuario.id(), numero, request.categoriaId(), request.observacion()));
     }
 
     @Operation(summary = "Avisos generados por los eventos de un reclamo")

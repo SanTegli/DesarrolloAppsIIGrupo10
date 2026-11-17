@@ -33,6 +33,7 @@ documento donde está la decisión.
 | RF-13 | Cualquiera, sin sesión, ve un tablero público con cifras agregadas por período, municipio y categoría | CP63, CP64, CP67 |
 | RF-14 | Agentes y administradores ven un tablero de gestión con pendientes, vencidos y sin asignar, por área y municipio | CP65, CP66 |
 | RF-15 | El ciudadano cancela su reclamo mientras está ingresado o asignado, es decir, antes de que un agente lo tome | `ReclamoServiceTest.ciudadanoCancelaIngresadoOAsignado`, `ReclamoTest.cancelacion` |
+| RF-16 | Si ninguna categoría le sirve, el ciudadano elige "Otro problema" y escribe qué tipo de problema es. La IA sugiere una de las categorías existentes, o ninguna, y el administrador recategoriza el reclamo con la sugerida u otra mientras no tenga área. Con la categoría nueva, el plazo se recalcula, la prioridad no baja y el sistema intenta asignarlo; el ciudadano recibe un aviso | CP73, CP74 |
 
 ## Requerimientos no funcionales
 
@@ -107,6 +108,7 @@ de metas que dice si cada una se cumple.
 | RNF-IA-3 | Disponibilidad | Al menos el 95 % de los casos con una respuesta válida (`200` con una de las cuatro prioridades). Una respuesta fuera del esquema es un error del proveedor (`502`). Una falla no deja el reclamo sin revisar: se reintenta por la cola cada 20 s, hasta 4 veces, y recién entonces queda la prioridad de la categoría con origen `RESPALDO` | `EvaluarPrioridades.java`, `EvaluadorPrioridadTest`, `ErroresDelProveedorTest`, `ReevaluacionPrioridadIntegrationTest.siLaIaSigueSinResponderReintentaYDespuesQuedaLaCategoria` |
 | RNF-IA-4 | Privacidad de los datos | Al proveedor de IA solo le llegan la categoría y la descripción: nunca nombre, DNI, email, teléfono, dirección ni foto. El motivo que devuelve no incluye datos personales. La clave del proveedor solo está en `.env` | `PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`, `ConfiguracionProveedorTest` |
 | RNF-IA-5 | Robustez | Una instrucción escondida en la descripción no cambia la prioridad. La IA puede subir la prioridad de la categoría pero no bajarla, así que un error de la IA no deja sin atender un reclamo peligroso | CP26 (caso 25 de la evaluación), `InstruccionesPrioridadTest`, `PrioridadPorIATest` |
+| RNF-IA-6 | Sugerencia de categoría acotada | Para "Otro problema" (PR 26), la IA solo puede sugerir una de las categorías existentes o ninguna: el esquema JSON se arma con la lista. Una categoría inventada es un error (`502`) y se reintenta. Lo que escribió el vecino se trata como dato, no como instrucción. La sugerencia nunca cambia la categoría sola: decide un administrador | `SugeridorCategoriaTest`, `CategoriaControllerTest`, `SugerenciaCategoriaIntegrationTest.unaCategoriaInventadaSeTrataComoFallaYSeReintenta`, CP73 |
 
 **Resultado medido** ([ia-evaluacion.md](evidencias/ia-evaluacion.md), Gemini `gemini-3.5-flash-lite`,
 sobre los 25 casos):
@@ -152,6 +154,7 @@ RNF-IA-5.
 | Decisión | Por qué | Dónde |
 | --- | --- | --- |
 | Clasificar la prioridad, y no la categoría | La categoría la elige el vecino y define el área. La prioridad es la que más gana con leer el texto libre | [Decisiones de la Segunda Parte](arquitectura.md#decisiones-de-la-segunda-parte) |
+| La categoría solo se sugiere, para "Otro problema" (PR 26) | Cuando el vecino no encuentra su categoría, la IA ayuda a encontrarla, pero no la cambia sola: una sugerencia equivocada mandaría el reclamo a un área que no corresponde. Decide el administrador, con la sugerida ya elegida | ["Otro problema"](arquitectura.md#otro-problema-la-ia-sugiere-el-administrador-decide-pr-26) |
 | Un servicio aparte (REST 2), no una llamada desde el backend | El backend no conoce a Gemini ni a OpenAI: cambiar de proveedor o de modelo no lo toca | [servicios/README.md](../servicios/README.md#servicio-de-prioridad-con-ia-rest-2) |
 | Híbrida: sincrónica en el alta con 4 s, y por cola si no llega (PR 24) | Casi siempre el ciudadano ve la prioridad y el motivo al crear el reclamo. Cuando Gemini tarda, que pasa en una de cada cuatro consultas, esperarlo trabaría el alta y descartarlo desperdiciaría la IA: la cola la completa después sin tocar el flujo de estados | [Revisión en segundo plano](arquitectura.md#revisión-en-segundo-plano-pr-24) |
 | Respuesta con esquema JSON y validada | El modelo solo puede contestar una de las cuatro prioridades y un motivo corto. Si contesta otra cosa, es un error y hay respaldo | `EsquemaRespuesta`, `EvaluadorPrioridad` |

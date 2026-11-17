@@ -9,8 +9,13 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 
 import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
 import ar.edu.uade.reclamos.dominio.estrategia.PrioridadCalculada;
+import ar.edu.uade.reclamos.dominio.fabrica.ReclamoFactory;
+import ar.edu.uade.reclamos.dominio.modelo.Categoria;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.OrigenPrioridad;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
+import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import java.time.Duration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -75,6 +80,22 @@ class PrioridadPorIATest {
     }
 
     @Test
+    void enOtroProblemaLaIaVeTambienLoQueEscribioElVecino() {
+        servidor.expect(jsonPath("$.categoria").value("Otro problema: Baldosas levantadas"))
+                .andRespond(withSuccess("{\"prioridad\": \"MEDIA\", \"motivo\": \"Vereda.\"}",
+                        MediaType.APPLICATION_JSON));
+
+        ia.calcular(otroProblema("Baldosas levantadas"));
+    }
+
+    @Test
+    void laPropuestaLargaSeRecortaALoQueAceptaRest2() {
+        String categoria = PrioridadPorIA.categoriaParaLaIA(otroProblema("x".repeat(80)));
+
+        assertThat(categoria).hasSize(PrioridadPorIA.MAXIMO_CATEGORIA).startsWith("Otro problema: x").endsWith("…");
+    }
+
+    @Test
     void conRespaldoSiLaIaFallaUsaLaCategoriaYLoMarca() {
         servidor.expect(anything()).andRespond(withServerError());
         PrioridadConRespaldo conRespaldo = new PrioridadConRespaldo(ia, new PrioridadPorCategoria());
@@ -114,5 +135,12 @@ class PrioridadPorIATest {
         servidor.expect(anything()).andRespond(withSuccess(
                 "{\"prioridad\": \"" + prioridad + "\", \"motivo\": \"" + motivo + "\", \"proveedor\": \"gemini\", "
                         + "\"modelo\": \"gemini-3.5-flash-lite\"}", MediaType.APPLICATION_JSON));
+    }
+
+    private static Reclamo otroProblema(String propuesta) {
+        Categoria otro = new Categoria("Otro problema", "Ninguna corresponde", 72, Prioridad.MEDIA, true);
+        Ciudadano ciudadano = new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null);
+        return new ReclamoFactory().crear(ciudadano, otro, new Municipio("Quilmes", "Buenos Aires"),
+                "Baldosas sueltas", "Belgrano 450", propuesta);
     }
 }

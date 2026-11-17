@@ -28,6 +28,14 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
     public boolean reevaluaPrioridadConIA() {
         return "ia".equals(prioridad.estrategia()) && mensajeria.habilitada() && prioridad.ia().reevaluacion().habilitada();
     }
+
+    /**
+     * PR 26: la IA sugiere la categoría de los reclamos de "Otro problema", por la cola {@code reclamos.categoria}.
+     * Necesita lo mismo que la reevaluación (el servicio de IA y la mensajería) y usa sus tiempos e intentos.
+     */
+    public boolean sugiereCategoriaConIA() {
+        return "ia".equals(prioridad.estrategia()) && mensajeria.habilitada() && prioridad.ia().sugerirCategoria();
+    }
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -41,12 +49,14 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
      * @param tiempoRespuesta cuánto espera el alta la respuesta; corto, porque el ciudadano está esperando
      * @param circuito        cuándo dejar de llamar al servicio si falla seguido
      * @param reevaluacion    la segunda oportunidad, por la cola, si la IA no respondió en el alta
+     * @param sugerirCategoria si la IA sugiere la categoría de los reclamos de "Otro problema" (PR 26)
      */
     public record Ia(@DefaultValue("http://localhost:8082") String url,
                      @DefaultValue("1s") Duration tiempoConexion,
                      @DefaultValue("4s") Duration tiempoRespuesta,
                      @DefaultValue Circuito circuito,
-                     @DefaultValue Reevaluacion reevaluacion) {
+                     @DefaultValue Reevaluacion reevaluacion,
+                     @DefaultValue("true") boolean sugerirCategoria) {
         public Ia {
             if (url == null || url.isBlank()) {
                 throw new IllegalArgumentException("reclamos.prioridad.ia.url no puede estar vacía");

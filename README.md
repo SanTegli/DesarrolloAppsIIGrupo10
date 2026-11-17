@@ -189,8 +189,8 @@ La conexión de `dev` se puede cambiar sin tocar archivos con las variables `DB_
 
 En `dev`, Hibernate actualiza el esquema y luego se ejecuta
 `reclamos-persistencia/src/main/resources/db/datos-dev.sql`. La semilla respeta los IDs de
-`docs/api-contract.md`: tres municipios (Quilmes, Avellaneda y Berazategui), tres categorías, nueve áreas y
-ocho usuarios. Desde el PR 25 no hay barrios: una base creada antes se borra una vez con
+`docs/api-contract.md`: tres municipios (Quilmes, Avellaneda y Berazategui), ocho categorías (desde el PR 26,
+con "Otro problema"), nueve áreas y ocho usuarios. Desde el PR 25 no hay barrios: una base creada antes se borra una vez con
 `docker compose down -v`. La tabla técnica `inicializaciones` registra el marcador `datos-dev-v2` al terminar la primera
 ejecución. Los siguientes arranques no restauran datos ni relaciones eliminadas o modificadas.
 Esta tabla se usa únicamente para inicializar datos de desarrollo; una base nueva vuelve a cargar
@@ -335,3 +335,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 23 | `mejora/interfaz` | Rediseño de la interfaz |
 | 24 | `feature/24-ia-asincronica` | IA híbrida: el alta espera 4 s y, si la IA no llega, el reclamo queda `PENDIENTE_IA` y se revisa por la cola `reclamos.prioridad` con reintentos sin bloquear (cola de espera con TTL). La IA sube o mantiene, nunca baja; avisa si cambió. Gemini con razonamiento `minimal` y el detalle se actualiza solo |
 | 25 | `feature/25-municipios` | Municipios en vez de barrios: Quilmes, Avellaneda y Berazategui, cada uno con sus áreas. Georef busca la dirección en todos y la sugerencia elegida define el municipio; en el alta, `GET /ubicacion` confirma el partido. Lista de municipios si el mapa no responde. SOAP v2 por municipio y categoría. Semilla `datos-dev-v2` |
+| 26 | `feature/26-otro-problema` | Cinco categorías nuevas, entre ellas "Otro problema": el vecino escribe qué tipo de problema es, la IA sugiere una categoría existente por la cola `reclamos.categoria` (REST 2 `POST /api/categorias/sugerir`) y un administrador recategoriza con `PATCH /api/reclamos/{numero}/categoria`; el reclamo se asigna solo y el vecino recibe un aviso. Semilla en un bloque aparte, sin borrar la base |

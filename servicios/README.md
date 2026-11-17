@@ -69,14 +69,17 @@ existe) impide arrancar, en lugar de dar respuestas equivocadas después.
 ## Servicio de prioridad con IA (REST 2)
 
 Sugiere la prioridad de un reclamo a partir de su categoría y su descripción, con un modelo de lenguaje
-externo. Es el componente de IA del sistema, publicado como servicio (*Model as a Service*): el backend no
-habla con Gemini ni con OpenAI, habla con esta API.
+externo. Desde el PR 26 también sugiere la categoría de un reclamo de "Otro problema"
+(`POST /api/categorias/sugerir`), entre las categorías que le manda el backend. Es el componente de IA del
+sistema, publicado como servicio (*Model as a Service*): el backend no habla con Gemini ni con OpenAI, habla
+con esta API.
 
 ```text
 servicio-prioridad/
   src/main/resources/instrucciones-prioridad.txt   Criterios de cada prioridad que recibe el modelo
-  src/main/java/.../api/                           POST /api/prioridades/evaluar y sus errores
-  src/main/java/.../evaluacion/                    EvaluadorPrioridad: arma la consulta y valida la respuesta
+  src/main/resources/instrucciones-categoria.txt   Cómo elegir la categoría de un "Otro problema" (PR 26)
+  src/main/java/.../api/                           POST /api/prioridades/evaluar, POST /api/categorias/sugerir y sus errores
+  src/main/java/.../evaluacion/                    EvaluadorPrioridad y SugeridorCategoria: arman la consulta y validan la respuesta
   src/main/java/.../proveedor/                     ProveedorIA y sus adaptadores: Gemini, OpenAI y simulado
   src/main/java/.../configuracion/                 Elige el adaptador según la configuración (Factory)
   evaluacion/                                      Los 25 casos de prueba y el programa que los evalúa
@@ -88,7 +91,7 @@ servicio-prioridad/
 | --- | --- | --- |
 | `gemini` (por defecto) | API de Gemini, modelo `gemini-3.5-flash-lite` | `GEMINI_API_KEY`. Es gratis y no pide tarjeta; se crea en [Google AI Studio](https://aistudio.google.com/apikey) |
 | `openai` | API de OpenAI, modelo `gpt-5.4-mini` | `OPENAI_API_KEY`, con crédito cargado |
-| `simulado` | Palabras clave, sin red | Nada. **No es IA**: lo dice en cada respuesta. Sirve para los tests y para trabajar sin clave |
+| `simulado` | Palabras clave, sin red | Nada. **No es IA**: lo dice en cada respuesta. Sirve para los tests y para trabajar sin clave. Para la categoría, elige la primera cuyo nombre aparece en lo que escribió el vecino |
 
 Cambiar de proveedor es configuración: cada uno es un adaptador de la interfaz `ProveedorIA`, y el resto del
 servicio no cambia. Sin clave, el servicio arranca igual y responde 503; el backend usa entonces la prioridad
@@ -123,6 +126,7 @@ Para que el backend lo use, se arranca el backend con `RECLAMOS_PRIORIDAD_ESTRAT
 | `prioridad.ia.gemini.razonamiento` | `minimal` | Cuánto razona Gemini antes de responder (`minimal`, `low`, `medium` o `high`); va en `thinkingConfig.thinkingLevel`. Se cambia con `GEMINI_RAZONAMIENTO`. Clasificar una prioridad no necesita más, y `minimal` es el más rápido |
 | `prioridad.ia.openai.modelo` | `gpt-5.4-mini` | Modelo de OpenAI; se cambia con `OPENAI_MODELO` |
 | `prioridad.ia.instrucciones` | `classpath:instrucciones-prioridad.txt` | Criterios para el modelo; se pueden ajustar sin tocar código |
+| `prioridad.ia.instrucciones-categoria` | `classpath:instrucciones-categoria.txt` | Las instrucciones de la sugerencia de categoría (PR 26) |
 
 ### Evaluación con los 25 casos
 

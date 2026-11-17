@@ -79,7 +79,7 @@ class ReclamoServiceTest {
         orden.verify(areas).buscarCandidatas(1L, 1L);
         orden.verify(asignacion).seleccionarArea(resultado, List.of(e.area));
         orden.verify(reclamos).guardar(resultado);
-        orden.verify(eventos).publicar(new ReclamoCreado(resultado.getNumero(), 1L, 1L, 1L,
+        orden.verify(eventos).publicar(new ReclamoCreado(resultado.getNumero(), 1L, 1L, 1L, false,
                 Prioridad.CRITICA, resultado.getFechaCreacion()));
         orden.verify(eventos).publicar(new ReclamoAsignado(resultado.getNumero(), 1L, e.area.getNombre(),
                 null, java.time.LocalDateTime.now(e.reloj)));
@@ -97,7 +97,7 @@ class ReclamoServiceTest {
         assertThat(resultado.getPrioridad()).isEqualTo(Prioridad.CRITICA);
         assertThat(resultado.getHistorial()).hasSize(1);
         verify(reclamos).guardar(resultado);
-        verify(eventos).publicar(new ReclamoCreado(resultado.getNumero(), 1L, 1L, 1L,
+        verify(eventos).publicar(new ReclamoCreado(resultado.getNumero(), 1L, 1L, 1L, false,
                 Prioridad.CRITICA, resultado.getFechaCreacion()));
         verifyNoMoreInteractions(eventos);
     }

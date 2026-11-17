@@ -20,14 +20,19 @@ public class OpenAiAdapter implements ProveedorIA {
 
     static final String RUTA = "/v1/chat/completions";
 
+    /** Esquema de la prioridad. */
+    static final Map<String, Object> ESQUEMA = esquema(FormatoRespuesta.PRIORIDAD);
+
     /** JSON Schema estricto: en modo {@code strict} OpenAI exige {@code additionalProperties: false}. */
-    static final Map<String, Object> ESQUEMA = Map.of(
-            "type", "object",
-            "properties", Map.of(
-                    EsquemaRespuesta.CAMPO_PRIORIDAD, Map.of("type", "string", "enum", EsquemaRespuesta.PRIORIDADES),
-                    EsquemaRespuesta.CAMPO_MOTIVO, Map.of("type", "string")),
-            "required", List.of(EsquemaRespuesta.CAMPO_PRIORIDAD, EsquemaRespuesta.CAMPO_MOTIVO),
-            "additionalProperties", false);
+    static Map<String, Object> esquema(FormatoRespuesta formato) {
+        return Map.of(
+                "type", "object",
+                "properties", Map.of(
+                        formato.campo(), Map.of("type", "string", "enum", formato.valores()),
+                        EsquemaRespuesta.CAMPO_MOTIVO, Map.of("type", "string")),
+                "required", List.of(formato.campo(), EsquemaRespuesta.CAMPO_MOTIVO),
+                "additionalProperties", false);
+    }
 
     private final RestClient http;
     private final String clave;
@@ -62,7 +67,8 @@ public class OpenAiAdapter implements ProveedorIA {
                         Map.of("role", "system", "content", consulta.instrucciones()),
                         Map.of("role", "user", "content", consulta.reclamo())),
                 "response_format", Map.of("type", "json_schema", "json_schema",
-                        Map.of("name", "prioridad_reclamo", "strict", true, "schema", ESQUEMA)));
+                        Map.of("name", consulta.formato().nombre(), "strict", true,
+                                "schema", esquema(consulta.formato()))));
         JsonNode respuesta;
         try {
             respuesta = http.post().uri(RUTA)
@@ -79,6 +85,6 @@ public class OpenAiAdapter implements ProveedorIA {
             throw new RespuestaInvalidaException("OpenAI se negó a responder");
         }
         String texto = mensaje == null || !mensaje.hasNonNull("content") ? null : mensaje.get("content").asText();
-        return LectorRespuesta.leer(json, "OpenAI", texto);
+        return LectorRespuesta.leer(json, "OpenAI", texto, consulta.formato());
     }
 }

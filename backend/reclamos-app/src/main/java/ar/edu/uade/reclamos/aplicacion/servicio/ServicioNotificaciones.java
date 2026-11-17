@@ -101,6 +101,17 @@ public class ServicioNotificaciones {
         }
     }
 
+    /**
+     * PR 26: un administrador cambió la categoría. Avisa solo al ciudadano; si con la categoría nueva el reclamo
+     * quedó asignado, el área se entera por el aviso de asignación.
+     */
+    public void avisarRecategorizacion(String numero, String categoriaAnterior, String categoriaNueva,
+                                       LocalDateTime fecha) {
+        Reclamo reclamo = reclamo(numero);
+        notificar(reclamo, reclamo.getCiudadano(), "Revisamos tu reclamo " + numero + ": paso de " + categoriaAnterior
+                + " a " + categoriaNueva + ".", fecha, TipoAviso.RECLAMO_RECATEGORIZADO);
+    }
+
     public void avisarVencimiento(String numero, Prioridad prioridadNueva, LocalDateTime fecha) {
         Reclamo reclamo = reclamo(numero);
         notificar(reclamo, reclamo.getCiudadano(), "Tu reclamo " + numero

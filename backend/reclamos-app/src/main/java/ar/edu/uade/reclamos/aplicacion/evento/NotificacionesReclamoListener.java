@@ -4,6 +4,7 @@ import ar.edu.uade.reclamos.aplicacion.servicio.ServicioNotificaciones;
 import ar.edu.uade.reclamos.dominio.evento.EstadoReclamoCambiado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoAsignado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoCreado;
+import ar.edu.uade.reclamos.dominio.evento.ReclamoRecategorizado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoResuelto;
 import ar.edu.uade.reclamos.dominio.evento.PrioridadRevisada;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoVencido;
@@ -51,6 +52,13 @@ public class NotificacionesReclamoListener {
     @EventListener
     public void vencido(ReclamoVencido evento) {
         notificaciones.avisarVencimiento(evento.numeroReclamo(), evento.prioridadNueva(), evento.ocurridoEn());
+    }
+
+    /** PR 26: el ciudadano se entera de que su reclamo cambió de categoría. */
+    @EventListener
+    public void recategorizado(ReclamoRecategorizado evento) {
+        notificaciones.avisarRecategorizacion(evento.numeroReclamo(), evento.categoriaAnterior(),
+                evento.categoriaNueva(), evento.ocurridoEn());
     }
 
     /** Solo si la prioridad cambió: que la IA confirme la de la categoría no es novedad para nadie. */

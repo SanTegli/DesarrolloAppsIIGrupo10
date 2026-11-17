@@ -85,11 +85,17 @@ public class GestionReclamosFacade {
      */
     public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          UbicacionElegida ubicacion, FotoSubida foto) {
+        return crear(usuarioId, categoriaId, municipioId, descripcion, direccion, ubicacion, foto, null);
+    }
+
+    /** Igual, con lo que escribió el vecino si eligió "Otro problema" (PR 26). */
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
+                         UbicacionElegida ubicacion, FotoSubida foto, String categoriaPropuesta) {
         String referencia = fotos.preparar(foto);
         Reclamo reclamo;
         try {
             reclamo = escritura.crear(usuarioId, categoriaId, municipioId, descripcion, direccion,
-                    ubicaciones.confirmar(municipioId, ubicacion), referencia);
+                    ubicaciones.confirmar(municipioId, ubicacion), referencia, categoriaPropuesta);
         } catch (RuntimeException error) {
             fotos.descartar(referencia);
             throw error;
@@ -152,6 +158,11 @@ public class GestionReclamosFacade {
 
     public Reclamo asignar(Long usuarioId, String numero, Long areaId, String observacion) {
         return escritura.asignar(usuarioId, numero, areaId, observacion);
+    }
+
+    /** PR 26: cambia la categoría de un reclamo sin área y lo intenta asignar con la nueva. */
+    public Reclamo recategorizar(Long usuarioId, String numero, Long categoriaId, String observacion) {
+        return escritura.recategorizar(usuarioId, numero, categoriaId, observacion);
     }
 
     public Reclamo reasignar(Long usuarioId, String numero, Long areaId, String observacion) {

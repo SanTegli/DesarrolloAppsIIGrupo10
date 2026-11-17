@@ -26,7 +26,8 @@ public class RestMapper {
                 categoriaReferencia(reclamo.getCategoria()), municipioReferencia(reclamo.getMunicipio()),
                 usuarioReferencia(reclamo.getCiudadano()), areaReferencia(reclamo.getArea()),
                 usuarioReferencia(reclamo.getAgente()), reclamo.getHistorial().stream().map(this::historial).toList(),
-                acciones);
+                acciones, reclamo.getCategoriaPropuesta(), categoriaReferencia(reclamo.getCategoriaSugerida()),
+                reclamo.getMotivoSugerencia());
     }
 
     public CandidatoDuplicadoResponse candidato(CandidatoDuplicado candidato) {
@@ -116,7 +117,7 @@ public class RestMapper {
 
     public CategoriaResponse categoria(Categoria categoria) {
         return new CategoriaResponse(categoria.getId(), categoria.getNombre(), categoria.getDescripcion(),
-                categoria.getSlaHoras(), categoria.getPrioridadBase());
+                categoria.getSlaHoras(), categoria.getPrioridadBase(), categoria.esOtra());
     }
 
     public MunicipioResponse municipio(Municipio municipio) {
@@ -130,7 +131,7 @@ public class RestMapper {
     }
 
     private ReferenciaResponse categoriaReferencia(Categoria categoria) {
-        return new ReferenciaResponse(categoria.getId(), categoria.getNombre());
+        return categoria == null ? null : new ReferenciaResponse(categoria.getId(), categoria.getNombre());
     }
 
     private ReferenciaResponse municipioReferencia(Municipio municipio) {

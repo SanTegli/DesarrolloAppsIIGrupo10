@@ -23,6 +23,7 @@ prioridad:
     # lenta de Gemini todavía llega a la segunda.
     tiempo-limite: 9s
     instrucciones: classpath:instrucciones-prioridad.txt
+    instrucciones-categoria: classpath:instrucciones-categoria.txt   # PR 26: categoría de "Otro problema"
     gemini:
       url: https://generativelanguage.googleapis.com
       clave: ${GEMINI_API_KEY:}

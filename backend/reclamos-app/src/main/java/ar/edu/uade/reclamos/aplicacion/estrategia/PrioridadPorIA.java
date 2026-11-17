@@ -19,6 +19,9 @@ import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
  */
 public class PrioridadPorIA implements EstrategiaPrioridad {
 
+    /** Lo que acepta REST 2 en {@code categoria}. */
+    static final int MAXIMO_CATEGORIA = 80;
+
     private final ClienteServicioPrioridad cliente;
 
     public PrioridadPorIA(ClienteServicioPrioridad cliente) {
@@ -28,12 +31,25 @@ public class PrioridadPorIA implements EstrategiaPrioridad {
     @Override
     public PrioridadCalculada calcular(Reclamo reclamo) {
         Prioridad base = reclamo.getCategoria().getPrioridadBase();
-        SugerenciaPrioridad sugerencia = cliente.sugerir(reclamo.getCategoria().getNombre(),
-                reclamo.getDescripcion());
+        SugerenciaPrioridad sugerencia = cliente.sugerir(categoriaParaLaIA(reclamo), reclamo.getDescripcion());
         if (base.esMayorQue(sugerencia.prioridad())) {
             return new PrioridadCalculada(base, OrigenPrioridad.CATEGORIA, "La IA sugirió "
                     + sugerencia.prioridad() + "; se mantiene la prioridad de la categoría, que es mayor.");
         }
         return new PrioridadCalculada(sugerencia.prioridad(), OrigenPrioridad.IA, sugerencia.motivo());
+    }
+
+    /**
+     * La categoría que ve la IA. En "Otro problema" (PR 26) el nombre solo no dice nada, así que va con lo que
+     * escribió el vecino, recortado a lo que acepta REST 2.
+     */
+    public static String categoriaParaLaIA(Reclamo reclamo) {
+        String nombre = reclamo.getCategoria().getNombre();
+        if (!reclamo.getCategoria().esOtra() || reclamo.getCategoriaPropuesta() == null) {
+            return nombre;
+        }
+        String completa = nombre + ": " + reclamo.getCategoriaPropuesta();
+        return completa.length() <= MAXIMO_CATEGORIA ? completa
+                : completa.substring(0, MAXIMO_CATEGORIA - 1).stripTrailing() + "…";
     }
 }

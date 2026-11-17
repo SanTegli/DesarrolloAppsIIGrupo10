@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react'
 import { buscarDuplicados, crearReclamo } from '../api/reclamos.js'
 import { sugerirUbicaciones } from '../api/ubicaciones.js'
-import { enlaceMapa } from '../dominio/etiquetas.js'
+import { enlaceMapa, ordenarCategorias } from '../dominio/etiquetas.js'
 import { AvisoError } from './Aviso.jsx'
 import CandidatosDuplicados from './CandidatosDuplicados.jsx'
 
 const MAXIMO_DESCRIPCION = 1000
 const MAXIMO_DIRECCION = 200
+const MAXIMO_PROPUESTA = 80
 const MINIMO_BUSQUEDA = 3
 const NINGUNA = ''
 // Igual que el backend: JPEG o PNG, hasta 5 MB. El backend vuelve a validar el contenido real del archivo.
@@ -19,11 +20,14 @@ export const MAXIMO_FOTO = 5 * 1024 * 1024
  * una, y con eso queda elegido el municipio del reclamo. Es opcional: sin elegir (o si el mapa no responde), el
  * ciudadano elige el municipio de la lista, el reclamo se crea igual y la ubicación queda pendiente.
  * La foto es obligatoria: es la prueba del problema.
+ * Si ninguna categoría sirve, el vecino elige "Otro problema" y escribe qué tipo de problema es; la IA sugiere
+ * la categoría y un administrador lo recategoriza.
  * Si el ciudadano marcó el punto en el mapa, antes de crear se buscan reclamos abiertos parecidos a pocos
  * metros: si es el mismo problema, lo apoya en lugar de crear otro.
  */
 export default function FormularioReclamo({ categorias, municipios, onCreado, onApoyado = () => {} }) {
   const [categoriaId, setCategoriaId] = useState('')
+  const [propuesta, setPropuesta] = useState('')
   const [municipioManual, setMunicipioManual] = useState('')
   const [descripcion, setDescripcion] = useState('')
   const [direccion, setDireccion] = useState('')
@@ -132,6 +136,7 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
         descripcion: descripcion.trim(),
         direccion: direccion.trim(),
         foto,
+        categoriaPropuesta: categoria?.otra ? propuesta.trim() : undefined,
         ubicacion: sugerencia
           ? {
               latitud: sugerencia.latitud,
@@ -156,18 +161,37 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
         <span>Categoría</span>
         <select value={categoriaId} onChange={(evento) => setCategoriaId(evento.target.value)} required>
           <option value="">Elegí una categoría</option>
-          {categorias.map((opcion) => (
+          {ordenarCategorias(categorias).map((opcion) => (
             <option key={opcion.id} value={opcion.id}>
               {opcion.nombre}
             </option>
           ))}
         </select>
-        {categoria && (
+        {categoria && !categoria.otra && (
           <small>
             {categoria.descripcion}. Plazo de atención: {categoria.slaHoras} horas.
           </small>
         )}
       </label>
+
+      {categoria?.otra && (
+        <div className="campo-propuesta">
+          <label>
+            <span>¿Qué tipo de problema es?</span>
+            <input
+              type="text"
+              value={propuesta}
+              onChange={(evento) => setPropuesta(evento.target.value)}
+              maxLength={MAXIMO_PROPUESTA}
+              placeholder="Por ejemplo: baldosas levantadas"
+              required
+            />
+          </label>
+          <small className="ayuda-campo">
+            En pocas palabras. Con esto, el municipio le asigna la categoría que corresponde y el área que lo atiende.
+          </small>
+        </div>
+      )}
 
       <div className="campo-direccion">
         <label>

@@ -31,6 +31,10 @@ sigue, el ciudadano puede crear un reclamo nuevo.
 El vencimiento no es un estado. Un reclamo `INGRESADO`, `ASIGNADO` o `EN_PROCESO` que pasa su fecha
 límite queda marcado como vencido y sube un nivel de prioridad, sin cambiar de estado.
 
+La recategorización (PR 26) tampoco es una transición. Un administrador cambia la categoría de un reclamo
+`INGRESADO`, típicamente uno de "Otro problema". El historial suma un registro `INGRESADO → INGRESADO` con la
+categoría vieja y la nueva, y después el sistema intenta la asignación automática con la categoría nueva.
+
 ## Proceso de negocio
 
 Diagrama simplificado (BPMN simplificado como diagrama de flujo). Cada paso indica quién lo ejecuta.
@@ -49,7 +53,11 @@ flowchart TB
   C --> D{"¿Hay un área del municipio<br/>que atienda la categoría?"}
   D -- Sí --> E["Sistema: asigna el área"]
   D -- No --> F["Sistema: lo deja ingresado, sin área"]
-  F --> G{"Administrador:<br/>¿corresponde al municipio?"}
+  F --> OP{"¿Es Otro problema?"}
+  OP -- Sí --> SG["Sistema: la IA sugiere una categoría"]
+  SG --> RC["Administrador: recategoriza<br/>con la sugerida u otra"]
+  RC --> D
+  OP -- No --> G{"Administrador:<br/>¿corresponde al municipio?"}
   G -- No --> H(["Administrador: rechaza el reclamo"])
   G -- Sí --> I["Administrador: asigna un área a mano"]
   E --> J["Agente del área: toma el reclamo"]

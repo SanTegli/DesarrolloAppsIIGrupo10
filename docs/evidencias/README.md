@@ -15,7 +15,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 74 tests: capa de API, etiquetas y componentes
+npm test             # 87 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/*.test.mjs   # los scripts de la demo y de la carga, contra un sistema simulado
@@ -99,6 +99,13 @@ grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Geor
 | CP31 | Una ubicación fuera del municipio se rechaza | `UbicacionesIntegrationTest.elAltaConUnaUbicacionFueraDelMunicipioOIncompletaSeRechaza` | Solo por API: `POST /api/reclamos` con coordenadas de Córdoba. Responde 400 |
 | CP71 | La dirección elegida define el municipio, y Georef confirma el partido en el alta (PR 25) | `UbicacionesIntegrationTest.siGeorefUbicaElPuntoEnOtroMunicipioElAltaSeRechaza`, `siLaUbicacionInversaNoRespondeAlcanzaConElRecuadro`, `ServicioUbicacionesTest`, `FormularioReclamo.test.jsx` | En la interfaz, elegir la sugerencia de Wilde (Avellaneda): el formulario dice "Municipio: Avellaneda" y el reclamo queda en Avellaneda. Solo por API: `municipioId: 1` con coordenadas de Wilde dentro del recuadro de Quilmes responde 400 "queda en Avellaneda, no en Quilmes" |
 | CP72 | Cada municipio tiene sus áreas: no se asigna un área de otro municipio (PR 25) | `ReclamoTest.noSeAsignaAOtroMunicipio`, `AreaMunicipalTest.puedeAtender`, `DatosSemillaTest`, `DetalleReclamo.test.jsx` | Como Elena, abrir un reclamo de Avellaneda: **Asignar área** ofrece solo las de Avellaneda. Solo por API: `PATCH .../asignacion` con `areaId: 1` (Alumbrado de Quilmes) responde 409 |
+
+### Segunda Parte: "Otro problema" y recategorización (PR 26)
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP73 | "Otro problema" pide qué tipo de problema es, y la IA sugiere una categoría existente o ninguna, por la cola y sin datos del vecino | `SugerenciaCategoriaIntegrationTest`, `RecategorizacionTest`, `SugeridorCategoriaTest`, `CategoriaControllerTest`, `FormularioReclamo.test.jsx` | Como Ana, crear un reclamo de **Otro problema** con "Baldosas levantadas". Queda sin área. Como Elena, abrir el detalle: en unos segundos aparece "La IA sugiere Vereda rota: …" y la lista ya la tiene elegida. En RabbitMQ se ve la cola `reclamos.categoria`. Solo por API: el alta de "Otro problema" sin `categoriaPropuesta` responde 400 |
+| CP74 | El administrador recategoriza: plazo nuevo desde la creación, la prioridad no baja, queda en el historial, se asigna solo y el vecino recibe un aviso | `SugerenciaCategoriaIntegrationTest.elAdministradorRecategorizaYElReclamoSeAsignaSolo`, `soloElAdministradorRecategorizaYNoAOtroProblema`, `RecategorizacionTest`, `DetalleReclamo.test.jsx` | Como Elena, **Recategorizar** con la sugerida: el reclamo pasa a Vereda rota, `ASIGNADO` a Obras Públicas, fecha límite a 7 días de la creación. Ana ve el aviso "paso de Otro problema a Vereda rota". Solo por API: `PATCH .../categoria` con la sesión de Ana responde 403, a "Otro problema" o con el reclamo asignado, 409 |
 
 ### Segunda Parte: avisos por correo con RabbitMQ
 
@@ -224,6 +231,9 @@ categoría" (la API simulada no llama a la IA) y la verificación del teléfono 
 | [13-ciudadano-cerrado](interfaz/13-ciudadano-cerrado.png) | Flujo completo: el ciudadano confirmó la solución; historial de cinco pasos y avisos | CP08 |
 | [14-avisos-ciudadano](interfaz/14-avisos-ciudadano.png) | Pestaña Avisos: lo que recibió el usuario, con enlace a cada reclamo | CP14 |
 | [15-tablero-publico](interfaz/15-tablero-publico.png) | Tablero público desde la pantalla de ingreso, sin sesión | CP63 |
+| [16-otro-problema-alta](interfaz/16-otro-problema-alta.png) | Ciudadano: "Otro problema" con el tipo de problema escrito (PR 26) | CP73 |
+| [17-otro-problema-sugerencia-ia](interfaz/17-otro-problema-sugerencia-ia.png) | Administrador: la categoría que sugirió la IA, ya elegida para recategorizar. La API simulada sugiere con reglas, no con IA | CP73, CP74 |
+| [18-otro-problema-recategorizado](interfaz/18-otro-problema-recategorizado.png) | Recategorizado: plazo nuevo, asignado solo a Obras Públicas, historial y avisos | CP74 |
 
 Para volver a tomarlas: `npm run mock` y `npm run dev` en `frontend/`, y el mismo recorrido a mano.
 
@@ -249,7 +259,7 @@ node capturas-evidencias.mjs
 
 El script crea datos de prueba en cada corrida:
 
-- Dos reclamos de Ana y uno de Bruno.
+- Tres reclamos de Ana (uno de "Otro problema", que Elena recategoriza) y uno de Bruno.
 - Una cuenta nueva.
 - Un apoyo de Ana.
 - El reclamo de Ana pasa por tomar, resolver, reabrir, resolver y cerrar.
@@ -268,6 +278,7 @@ para seguir el recorrido.
 | `17` a `20`: sin asignar, asignación manual, cuenta bloqueada | CP06, CP18, CP51 |
 | `21` y `22`: tableros | CP63, CP65 |
 | `23` a `27`: Swagger de REST 2 con Gemini, WSDL, Mailpit y RabbitMQ | CP16, CP22, CP33, CP36 |
+| `28` a `30`: "Otro problema", la sugerencia de la IA y la recategorización (PR 26) | CP73, CP74 |
 
 ## Pendiente antes de entregar
 

@@ -1,5 +1,10 @@
 package ar.edu.uade.reclamos.aplicacion.configuracion;
 
+import ar.edu.uade.reclamos.aplicacion.categoria.ListenerSugerenciaCategoria;
+import ar.edu.uade.reclamos.aplicacion.categoria.OutboxSugerenciasCategoria;
+import ar.edu.uade.reclamos.aplicacion.categoria.ServicioSugerenciaCategoria;
+import ar.edu.uade.reclamos.aplicacion.categoria.SolicitudesSugerenciaCategoria;
+import ar.edu.uade.reclamos.aplicacion.categoria.TopologiaSugerenciaCategoria;
 import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
 import ar.edu.uade.reclamos.aplicacion.mensajeria.BrokerMensajes;
 import ar.edu.uade.reclamos.aplicacion.mensajeria.BrokerRabbit;
@@ -12,6 +17,7 @@ import ar.edu.uade.reclamos.aplicacion.prioridad.ServicioReevaluacionPrioridad;
 import ar.edu.uade.reclamos.aplicacion.prioridad.SolicitudesReevaluacion;
 import ar.edu.uade.reclamos.aplicacion.prioridad.TopologiaReevaluacion;
 import ar.edu.uade.reclamos.dominio.evento.PublicadorEventos;
+import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MensajeSalienteRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,7 +44,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
  *
  * <p>Las colas, la cola de errores y los reintentos de los avisos son del consumidor
  * ({@code servicio-notificaciones}). Las de la reevaluación de prioridad son del backend, que en ese caso es
- * productor y consumidor a la vez ({@link TopologiaReevaluacion}).
+ * productor y consumidor a la vez ({@link TopologiaReevaluacion}), igual que las de la sugerencia de categoría
+ * ({@link TopologiaSugerenciaCategoria}, PR 26).
  */
 @Configuration(proxyBeanMethods = false)
 public class ConfiguracionMensajeria {
@@ -65,6 +72,20 @@ public class ConfiguracionMensajeria {
             return SolicitudesReevaluacion.NINGUNA;
         }
         return new OutboxReevaluaciones(mensajes.getObject(), json.getIfAvailable(ObjectMapper::new), reloj);
+    }
+
+    /**
+     * Los pedidos de sugerencia de categoría para "Otro problema" (PR 26). Sin la estrategia {@code ia} o sin
+     * mensajería no hay sugerencia ({@link SolicitudesSugerenciaCategoria#NINGUNA}): el administrador elige solo.
+     */
+    @Bean
+    public SolicitudesSugerenciaCategoria solicitudesSugerenciaCategoria(
+            PropiedadesReclamos propiedades, ObjectProvider<MensajeSalienteRepository> mensajes,
+            ObjectProvider<ObjectMapper> json, Clock reloj) {
+        if (!propiedades.sugiereCategoriaConIA()) {
+            return SolicitudesSugerenciaCategoria.NINGUNA;
+        }
+        return new OutboxSugerenciasCategoria(mensajes.getObject(), json.getIfAvailable(ObjectMapper::new), reloj);
     }
 
     /** {@code @EnableScheduling} acá también: la tarea de vencimientos, que lo declara, se puede apagar. */
@@ -126,6 +147,43 @@ public class ConfiguracionMensajeria {
         public ListenerReevaluacionPrioridad listenerReevaluacionPrioridad(ServicioReevaluacionPrioridad servicio,
                                                                            ObjectProvider<ObjectMapper> json) {
             return new ListenerReevaluacionPrioridad(servicio, json.getIfAvailable(ObjectMapper::new));
+        }
+    }
+
+    /**
+     * Sugerencia de categoría por la cola (PR 26): con la mensajería encendida, la estrategia {@code ia} y
+     * {@code reclamos.prioridad.ia.sugerir-categoria} (la misma condición que
+     * {@link PropiedadesReclamos#sugiereCategoriaConIA()}). Usa los tiempos e intentos de la reevaluación.
+     */
+    @Configuration(proxyBeanMethods = false)
+    @ConditionalOnExpression("${reclamos.mensajeria.habilitada:false} "
+            + "and '${reclamos.prioridad.estrategia:categoria}' == 'ia' "
+            + "and ${reclamos.prioridad.ia.sugerir-categoria:true}")
+    static class ConSugerenciaCategoria {
+
+        @Bean
+        public Declarables topologiaSugerenciaCategoria(PropiedadesReclamos propiedades) {
+            return TopologiaSugerenciaCategoria.declarar(propiedades.prioridad().ia().reevaluacion().espera());
+        }
+
+        /** Con su propio cliente y su propio circuito, como el de la reevaluación. */
+        @Bean
+        public ServicioSugerenciaCategoria servicioSugerenciaCategoria(PropiedadesReclamos propiedades,
+                                                                       ReclamoRepository reclamos,
+                                                                       CategoriaRepository categorias,
+                                                                       SolicitudesSugerenciaCategoria solicitudes,
+                                                                       PublicadorEventos eventos, Clock reloj) {
+            PropiedadesReclamos.Ia ia = propiedades.prioridad().ia();
+            ClienteServicioPrioridad cliente = ClienteServicioPrioridad.crear(ia.url(), ia.tiempoConexion(),
+                    ia.reevaluacion().tiempoRespuesta(), ia.circuito().llamadas(), ia.circuito().espera());
+            return new ServicioSugerenciaCategoria(reclamos, categorias, cliente, solicitudes, eventos, reloj,
+                    ia.reevaluacion().intentos());
+        }
+
+        @Bean
+        public ListenerSugerenciaCategoria listenerSugerenciaCategoria(ServicioSugerenciaCategoria servicio,
+                                                                       ObjectProvider<ObjectMapper> json) {
+            return new ListenerSugerenciaCategoria(servicio, json.getIfAvailable(ObjectMapper::new));
         }
     }
 }

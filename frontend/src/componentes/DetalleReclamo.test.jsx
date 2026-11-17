@@ -1,7 +1,7 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { AREAS, TOKEN_CSRF, USUARIOS, reclamo, simularApi } from '../pruebas/apiFalsa.js'
+import { AREAS, CATEGORIAS, TOKEN_CSRF, USUARIOS, reclamo, simularApi } from '../pruebas/apiFalsa.js'
 import DetalleReclamo from './DetalleReclamo.jsx'
 
 const [ana, carla, elena] = USUARIOS
@@ -9,8 +9,22 @@ const RUTA = '/api/reclamos/REC-4F2A91BC'
 
 function mostrar(usuario, rutas) {
   const llamadas = simularApi({ [`GET ${RUTA}/notificaciones`]: [], ...rutas })
-  render(<DetalleReclamo usuario={usuario} numero="REC-4F2A91BC" areas={AREAS} onVolver={vi.fn()} />)
+  render(
+    <DetalleReclamo usuario={usuario} numero="REC-4F2A91BC" areas={AREAS} categorias={CATEGORIAS} onVolver={vi.fn()} />,
+  )
   return llamadas
+}
+
+/** Un reclamo de "Otro problema" recién ingresado, con lo que escribió Ana. */
+function deOtroProblema(cambios = {}) {
+  return reclamo({
+    estado: 'INGRESADO',
+    area: null,
+    categoria: { id: 8, nombre: 'Otro problema' },
+    categoriaPropuesta: 'Baldosas levantadas',
+    accionesDisponibles: ['ASIGNADO', 'RECHAZADO'],
+    ...cambios,
+  })
 }
 
 describe('DetalleReclamo', () => {
@@ -253,5 +267,82 @@ describe('DetalleReclamo', () => {
     })
 
     expect(await screen.findByRole('alert')).toHaveTextContent('El usuario no puede consultar este reclamo.')
+  })
+
+  it('el vecino ve el tipo de problema que escribió, sin la parte de recategorizar', async () => {
+    mostrar(ana, { [`GET ${RUTA}`]: deOtroProblema({ accionesDisponibles: ['CANCELADO'], motivoSugerencia: 'Es la vereda.' }) })
+
+    expect(await screen.findByText('“Baldosas levantadas”, en palabras del vecino')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Cambiar la categoría')).not.toBeInTheDocument()
+  })
+
+  it('el administrador ve la sugerencia de la IA ya elegida y recategoriza con un clic', async () => {
+    let estado = deOtroProblema({
+      categoriaSugerida: { id: 7, nombre: 'Vereda rota' },
+      motivoSugerencia: 'Las baldosas sueltas son de la vereda.',
+    })
+    const llamadas = mostrar(elena, {
+      [`GET ${RUTA}`]: () => estado,
+      [`PATCH ${RUTA}/categoria`]: () => {
+        estado = reclamo({ categoria: { id: 7, nombre: 'Vereda rota' }, area: { id: 2, nombre: 'Obras Públicas' } })
+        return estado
+      },
+    })
+    const usuario = userEvent.setup()
+
+    expect(await screen.findByText(/La IA sugiere/)).toHaveTextContent(
+      'La IA sugiere Vereda rota: Las baldosas sueltas son de la vereda.',
+    )
+    const selector = screen.getByLabelText('Cambiar la categoría')
+    expect(selector).toHaveValue('7')
+    expect(within(selector).getByRole('option', { name: 'Vereda rota (sugerida por la IA)' })).toBeInTheDocument()
+    // Ni "Otro problema" ni la categoría actual.
+    expect(within(selector).queryByRole('option', { name: 'Otro problema' })).not.toBeInTheDocument()
+    await usuario.type(screen.getByLabelText('Observación (opcional)'), 'Como sugirió la IA')
+    await usuario.click(screen.getByRole('button', { name: 'Recategorizar' }))
+
+    expect(await screen.findByText('El reclamo ahora es de Vereda rota.')).toBeInTheDocument()
+    const cambio = llamadas.find((llamada) => llamada.ruta.endsWith('/categoria'))
+    expect(cambio).toMatchObject({
+      metodo: 'PATCH',
+      csrf: TOKEN_CSRF,
+      cuerpo: { categoriaId: 7, observacion: 'Como sugirió la IA' },
+    })
+    expect(screen.queryByLabelText('Cambiar la categoría')).not.toBeInTheDocument()
+  })
+
+  it('si la IA no sugirió ninguna, el administrador elige y lo dice', async () => {
+    mostrar(elena, { [`GET ${RUTA}`]: deOtroProblema({ motivoSugerencia: 'No se parece a ninguna.' }) })
+
+    expect(await screen.findByText('La IA no sugirió ninguna categoría: No se parece a ninguna.')).toBeInTheDocument()
+    expect(screen.getByLabelText('Cambiar la categoría')).toHaveValue('')
+  })
+
+  it('mientras la IA analiza la categoría, consulta de nuevo y muestra la sugerencia cuando llega', async () => {
+    const esperando = deOtroProblema()
+    const sugerido = deOtroProblema({ categoriaSugerida: { id: 7, nombre: 'Vereda rota' }, motivoSugerencia: 'Vereda.' })
+    const respuestas = [esperando, esperando]
+    simularApi({ [`GET ${RUTA}`]: () => respuestas.shift() ?? sugerido, [`GET ${RUTA}/notificaciones`]: [] })
+    render(
+      <DetalleReclamo
+        usuario={elena}
+        numero="REC-4F2A91BC"
+        areas={AREAS}
+        categorias={CATEGORIAS}
+        onVolver={vi.fn()}
+        revisionIA={{ cada: 10, intentos: 5 }}
+      />,
+    )
+
+    expect(await screen.findByText('La IA todavía está analizando qué categoría corresponde.')).toBeInTheDocument()
+    expect(await screen.findByText(/La IA sugiere/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Cambiar la categoría')).toHaveValue('7')
+  })
+
+  it('con el reclamo ya asignado no se ofrece recategorizar', async () => {
+    mostrar(elena, { [`GET ${RUTA}`]: reclamo({ accionesDisponibles: ['ASIGNADO'] }) })
+
+    expect(await screen.findByLabelText('Reasignar área')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Cambiar la categoría')).not.toBeInTheDocument()
   })
 })

@@ -1,5 +1,6 @@
 package ar.edu.uade.reclamos.dominio.fabrica;
 
+import ar.edu.uade.reclamos.comun.excepcion.DatosInvalidosException;
 import ar.edu.uade.reclamos.comun.excepcion.ReglaNegocioException;
 import ar.edu.uade.reclamos.comun.validacion.Validador;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
@@ -34,6 +35,16 @@ public class ReclamoFactory {
 
     public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Municipio municipio, String descripcion,
                          String direccion) {
+        return crear(ciudadano, categoria, municipio, descripcion, direccion, null);
+    }
+
+    /**
+     * Igual que {@link #crear(Ciudadano, Categoria, Municipio, String, String)}, con lo que escribió el vecino
+     * sobre el tipo de problema. Es obligatorio si la categoría es "otra" y se ignora en las demás: el
+     * formulario lo pide solo para "Otro problema".
+     */
+    public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Municipio municipio, String descripcion,
+                         String direccion, String categoriaPropuesta) {
         Validador.requerirNoNulo(ciudadano, "ciudadano");
         Validador.requerirNoNulo(categoria, "categoría");
         Validador.requerirNoNulo(municipio, "municipio");
@@ -42,8 +53,16 @@ public class ReclamoFactory {
         }
         LocalDateTime ahora = LocalDateTime.now(reloj).truncatedTo(ChronoUnit.SECONDS);
         LocalDateTime fechaLimite = ahora.plusHours(categoria.getSlaHoras());
-        return new Reclamo(generarNumero(), ciudadano, categoria, municipio, descripcion, direccion,
+        if (categoria.esOtra() && (categoriaPropuesta == null || categoriaPropuesta.isBlank())) {
+            throw new DatosInvalidosException("Elegiste \"" + categoria.getNombre()
+                    + "\": contanos qué tipo de problema es.");
+        }
+        Reclamo reclamo = new Reclamo(generarNumero(), ciudadano, categoria, municipio, descripcion, direccion,
                 categoria.getPrioridadBase(), ahora, fechaLimite);
+        if (categoria.esOtra()) {
+            reclamo.proponerCategoria(categoriaPropuesta.strip());
+        }
+        return reclamo;
     }
 
     /** Formato REC-XXXXXXXX: prefijo más ocho caracteres hexadecimales en mayúscula. */
