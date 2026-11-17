@@ -5,7 +5,7 @@ import { AvisoError } from './Aviso.jsx'
 
 /**
  * Bandeja de avisos del usuario actual. Es donde un agente se entera de que a su área le
- * asignaron un reclamo, y donde el ciudadano ve las novedades de los suyos.
+ * asignaron un reclamo, y donde el ciudadano ve las novedades de los suyos y de los que apoya.
  */
 export default function BandejaAvisos({ usuario, onAbrir }) {
   const { datos, error, cargando, recargar } = useCarga(() => listarAvisos(), [usuario.id])
@@ -42,9 +42,16 @@ export default function BandejaAvisos({ usuario, onAbrir }) {
                   <td className="sin-corte">{formatearFecha(aviso.fechaEnvio)}</td>
                   <td>{aviso.mensaje}</td>
                   <td>
-                    <button type="button" className="enlace" onClick={() => onAbrir(aviso.numeroReclamo)}>
-                      {aviso.numeroReclamo}
-                    </button>
+                    {aviso.abrible === false ? (
+                      // Un reclamo ajeno que el vecino apoya (PR 27): recibe los avisos, pero el detalle es del autor.
+                      <span title="Es un reclamo de otro vecino que apoyás">
+                        {aviso.numeroReclamo} <small className="secundario">(lo apoyás)</small>
+                      </span>
+                    ) : (
+                      <button type="button" className="enlace" onClick={() => onAbrir(aviso.numeroReclamo)}>
+                        {aviso.numeroReclamo}
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

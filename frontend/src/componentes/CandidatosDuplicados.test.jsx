@@ -30,8 +30,14 @@ function candidato(cambios = {}) {
     cantidadApoyos: 2,
     apoyadoPorMi: false,
     propio: false,
+    categoria: { id: 1, nombre: 'Luminaria rota' },
+    masParecido: false,
     ...cambios,
   }
+}
+
+function sinIA(candidatos) {
+  return { comparadoPorIA: false, motivo: null, candidatos }
 }
 
 function mostrar(rutas) {
@@ -59,7 +65,7 @@ const crearBoton = () => screen.getByRole('button', { name: 'Crear reclamo' })
 describe('Posibles duplicados en el alta', () => {
   it('antes de crear muestra los reclamos parecidos cercanos, sin el nombre del autor', async () => {
     const { llamadas, onCreado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': [candidato()],
+      'POST /api/reclamos/candidatos-duplicados': sinIA([candidato()]),
     })
 
     await completarConElMapa(usuario)
@@ -75,23 +81,25 @@ describe('Posibles duplicados en el alta', () => {
     )
     expect(crearBoton()).toBeDisabled()
     expect(onCreado).not.toHaveBeenCalled()
-    expect(llamadas.find((llamada) => llamada.ruta === '/api/reclamos/candidatos-duplicados').consulta).toEqual({
-      categoriaId: '1',
-      latitud: String(BERNAL.latitud),
-      longitud: String(BERNAL.longitud),
+    const busqueda = llamadas.find((llamada) => llamada.ruta === '/api/reclamos/candidatos-duplicados')
+    expect(busqueda).toMatchObject({
+      metodo: 'POST',
+      csrf: TOKEN_CSRF,
+      cuerpo: { categoriaId: 1, descripcion: 'Farol apagado', latitud: BERNAL.latitud, longitud: BERNAL.longitud },
     })
-    expect(llamadas.some((llamada) => llamada.metodo === 'POST')).toBe(false)
+    expect(within(panel).getByText(/Ya hay un reclamo abierto de la misma categoría/)).toBeInTheDocument()
+    expect(llamadas.some((llamada) => llamada.ruta === '/api/reclamos' && llamada.metodo === 'POST')).toBe(false)
   })
 
-  it('"Es el mismo: apoyar" suma el apoyo y no crea un reclamo', async () => {
+  it('"Es el mismo: asociarme" suma el apoyo y no crea un reclamo', async () => {
     const { llamadas, onApoyado, onCreado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': [candidato()],
+      'POST /api/reclamos/candidatos-duplicados': sinIA([candidato()]),
       'POST /api/reclamos/REC-AAAA1111/apoyo': { numero: 'REC-AAAA1111', cantidadApoyos: 3, apoyado: true },
     })
 
     await completarConElMapa(usuario)
     await usuario.click(crearBoton())
-    await usuario.click(await screen.findByRole('button', { name: 'Es el mismo: apoyar REC-AAAA1111' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Es el mismo: asociarme a REC-AAAA1111' }))
 
     expect(onApoyado).toHaveBeenCalledWith('REC-AAAA1111')
     expect(onCreado).not.toHaveBeenCalled()
@@ -102,7 +110,7 @@ describe('Posibles duplicados en el alta', () => {
 
   it('"Es otro problema: continuar" crea el reclamo y no vuelve a preguntar', async () => {
     const { llamadas, onCreado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': [candidato()],
+      'POST /api/reclamos/candidatos-duplicados': sinIA([candidato()]),
       'POST /api/reclamos': { status: 201, cuerpo: reclamo() },
     })
 
@@ -120,10 +128,10 @@ describe('Posibles duplicados en el alta', () => {
 
   it('un reclamo propio no se puede apoyar y uno ya apoyado se puede quitar', async () => {
     const { llamadas, onApoyado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': [
+      'POST /api/reclamos/candidatos-duplicados': sinIA([
         candidato({ numero: 'REC-PROPIO01', propio: true, foto: null, cantidadApoyos: 0 }),
         candidato({ apoyadoPorMi: true, cantidadApoyos: 1 }),
-      ],
+      ]),
       'DELETE /api/reclamos/REC-AAAA1111/apoyo': { numero: 'REC-AAAA1111', cantidadApoyos: 0, apoyado: false },
     })
 
@@ -134,19 +142,19 @@ describe('Posibles duplicados en el alta', () => {
     expect(within(panel).getByText('Es un reclamo tuyo.')).toBeInTheDocument()
     expect(within(panel).getByText('Sin foto')).toBeInTheDocument()
     expect(within(panel).getByText(/Nadie lo apoyó todavía/)).toBeInTheDocument()
-    expect(within(panel).queryAllByRole('button', { name: /Es el mismo: apoyar/ })).toHaveLength(0)
-    expect(within(panel).getByText('Ya lo apoyás')).toBeInTheDocument()
+    expect(within(panel).queryAllByRole('button', { name: /Es el mismo: asociarme/ })).toHaveLength(0)
+    expect(within(panel).getByText('Ya estás asociado')).toBeInTheDocument()
 
-    await usuario.click(within(panel).getByRole('button', { name: 'Quitar apoyo' }))
+    await usuario.click(within(panel).getByRole('button', { name: 'Quitar asociación' }))
 
-    expect(await within(panel).findByRole('button', { name: 'Es el mismo: apoyar REC-AAAA1111' })).toBeInTheDocument()
+    expect(await within(panel).findByRole('button', { name: 'Es el mismo: asociarme a REC-AAAA1111' })).toBeInTheDocument()
     expect(llamadas.find((llamada) => llamada.metodo === 'DELETE')).toMatchObject({ csrf: TOKEN_CSRF })
     expect(onApoyado).not.toHaveBeenCalled()
   })
 
   it('sin punto en el mapa, o sin candidatos, crea directo', async () => {
     const { llamadas, onCreado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': [],
+      'POST /api/reclamos/candidatos-duplicados': sinIA([]),
       'POST /api/reclamos': { status: 201, cuerpo: reclamo() },
     })
 
@@ -160,7 +168,7 @@ describe('Posibles duplicados en el alta', () => {
 
   it('si la búsqueda de duplicados falla, el alta sigue', async () => {
     const { onCreado, usuario } = mostrar({
-      'GET /api/reclamos/candidatos-duplicados': { status: 500, cuerpo: { status: 500, codigo: 'ERROR_INTERNO', mensaje: 'x', detalles: [] } },
+      'POST /api/reclamos/candidatos-duplicados': { status: 500, cuerpo: { status: 500, codigo: 'ERROR_INTERNO', mensaje: 'x', detalles: [] } },
       'POST /api/reclamos': { status: 201, cuerpo: reclamo() },
     })
 
@@ -168,5 +176,48 @@ describe('Posibles duplicados en el alta', () => {
     await usuario.click(crearBoton())
 
     await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
+  })
+
+  it('con la IA, el más parecido va primero y marcado, aunque sea de otra categoría', async () => {
+    const { usuario } = mostrar({
+      'POST /api/reclamos/candidatos-duplicados': {
+        comparadoPorIA: true,
+        motivo: 'Los dos hablan del mismo farol apagado.',
+        candidatos: [
+          candidato({ numero: 'REC-OTRO0001', categoria: { id: 8, nombre: 'Otro problema' }, masParecido: true }),
+          candidato(),
+        ],
+      },
+    })
+
+    await completarConElMapa(usuario)
+    await usuario.click(crearBoton())
+
+    const panel = await screen.findByRole('region', { name: '¿Es alguno de estos?' })
+    expect(within(panel).getByText(/La IA cree que el reclamo REC-OTRO0001 es el mismo problema/)).toHaveTextContent(
+      'Los dos hablan del mismo farol apagado.',
+    )
+    const tarjetas = within(panel).getAllByRole('listitem')
+    expect(tarjetas[0]).toHaveClass('mas-parecido')
+    expect(within(tarjetas[0]).getByText('El mismo problema, según la IA')).toBeInTheDocument()
+    expect(within(tarjetas[0]).getByText('Otro problema')).toBeInTheDocument()
+    expect(within(tarjetas[1]).queryByText('El mismo problema, según la IA')).not.toBeInTheDocument()
+    expect(within(tarjetas[0]).getByRole('button', { name: /asociarme/ })).toHaveClass('boton-primario')
+    expect(within(tarjetas[1]).getByRole('button', { name: /asociarme/ })).toHaveClass('boton-secundario')
+  })
+
+  it('si la IA dice que ninguno es el mismo, lo explica y muestra los de la misma categoría', async () => {
+    const { usuario } = mostrar({
+      'POST /api/reclamos/candidatos-duplicados': {
+        comparadoPorIA: true,
+        motivo: 'Son problemas distintos.',
+        candidatos: [candidato()],
+      },
+    })
+
+    await completarConElMapa(usuario)
+    await usuario.click(crearBoton())
+
+    expect(await screen.findByText(/La IA no encontró el mismo problema, pero hay un reclamo abierto/)).toBeInTheDocument()
   })
 })

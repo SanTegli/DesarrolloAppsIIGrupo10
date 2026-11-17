@@ -2,13 +2,18 @@ openapi: 3.1.0
 info:
   title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
   description: "Sugiere la prioridad de un reclamo a partir de su categoría y su descripció\
-    n con un modelo de lenguaje externo (Gemini u OpenAI) y, desde la 1.1, la categorí\
-    a de un reclamo cargado como \"Otro problema\". No recibe datos personales."
-  version: 1.1.0
+    n con un modelo de lenguaje externo (Gemini u OpenAI). Desde la 1.1 sugiere la\
+    \ categoría de un reclamo cargado como \"Otro problema\", y desde la 1.2 dice\
+    \ si alguno de los reclamos cercanos es el mismo problema que uno nuevo. No recibe\
+    \ datos personales."
+  version: 1.2.0
 servers:
 - url: http://localhost
   description: Generated server url
 tags:
+- name: Duplicados
+  description: "Reclamo cercano que describe el mismo problema, según un modelo de\
+    \ lenguaje"
 - name: Categorías
   description: Categoría sugerida por un modelo de lenguaje para un reclamo de "Otro
     problema"
@@ -39,6 +44,53 @@ paths:
                 $ref: "#/components/schemas/EvaluacionResponse"
         "400":
           description: Entrada inválida (DATOS_INVALIDOS)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: El modelo respondió algo inválido (RESPUESTA_INVALIDA)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "Proveedor caído, sin clave o sin cuota (PROVEEDOR_NO_DISPONIBLE)"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/duplicados/comparar:
+    post:
+      tags:
+      - Duplicados
+      summary: Comparar un reclamo nuevo con los reclamos abiertos cercanos
+      description: "Le pide al modelo configurado cuál de los candidatos describe\
+        \ el mismo problema, o ninguno, con una explicación breve. Solo compara texto:\
+        \ categoría y descripción."
+      operationId: comparar
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComparacionDuplicadosRequest"
+        required: true
+      responses:
+        "200":
+          description: "El id del candidato más parecido, o null si ninguno es el\
+            \ mismo"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ComparacionDuplicadosResponse"
+        "400":
+          description: Entrada inválida o ids repetidos (DATOS_INVALIDOS)
           content:
             '*/*':
               schema:
@@ -185,6 +237,84 @@ components:
       - modelo
       - motivo
       - prioridad
+      - proveedor
+    Candidato:
+      type: object
+      properties:
+        id:
+          type: string
+          example: 1
+          maxLength: 20
+          minLength: 0
+          pattern: "[A-Za-z0-9_-]+"
+        categoria:
+          type: string
+          example: Otro problema
+          maxLength: 80
+          minLength: 0
+        descripcion:
+          type: string
+          example: "No hay luz en la esquina, el poste está apagado"
+          maxLength: 1000
+          minLength: 0
+      required:
+      - categoria
+      - descripcion
+      - id
+    ComparacionDuplicadosRequest:
+      type: object
+      properties:
+        nuevo:
+          $ref: "#/components/schemas/Reclamo"
+        candidatos:
+          type: array
+          items:
+            $ref: "#/components/schemas/Candidato"
+          maxItems: 10
+          minItems: 0
+      required:
+      - candidatos
+      - nuevo
+    Reclamo:
+      type: object
+      properties:
+        categoria:
+          type: string
+          example: Luminaria rota
+          maxLength: 80
+          minLength: 0
+        descripcion:
+          type: string
+          example: El farol de la esquina no prende hace tres días
+          maxLength: 1000
+          minLength: 0
+      required:
+      - categoria
+      - descripcion
+    ComparacionDuplicadosResponse:
+      type: object
+      properties:
+        similar:
+          type: string
+          description: null si ningún candidato es el mismo problema
+          example: 1
+        motivo:
+          type: string
+          example: Los dos hablan del mismo farol apagado en la esquina.
+          maxLength: 300
+        proveedor:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - simulado
+          example: gemini
+        modelo:
+          type: string
+          example: gemini-3.5-flash-lite
+      required:
+      - modelo
+      - motivo
       - proveedor
     SugerenciaCategoriaRequest:
       type: object

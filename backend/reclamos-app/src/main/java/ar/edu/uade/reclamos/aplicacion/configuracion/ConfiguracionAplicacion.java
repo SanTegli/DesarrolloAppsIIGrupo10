@@ -9,6 +9,8 @@ import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorCategoria;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorIA;
 import ar.edu.uade.reclamos.aplicacion.estrategia.PrioridadPorPalabrasClave;
 import ar.edu.uade.reclamos.aplicacion.integracion.ClienteServicioPrioridad;
+import ar.edu.uade.reclamos.aplicacion.integracion.ComparadorDuplicados;
+import ar.edu.uade.reclamos.aplicacion.integracion.ComparadorDuplicadosPorIA;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaLocal;
 import ar.edu.uade.reclamos.aplicacion.integracion.CoberturaSoap;
 import ar.edu.uade.reclamos.aplicacion.integracion.GeocodificadorConCache;
@@ -71,6 +73,17 @@ public class ConfiguracionAplicacion {
             default -> throw new IllegalArgumentException(
                     "reclamos.prioridad.estrategia debe ser categoria, palabras-clave o ia");
         };
+    }
+
+    /**
+     * PR 27: con la estrategia {@code ia}, los posibles duplicados del alta se comparan con REST 2. Usa su propio
+     * cliente (y su propio circuito), con el mismo tiempo que el alta: el vecino está esperando.
+     */
+    @Bean
+    public ComparadorDuplicados comparadorDuplicados(PropiedadesReclamos propiedades) {
+        return propiedades.comparaDuplicadosConIA()
+                ? new ComparadorDuplicadosPorIA(clienteIA(propiedades.prioridad().ia()))
+                : ComparadorDuplicados.NINGUNO;
     }
 
     /** El cliente del alta: espera poco, porque el ciudadano está esperando. */

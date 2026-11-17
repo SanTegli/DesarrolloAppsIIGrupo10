@@ -100,6 +100,19 @@ public class ReclamoController {
                 .map(mapper::candidato).toList();
     }
 
+    /**
+     * PR 27: los posibles duplicados para el alta, con el texto del reclamo nuevo. Busca reclamos abiertos a 50 m
+     * de cualquier categoría y, con la IA, marca el que describe el mismo problema. Sin datos del autor.
+     */
+    @Operation(summary = "Posibles duplicados del alta, comparados por la IA con el texto del reclamo nuevo")
+    @PostMapping("/candidatos-duplicados")
+    public DuplicadosDelAltaResponse duplicadosDelAlta(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @Valid @RequestBody BuscarDuplicadosRequest request) {
+        return mapper.duplicadosDelAlta(facade.duplicadosDelAlta(usuario.id(), request.categoriaId(),
+                request.descripcion(), request.latitud(), request.longitud()));
+    }
+
     /** "A mí también me pasa". Idempotente: apoyar dos veces deja un solo apoyo. */
     @Operation(summary = "Apoyar el reclamo de otro vecino (solo ciudadanos)")
     @PostMapping("/{numero}/apoyo")

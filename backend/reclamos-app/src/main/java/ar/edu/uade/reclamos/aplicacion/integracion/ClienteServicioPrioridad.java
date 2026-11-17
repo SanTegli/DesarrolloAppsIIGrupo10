@@ -39,6 +39,7 @@ public class ClienteServicioPrioridad {
 
     static final String RUTA = "/api/prioridades/evaluar";
     static final String RUTA_CATEGORIA = "/api/categorias/sugerir";
+    static final String RUTA_DUPLICADOS = "/api/duplicados/comparar";
     private static final Logger LOGGER = LoggerFactory.getLogger(ClienteServicioPrioridad.class);
 
     record Pedido(String categoria, String descripcion) { }
@@ -48,6 +49,15 @@ public class ClienteServicioPrioridad {
     record PedidoCategoria(String categoriaPropuesta, String descripcion, List<String> categorias) { }
 
     record RespuestaCategoria(String categoria, String motivo, String proveedor, String modelo) { }
+
+    record TextoReclamo(String categoria, String descripcion) { }
+
+    /** Un reclamo cercano, como se le manda a REST 2: un id elegido por quien llama, categoría y descripción. */
+    public record TextoCandidato(String id, String categoria, String descripcion) { }
+
+    record PedidoDuplicados(TextoReclamo nuevo, List<TextoCandidato> candidatos) { }
+
+    record RespuestaDuplicados(String similar, String motivo, String proveedor, String modelo) { }
 
     private final RestClient http;
     private final CircuitBreaker circuito;
@@ -112,6 +122,22 @@ public class ClienteServicioPrioridad {
         }
     }
 
+    /**
+     * PR 27: cuál de los reclamos cercanos describe el mismo problema que el nuevo. Solo texto.
+     *
+     * @return el id del más parecido, o {@code null} si ninguno, con el motivo
+     * @throws ServicioExternoNoDisponibleException igual que {@link #sugerir}, y si elige un id que no se mandó
+     */
+    public ComparacionDuplicados compararDuplicados(String categoria, String descripcion,
+                                                    List<TextoCandidato> candidatos) {
+        try {
+            return circuito.executeSupplier(() -> llamarDuplicados(categoria, descripcion, candidatos));
+        } catch (CallNotPermittedException abierto) {
+            throw new ServicioExternoNoDisponibleException(
+                    "El servicio de prioridad falló varias veces seguidas; el circuito está abierto", abierto);
+        }
+    }
+
     public CircuitBreaker.State estadoCircuito() {
         return circuito.getState();
     }
@@ -143,6 +169,21 @@ public class ClienteServicioPrioridad {
         }
         return new SugerenciaCategoria(respuesta.categoria(), acotar(respuesta.motivo()), respuesta.proveedor(),
                 respuesta.modelo());
+    }
+
+    private ComparacionDuplicados llamarDuplicados(String categoria, String descripcion,
+                                                   List<TextoCandidato> candidatos) {
+        RespuestaDuplicados respuesta = enviar(RUTA_DUPLICADOS,
+                new PedidoDuplicados(new TextoReclamo(categoria, descripcion), candidatos), RespuestaDuplicados.class);
+        if (respuesta == null || respuesta.motivo() == null || respuesta.motivo().isBlank()) {
+            throw new ServicioExternoNoDisponibleException("El servicio de prioridad respondió incompleto");
+        }
+        if (respuesta.similar() != null
+                && candidatos.stream().noneMatch(candidato -> candidato.id().equals(respuesta.similar()))) {
+            throw new ServicioExternoNoDisponibleException(
+                    "El servicio de prioridad eligió un reclamo que no estaba entre los cercanos");
+        }
+        return new ComparacionDuplicados(respuesta.similar(), acotar(respuesta.motivo()));
     }
 
     private <T> T enviar(String ruta, Object pedido, Class<T> tipo) {

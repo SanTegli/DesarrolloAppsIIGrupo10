@@ -114,6 +114,10 @@ reclamos:
     radio-metros: 50
     radio-maximo-metros: 200
     maximo-candidatos: 5
+    # PR 27: con la estrategia ia, la IA compara el texto del reclamo nuevo con los abiertos cercanos de cualquier
+    # categoría (los maximo-comparados más próximos) y marca el que es el mismo problema.
+    comparar-con-ia: true
+    maximo-comparados: 10
   # Avisos por correo: outbox + RabbitMQ + servicio-notificaciones. Apagada sin broker; Compose la enciende.
   mensajeria:
     habilitada: false

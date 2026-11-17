@@ -41,6 +41,11 @@ public class ManejadorErrores {
                 List.of(), pedido);
     }
 
+    @ExceptionHandler(IdsRepetidosException.class)
+    public ResponseEntity<ErrorResponse> idsRepetidos(IdsRepetidosException error, HttpServletRequest pedido) {
+        return respuesta(400, "DATOS_INVALIDOS", error.getMessage(), List.of("candidatos: ids repetidos"), pedido);
+    }
+
     @ExceptionHandler(RespuestaInvalidaException.class)
     public ResponseEntity<ErrorResponse> respuestaInvalida(RespuestaInvalidaException error, HttpServletRequest pedido) {
         LOGGER.warn("Respuesta inválida del modelo: {}", error.getMessage());

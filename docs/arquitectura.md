@@ -788,8 +788,13 @@ antes de leer el archivo entero; el tercero vale aunque cambie el transporte.
 ### Duplicados y apoyos
 
 Antes de crear un reclamo, si el ciudadano marcó el punto en el mapa, la interfaz pregunta por reclamos
-abiertos de la misma categoría a pocos metros. Si es el mismo problema, lo apoya; si no, sigue con el alta.
-Depende de la geocodificación del PR 11: sin coordenadas no hay cercanía.
+abiertos a pocos metros. Si es el mismo problema, se asocia; si no, sigue con el alta. Depende de la
+geocodificación del PR 11: sin coordenadas no hay cercanía.
+
+**Con la IA (PR 27).** Comparar solo por categoría falla en los dos sentidos: "No hay luz en la esquina" cargado
+como "Otro problema" no aparece al reclamar una Luminaria rota, y un bache aparece aunque el vecino hable de un
+farol. Por eso el alta manda la descripción y la IA compara los textos de los reclamos cercanos de cualquier
+categoría:
 
 ```mermaid
 sequenceDiagram
@@ -801,17 +806,23 @@ sequenceDiagram
   participant RR as ReclamoRepository
   participant SA as ServicioApoyos
 
+  participant SP as servicio-prioridad<br/>(REST 2)
+
   C->>UI: completa el alta, con el punto elegido en el mapa, y toca Crear
-  UI->>RC: GET /api/reclamos/candidatos-duplicados?categoriaId&latitud&longitud
-  RC->>SD: candidatos(…)
-  SD->>RR: abiertos de la categoría dentro del recuadro (± 50 m)
+  UI->>RC: POST /api/reclamos/candidatos-duplicados (categoría, descripción y punto)
+  RC->>SD: paraElAlta(…)
+  SD->>RR: abiertos de cualquier categoría dentro del recuadro (± 50 m)
   RR-->>SD: reclamos
-  Note over SD: Haversine exacto, ≤ 50 m, del más cercano, hasta 5
-  SD-->>UI: tarjetas sin datos del autor
-  alt "Es el mismo: apoyar"
+  Note over SD: Haversine exacto, ≤ 50 m, los 10 más cercanos
+  SD->>SP: POST /api/duplicados/comparar (solo categorías y descripciones, ids 1, 2…)
+  SP-->>SD: el id del mismo problema, o ninguno, y el motivo
+  Note over SD: el elegido primero, después los de la misma categoría, hasta 5. Si la IA falla, solo esos
+  SD-->>UI: tarjetas sin datos del autor, con el más parecido marcado
+  alt "Es el mismo: asociarme"
     UI->>RC: POST /api/reclamos/{numero}/apoyo
     RC->>SA: apoyar (teléfono verificado, cuenta sin bloquear)
     SA-->>UI: cantidadApoyos
+    Note over SA: publica ReclamoApoyado: desde ahí el vecino recibe los avisos del reclamo
   else "Es otro problema: continuar"
     UI->>RC: POST /api/reclamos (multipart)
   end
@@ -820,8 +831,10 @@ sequenceDiagram
 | Pieza | Responsabilidad |
 | --- | --- |
 | `Distancia` (dominio) | Haversine y la conversión de metros a grados para el recuadro |
-| `ReclamoRepository.buscarAbiertosConUbicacionEn` | Primer filtro barato en la base: categoría, estado abierto, ubicación confirmada y un recuadro alrededor del punto |
-| `ServicioDuplicados` | Distancia exacta, radio (50 m, máximo 200) y cantidad (hasta 5). Marca los reclamos propios y los que ya apoya quien consulta |
+| `ReclamoRepository.buscarAbiertosConUbicacionEn` | Primer filtro barato en la base: categoría (o todas, desde el PR 27), estado abierto, ubicación confirmada y un recuadro alrededor del punto |
+| `ServicioDuplicados` | Distancia exacta, radio (50 m, máximo 200) y cantidad (hasta 5). Marca los reclamos propios y los que ya apoya quien consulta. Con `paraElAlta` (PR 27), le pide a la IA el más parecido |
+| `ComparadorDuplicados` (PR 27) | `ComparadorDuplicadosPorIA` llama a REST 2 con ids propios; `NINGUNO`, sin la estrategia `ia`. Si REST 2 falla, devuelve vacío y el alta no se traba |
+| `AvisosApoyantesListener` (PR 27) | Quinto observador: avisa a quienes se asociaron cuando se asocian, cuando el reclamo cambia de estado y cuando se resuelve. Los avisos no dicen quién lo creó |
 | `Apoyo` (dominio) | Nadie apoya su propio reclamo ni uno cerrado. No cambia la prioridad ni da permisos |
 | `ServicioApoyos` | Apoyar y retirar, idempotentes. Usa los mismos controles que reabrir: teléfono verificado y cuenta sin bloquear |
 | Restricción única `(ciudadano_id, reclamo_id)` | Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos. La fachada responde el estado actual si el segundo choca |
@@ -831,7 +844,12 @@ duplicado la puede ver cualquier ciudadano mientras siga abierto; por eso el alt
 patentes. El detalle completo sigue siendo solo del autor, del área y de la administración.
 
 **La búsqueda es una ayuda, no una regla.** Si falla, el alta sigue. La API no impide crear un reclamo
-parecido: decide el vecino. La vinculación de dos reclamos ya creados quedó fuera del alcance.
+parecido: decide el vecino. La IA tampoco decide: marca el más parecido y el vecino elige asociarse o seguir.
+La vinculación de dos reclamos ya creados quedó fuera del alcance.
+
+**Sin fotos.** La IA compara solo los textos. Comparar fotos pediría un modelo con visión y mandar al proveedor
+fotos de la vía pública, con caras o patentes posibles; el texto alcanza para el caso común y no expone más
+datos que los que la IA ya recibe para la prioridad.
 
 ### Tableros
 

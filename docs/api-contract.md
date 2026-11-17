@@ -282,10 +282,63 @@ tiene foto (es anterior a la foto obligatoria).
 
 ## Apoyos y posibles duplicados
 
-Antes de crear un reclamo con la ubicación marcada en el mapa, la interfaz busca reclamos abiertos de la
-misma categoría a pocos metros. Si es el mismo problema, el vecino **lo apoya** en lugar de crear otro.
+Antes de crear un reclamo con la ubicación marcada en el mapa, la interfaz busca reclamos abiertos a pocos
+metros. Desde el PR 27 la IA compara el texto del reclamo nuevo con los cercanos **de cualquier categoría** y
+marca el que describe el mismo problema. Si es así, el vecino **se asocia** (apoya) en lugar de crear otro, y
+desde ese momento recibe los avisos de ese reclamo.
 
-### `GET /api/reclamos/candidatos-duplicados` — posibles duplicados
+### `POST /api/reclamos/candidatos-duplicados` — posibles duplicados del alta (PR 27)
+
+Es la que usa la interfaz. Va por `POST` porque lleva la descripción, que no conviene poner en la URL.
+
+```json
+{ "categoriaId": 1, "descripcion": "El farol de la esquina no prende", "latitud": -34.73614578, "longitud": -58.3228998575 }
+```
+
+| Campo | Regla |
+| --- | --- |
+| `categoriaId` | Obligatorio; debe existir. Es la categoría que eligió el vecino |
+| `descripcion` | Hasta 1000 caracteres. Sin descripción no se compara: quedan los de la misma categoría |
+| `latitud`, `longitud` | Obligatorios: el punto elegido en el mapa |
+
+1. **Busca los cercanos.** Toma los reclamos abiertos con la ubicación confirmada a `reclamos.duplicados.radio-metros`
+   (50 m), de cualquier categoría. Se queda con los `maximo-comparados` más próximos (10).
+2. **La IA los compara.** Con la estrategia `ia`, le pregunta a REST 2 ([`POST /api/duplicados/comparar`](contratos/README.md#rest-2-post-apiduplicadoscomparar))
+   cuál describe el mismo problema que el nuevo. A REST 2 solo le llegan la categoría y la descripción de cada
+   uno, con ids `1`, `2`…: ni números de reclamo, ni nombres, ni direcciones, ni fotos. La espera es la del alta
+   (4 s), con su propio circuito.
+3. **Arma la lista.** Si la IA eligió uno, va primero con `masParecido: true`, aunque sea de otra categoría.
+   Después van los de la misma categoría, del más cercano al más lejano, hasta 5 en total.
+   - Si la IA dijo que ninguno es el mismo, quedan solo los de la misma categoría.
+   - Si no hay IA, o no respondió, quedan los de la misma categoría y `comparadoPorIA` es `false`.
+
+```json
+{
+  "comparadoPorIA": true,
+  "motivo": "Los dos hablan del mismo farol apagado en la esquina.",
+  "candidatos": [
+    {
+      "numero": "REC-7C4046A4",
+      "estado": "ASIGNADO",
+      "fechaCreacion": "2026-11-03T17:34:00",
+      "descripcion": "No hay luz en la esquina, el poste está apagado.",
+      "direccion": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires",
+      "foto": "/api/reclamos/REC-7C4046A4/foto",
+      "distanciaMetros": 13,
+      "cantidadApoyos": 0,
+      "apoyadoPorMi": false,
+      "propio": false,
+      "categoria": { "id": 8, "nombre": "Otro problema" },
+      "masParecido": true
+    }
+  ]
+}
+```
+
+Errores: `400` datos inválidos; `401` sin sesión; `404` categoría inexistente. Una falla de la IA no es un
+error: responde `200` sin comparación.
+
+### `GET /api/reclamos/candidatos-duplicados` — posibles duplicados de la misma categoría
 
 | Parámetro | Regla |
 | --- | --- |
@@ -310,10 +363,15 @@ puede usar cualquier usuario con sesión.
     "distanciaMetros": 13,
     "cantidadApoyos": 0,
     "apoyadoPorMi": false,
-    "propio": false
+    "propio": false,
+    "categoria": { "id": 1, "nombre": "Luminaria rota" },
+    "masParecido": false
   }
 ]
 ```
+
+Es la búsqueda del PR 17, sin IA: solo la categoría pedida y `masParecido` siempre `false`. Se mantiene por
+compatibilidad.
 
 **No lleva el nombre ni ningún dato del autor:** solo lo necesario para reconocer el problema. `propio` es
 `true` si lo creó quien consulta, y en ese caso no se puede apoyar.
@@ -339,7 +397,9 @@ existe no cambia nada. Responden `200`:
 | No existe el reclamo | `404` |
 
 Apoyar **no da permisos** sobre el reclamo (no ve el detalle ni le cambia el estado) y **no cambia la
-prioridad**. La base guarda un apoyo por ciudadano y reclamo (restricción única); si dos pedidos iguales
+prioridad**. Desde el PR 27, apoyar es **asociarse**: el vecino recibe un aviso al asociarse ("Te sumaste al
+reclamo REC-…") y otro cada vez que el reclamo cambia de estado o se resuelve ("El reclamo REC-… que apoyaste
+paso de ASIGNADO a EN_PROCESO."). Retirar el apoyo corta los avisos. La base guarda un apoyo por ciudadano y reclamo (restricción única); si dos pedidos iguales
 llegan a la vez, el segundo responde el estado actual.
 
 ### `GET /api/reclamos/{numero}` — consultar un reclamo
@@ -562,12 +622,14 @@ viejo. Cada usuario ve solo los suyos; no hay filtros.
     "numeroReclamo": "REC-4F2A91BC",
     "canal": "INTERNO",
     "mensaje": "Tu reclamo REC-4F2A91BC fue asignado al area Alumbrado.",
-    "fechaEnvio": "2026-10-05T10:00:00"
+    "fechaEnvio": "2026-10-05T10:00:00",
+    "abrible": true
   }
 ]
 ```
 
-Sin avisos devuelve `[]`. Sin sesión, `401`.
+Sin avisos devuelve `[]`. Sin sesión, `401`. `abrible` (PR 27) es `false` en los avisos de un reclamo ajeno que
+el vecino apoya: los lee, pero el detalle sigue siendo del autor, y la interfaz no ofrece abrirlo.
 
 ## Tableros
 

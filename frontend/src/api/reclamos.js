@@ -25,11 +25,15 @@ export function crearReclamo({ categoriaId, municipioId, descripcion, direccion,
 }
 
 /**
- * GET /api/reclamos/candidatos-duplicados. Reclamos abiertos de la categoría a pocos metros del punto elegido en
- * el mapa, sin datos del autor. Sirve para no crear un reclamo repetido.
+ * POST /api/reclamos/candidatos-duplicados (PR 27). Reclamos abiertos a pocos metros del punto elegido en el mapa,
+ * sin datos del autor. Con la IA, compara el texto del reclamo nuevo con los cercanos de cualquier categoría y
+ * marca el más parecido (`masParecido`). Devuelve `{ comparadoPorIA, motivo, candidatos }`.
  */
-export function buscarDuplicados({ categoriaId, latitud, longitud }) {
-  return pedir('/reclamos/candidatos-duplicados', { parametros: { categoriaId, latitud, longitud } })
+export function buscarDuplicados({ categoriaId, descripcion, latitud, longitud }) {
+  return pedir('/reclamos/candidatos-duplicados', {
+    metodo: 'POST',
+    cuerpo: { categoriaId, descripcion, latitud, longitud },
+  })
 }
 
 /** POST /api/reclamos/{numero}/apoyo. "A mí también me pasa". Idempotente. */

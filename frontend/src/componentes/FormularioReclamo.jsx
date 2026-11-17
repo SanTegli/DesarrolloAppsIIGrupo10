@@ -22,8 +22,8 @@ export const MAXIMO_FOTO = 5 * 1024 * 1024
  * La foto es obligatoria: es la prueba del problema.
  * Si ninguna categoría sirve, el vecino elige "Otro problema" y escribe qué tipo de problema es; la IA sugiere
  * la categoría y un administrador lo recategoriza.
- * Si el ciudadano marcó el punto en el mapa, antes de crear se buscan reclamos abiertos parecidos a pocos
- * metros: si es el mismo problema, lo apoya en lugar de crear otro.
+ * Si el ciudadano marcó el punto en el mapa, antes de crear se buscan reclamos abiertos a pocos metros y la IA
+ * compara sus textos con el nuevo: si es el mismo problema, el vecino se asocia en lugar de crear otro.
  */
 export default function FormularioReclamo({ categorias, municipios, onCreado, onApoyado = () => {} }) {
   const [categoriaId, setCategoriaId] = useState('')
@@ -86,7 +86,7 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
   // La sugerencia elegida trae su municipio; sin sugerencia, el que el vecino elige de la lista.
   const municipioId = sugerencia ? sugerencia.municipio.id : Number(municipioManual)
   const clave = sugerencia ? `${categoriaId}|${sugerencia.latitud}|${sugerencia.longitud}` : null
-  const candidatosVisibles = duplicados && duplicados.clave === clave ? duplicados.candidatos : null
+  const duplicadosVisibles = duplicados && duplicados.clave === clave ? duplicados.resultado : null
 
   async function enviar(evento) {
     evento.preventDefault()
@@ -97,9 +97,9 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
     setError(null)
     setEnviando(true)
     if (clave && clave !== revisada) {
-      const candidatos = await candidatosPara(sugerencia)
-      if (candidatos.length > 0) {
-        setDuplicados({ clave, candidatos })
+      const resultado = await candidatosPara(sugerencia)
+      if (resultado.candidatos.length > 0) {
+        setDuplicados({ clave, resultado })
         setEnviando(false)
         return
       }
@@ -112,11 +112,12 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
     try {
       return await buscarDuplicados({
         categoriaId: Number(categoriaId),
+        descripcion: descripcion.trim(),
         latitud: punto.latitud,
         longitud: punto.longitud,
       })
     } catch {
-      return []
+      return { comparadoPorIA: false, motivo: null, candidatos: [] }
     }
   }
 
@@ -272,10 +273,10 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
         {vistaPrevia && <img className="vista-previa" src={vistaPrevia} alt="Vista previa de la foto elegida" />}
       </div>
 
-      {candidatosVisibles && (
+      {duplicadosVisibles && (
         <CandidatosDuplicados
           key={clave}
-          candidatos={candidatosVisibles}
+          resultado={duplicadosVisibles}
           onApoyado={onApoyado}
           onContinuar={continuar}
           enviando={enviando}
@@ -283,7 +284,7 @@ export default function FormularioReclamo({ categorias, municipios, onCreado, on
       )}
 
       <div className="acciones">
-        <button type="submit" className="boton-primario" disabled={enviando || candidatosVisibles !== null}>
+        <button type="submit" className="boton-primario" disabled={enviando || duplicadosVisibles !== null}>
           {enviando ? 'Creando…' : 'Crear reclamo'}
         </button>
       </div>

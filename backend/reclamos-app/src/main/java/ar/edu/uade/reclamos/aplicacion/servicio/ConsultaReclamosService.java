@@ -96,6 +96,18 @@ public class ConsultaReclamosService {
         return notificaciones.buscarPorDestinatario(usuario.getId());
     }
 
+    /**
+     * La bandeja con cada aviso marcado según si el usuario puede abrir su reclamo. Desde el PR 27 llegan avisos
+     * de reclamos ajenos, los que el vecino apoya: esos se leen en la bandeja, pero el detalle sigue siendo del
+     * autor.
+     */
+    public List<AvisoDelUsuario> bandeja(Long usuarioId) {
+        Usuario usuario = usuario(usuarioId);
+        return notificaciones.buscarPorDestinatario(usuario.getId()).stream()
+                .map(aviso -> new AvisoDelUsuario(aviso, permisos.puedeConsultar(usuario, aviso.getReclamo())))
+                .toList();
+    }
+
     public Set<EstadoReclamo> accionesDisponibles(Long usuarioId, String numero) {
         Usuario usuario = usuario(usuarioId);
         Reclamo reclamo = reclamo(numero);

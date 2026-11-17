@@ -53,8 +53,8 @@ export const CAPTURAS = {
   '06-alta-sugerencias-georef': ['CP27, CP53', 'Alta con las sugerencias reales de Georef y la vista previa de la foto'],
   '07-alta-foto-rechazada': ['CP54', 'Un archivo que no es JPEG ni PNG se rechaza con 400'],
   '08-detalle-ia-maps-foto': ['CP23, CP28, CP53', 'Reclamo creado: prioridad con origen IA, enlace a Google Maps y foto'],
-  '09-posible-duplicado': ['CP58', 'Bruno ya reclamó lo mismo: el alta de Ana lo muestra sin datos del autor'],
-  '10-apoyo-registrado': ['CP60', 'Ana apoya el reclamo de Bruno en lugar de crear otro'],
+  '09-posible-duplicado': ['CP58, CP75', 'Ana carga "Otro problema" y la IA encuentra el bache de Bruno, sin datos del autor'],
+  '10-apoyo-registrado': ['CP60, CP76', 'Ana se asocia al reclamo de Bruno en lugar de crear otro'],
   '11-apoyo-contador': ['CP60', 'Detalle del reclamo de Bruno con el contador de apoyos'],
   '12-agente-listado': ['CP12', 'Carla ve solo los reclamos de su área'],
   '13-agente-en-proceso': ['CP08', 'Carla tomó el reclamo y escribe la observación para resolverlo'],
@@ -287,11 +287,13 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
       await entrar(ana, 'ana@example.org')
       estado.ana = ana
     }
+    // PR 27: Ana lo carga como "Otro problema"; la IA compara los textos y encuentra el bache de Bruno igual.
     await completarAlta(ana, {
-      categoria: 'Bache',
+      categoria: 'Otro problema',
       municipio: 'Quilmes',
-      descripcion: 'Hay un bache enorme en la esquina de la plaza.',
+      descripcion: 'Hay un pozo grande en la esquina de la plaza y los autos frenan de golpe.',
     })
+    await ana.getByLabel('¿Qué tipo de problema es?').fill('Pozo en la calle')
     await crear(ana, {
       siHayDuplicados: async (panel) => {
         const tarjeta = panel.locator('.tarjeta-duplicado', { hasText: estado.bache })
@@ -303,8 +305,8 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
         ).catch(() => {})
         await tarjeta.scrollIntoViewIfNeeded()
         await captura(ana, '09-posible-duplicado', false)
-        await ana.getByRole('button', { name: `Es el mismo: apoyar ${estado.bache}` }).click()
-        await ana.getByText(/Sumaste tu apoyo/).waitFor()
+        await ana.getByRole('button', { name: `Es el mismo: asociarme a ${estado.bache}` }).click()
+        await ana.getByText(/Te asociaste al reclamo/).waitFor()
         await captura(ana, '10-apoyo-registrado')
       },
     })

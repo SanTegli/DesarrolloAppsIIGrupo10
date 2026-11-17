@@ -18,5 +18,8 @@ public record CandidatoDuplicadoResponse(
         @Schema(description = "Distancia al punto elegido, en metros, redondeada") long distanciaMetros,
         @Schema(description = "Cuántos vecinos lo apoyan") long cantidadApoyos,
         @Schema(description = "Si quien consulta ya lo apoya") boolean apoyadoPorMi,
-        @Schema(description = "Si lo creó quien consulta: no se puede apoyar") boolean propio) {
+        @Schema(description = "Si lo creó quien consulta: no se puede apoyar") boolean propio,
+        @Schema(description = "Categoría del reclamo (PR 27: puede ser otra que la del reclamo nuevo)")
+        ReferenciaResponse categoria,
+        @Schema(description = "PR 27: la IA dijo que es el mismo problema que el reclamo nuevo") boolean masParecido) {
 }

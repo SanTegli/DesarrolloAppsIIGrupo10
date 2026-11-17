@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.prioridad.configuracion;
 
+import ar.edu.uade.reclamos.prioridad.evaluacion.ComparadorDuplicados;
 import ar.edu.uade.reclamos.prioridad.evaluacion.EvaluadorPrioridad;
+import ar.edu.uade.reclamos.prioridad.evaluacion.InstruccionesDuplicados;
 import ar.edu.uade.reclamos.prioridad.evaluacion.InstruccionesCategoria;
 import ar.edu.uade.reclamos.prioridad.evaluacion.InstruccionesPrioridad;
 import ar.edu.uade.reclamos.prioridad.evaluacion.SugeridorCategoria;
@@ -67,6 +69,18 @@ public class ConfiguracionProveedor {
     @Bean
     public SugeridorCategoria sugeridorCategoria(InstruccionesCategoria instrucciones, ProveedorIA proveedor) {
         return new SugeridorCategoria(instrucciones, proveedor);
+    }
+
+    @Bean
+    public InstruccionesDuplicados instruccionesDuplicados(PropiedadesIA propiedades, ResourceLoader recursos)
+            throws IOException {
+        return new InstruccionesDuplicados(recursos.getResource(propiedades.instruccionesDuplicados())
+                .getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    @Bean
+    public ComparadorDuplicados comparadorDuplicados(InstruccionesDuplicados instrucciones, ProveedorIA proveedor) {
+        return new ComparadorDuplicados(instrucciones, proveedor);
     }
 
     @Bean

@@ -38,7 +38,7 @@ flowchart LR
   EV --> LIS
   LIS -->|"aviso y fila de outbox<br/>en la misma transacción"| OUT
   OUT --> PUB
-  PUB -->|"aviso.reclamo-creado, aviso.reclamo-asignado,<br/>aviso.estado-cambiado, aviso.reclamo-resuelto,<br/>aviso.reclamo-vencido, aviso.prioridad-revisada,<br/>aviso.reclamo-recategorizado"| EX
+  PUB -->|"aviso.reclamo-creado, aviso.reclamo-asignado,<br/>aviso.estado-cambiado, aviso.reclamo-resuelto,<br/>aviso.reclamo-vencido, aviso.prioridad-revisada,<br/>aviso.reclamo-recategorizado, aviso.reclamo-apoyado"| EX
   PUB -.->|"RabbitMQ caído: la fila<br/>queda PENDIENTE y se reintenta"| OUT
   EX --> Q
   Q --> CON
@@ -68,6 +68,7 @@ Una por evento de dominio que genera avisos:
 | `ReclamoVencido` | `aviso.reclamo-vencido` |
 | `PrioridadRevisada` (solo si la prioridad cambió) | `aviso.prioridad-revisada` |
 | `ReclamoRecategorizado` (PR 26) | `aviso.reclamo-recategorizado` |
+| `ReclamoApoyado` (PR 27: un vecino se asoció) | `aviso.reclamo-apoyado` |
 
 ## Mensaje
 
@@ -243,3 +244,10 @@ Cuando un administrador cambia la categoría, el backend avisa al vecino con `ti
 `ReclamoRecategorizado` y clave `aviso.reclamo-recategorizado`. La cola `notificaciones.email` ya escucha
 `aviso.#`: `servicio-notificaciones` lo recibe sin cambios de topología. El asunto del correo es "Reclamo
 REC-…: cambió de categoría".
+
+## Avisos a quienes se asocian (PR 27)
+
+Un vecino que se asocia a un reclamo ajeno recibe `ReclamoApoyado` (clave `aviso.reclamo-apoyado`) y, mientras
+siga asociado, los avisos de cambio de estado y de resolución de ese reclamo, con las claves de siempre
+(`aviso.estado-cambiado`, `aviso.reclamo-resuelto`). Van a su propio correo, como cualquier aviso. Los textos no
+dicen quién creó el reclamo.

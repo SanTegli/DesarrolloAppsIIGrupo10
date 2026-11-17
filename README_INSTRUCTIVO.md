@@ -635,8 +635,11 @@ Invoke-RestMethod http://localhost:8080/api/usuarios/2/bloqueo -Method Patch -We
 Necesita reclamos con la ubicación marcada en el mapa: sin coordenadas no hay cercanía.
 
 1. Como Ana Pérez, crear un reclamo de **Luminaria rota**, dirección "Belgrano 450", tocar **Buscar en el mapa** y elegir la sugerencia de Bernal Oeste (Quilmes).
-2. Salir y entrar como Bruno Díaz. Hacer lo mismo: misma categoría, misma dirección y misma sugerencia. Al tocar **Crear reclamo** aparece **¿Es alguno de estos?** con el reclamo de Ana, su foto y la distancia, sin su nombre.
-3. **Es el mismo: apoyar** no crea un reclamo: vuelve a **Mis reclamos** con el aviso. En el detalle de Ana aparece "1 vecino apoya este reclamo". **Es otro problema: continuar** crea el reclamo de Bruno igual.
+2. Salir y entrar como Bruno Díaz. Misma dirección y misma sugerencia, pero con la categoría **Otro problema** ("Sin luz") y la descripción "No hay luz en la esquina, el farol no anda". Al tocar **Crear reclamo** aparece **¿Es alguno de estos?**: la IA compara los textos y marca el reclamo de Ana como el mismo problema, aunque sea de otra categoría. Sin datos de Ana.
+3. **Es el mismo: asociarme** no crea un reclamo: vuelve a **Mis reclamos** con el aviso. En el detalle de Ana aparece "1 vecino apoya este reclamo". **Es otro problema: continuar** crea el reclamo de Bruno igual.
+4. Como Carla, tomar el reclamo de Ana. En **Avisos** de Bruno aparece "El reclamo REC-… que apoyaste paso de ASIGNADO a EN_PROCESO.", marcado "(lo apoyás)" y sin enlace: Bruno no ve el detalle.
+
+Con `servicio-prioridad` detenido, o sin la estrategia `ia`, el panel muestra solo los reclamos de la misma categoría, como antes del PR 27. La comparación se apaga con `reclamos.duplicados.comparar-con-ia: false`.
 
 Con la API simulada (`npm run mock`) ya hay un reclamo de Bruno en Belgrano 450, Bernal (Quilmes): alcanza con el paso 1 como Ana.
 
@@ -716,7 +719,8 @@ En PowerShell 5, `>` guarda el archivo en UTF-16. Si los acentos se ven mal en G
 | GET | `/api/reclamos` | Listar según rol; filtro `estado` para todos, `areaId` y `ciudadanoId` solo administrador. |
 | GET | `/api/reclamos/{numero}` | Ver detalle, historial y acciones permitidas. |
 | GET | `/api/reclamos/{numero}/foto` | La foto del reclamo como JPEG sin metadatos, con los mismos permisos que el detalle; cualquier ciudadano ve la de un posible duplicado abierto. |
-| GET | `/api/reclamos/candidatos-duplicados` | Reclamos abiertos de la categoría cerca del punto (`categoriaId`, `latitud`, `longitud`; opcionales `radio` y `limite`), sin datos del autor. |
+| POST | `/api/reclamos/candidatos-duplicados` | PR 27: posibles duplicados del alta (`categoriaId`, `descripcion`, `latitud`, `longitud`). La IA compara los textos de los reclamos abiertos a 50 m de cualquier categoría y marca el mismo problema. |
+| GET | `/api/reclamos/candidatos-duplicados` | Reclamos abiertos de la categoría cerca del punto (`categoriaId`, `latitud`, `longitud`; opcionales `radio` y `limite`), sin datos del autor, sin IA. |
 | GET | `/api/dashboard/publico` | Tablero público, sin sesión: creados en el período (`desde`, `hasta`) y pendientes, resueltos y cerrados de hoy, con filtros `municipioId` y `categoriaId`. |
 | GET | `/api/dashboard/gestion` | Tablero de gestión: pendientes, vencidos, sin asignar y tabla por área y municipio. Agentes (su área) y administradores. |
 | POST / DELETE | `/api/reclamos/{numero}/apoyo` | Apoyar o retirar el apoyo a un reclamo de otro vecino. Idempotentes. Solo ciudadanos. |

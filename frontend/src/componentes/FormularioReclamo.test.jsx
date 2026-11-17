@@ -99,7 +99,7 @@ describe('FormularioReclamo: municipio', () => {
     }
     const { llamadas, onCreado, usuario } = mostrar({
       'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [wilde] },
-      'GET /api/reclamos/candidatos-duplicados': [],
+      'POST /api/reclamos/candidatos-duplicados': { comparadoPorIA: false, motivo: null, candidatos: [] },
       'POST /api/reclamos': { status: 201, cuerpo: reclamo() },
     })
 
@@ -112,7 +112,7 @@ describe('FormularioReclamo: municipio', () => {
     await usuario.click(screen.getByRole('button', { name: 'Crear reclamo' }))
 
     await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
-    expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo.municipioId).toBe(2)
+    expect(llamadas.find((llamada) => llamada.ruta === '/api/reclamos').cuerpo.municipioId).toBe(2)
   })
 
   it('si no se elige una dirección del mapa, el municipio se elige de la lista y es obligatorio', async () => {

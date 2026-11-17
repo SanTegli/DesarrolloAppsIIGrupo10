@@ -191,7 +191,7 @@ export default function App() {
             onApoyado={(numero) =>
               setVista({
                 nombre: 'reclamos',
-                aviso: `Sumaste tu apoyo al reclamo ${numero}. No se creó un reclamo nuevo.`,
+                aviso: `Te asociaste al reclamo ${numero}: te vamos a avisar cada vez que cambie. No se creó un reclamo nuevo.`,
               })
             }
             onCreado={(reclamo) =>

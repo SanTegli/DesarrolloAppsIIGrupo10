@@ -1,5 +1,7 @@
 package ar.edu.uade.reclamos.aplicacion.servicio;
 
+import ar.edu.uade.reclamos.dominio.evento.PublicadorEventos;
+import ar.edu.uade.reclamos.dominio.evento.ReclamoApoyado;
 import ar.edu.uade.reclamos.aplicacion.control.ControlesDeUso;
 import ar.edu.uade.reclamos.comun.excepcion.AccesoDenegadoException;
 import ar.edu.uade.reclamos.comun.excepcion.RecursoNoEncontradoException;
@@ -27,17 +29,22 @@ public class ServicioApoyos {
     private final UsuarioRepository usuarios;
     private final ControlesDeUso controles;
     private final Clock reloj;
+    private final PublicadorEventos eventos;
 
     public ServicioApoyos(ApoyoRepository apoyos, ReclamoRepository reclamos, UsuarioRepository usuarios,
-                          ControlesDeUso controles, Clock reloj) {
+                          ControlesDeUso controles, Clock reloj, PublicadorEventos eventos) {
         this.apoyos = apoyos;
         this.reclamos = reclamos;
         this.usuarios = usuarios;
         this.controles = controles;
         this.reloj = reloj;
+        this.eventos = eventos;
     }
 
-    /** Teléfono verificado y cuenta sin bloquear, como para reabrir. Si ya lo apoyaba, no hace nada. */
+    /**
+     * Teléfono verificado y cuenta sin bloquear, como para reabrir. Si ya lo apoyaba, no hace nada. Desde el PR 27
+     * es "Asociarme": quien apoya recibe los avisos de los cambios del reclamo ({@link ReclamoApoyado}).
+     */
     @Transactional
     public EstadoApoyo apoyar(Long usuarioId, String numero) {
         Ciudadano ciudadano = ciudadano(usuarioId);
@@ -46,6 +53,7 @@ public class ServicioApoyos {
             LocalDateTime ahora = LocalDateTime.now(reloj);
             controles.antesDeApoyar(ciudadano, ahora);
             apoyos.guardar(new Apoyo(ciudadano, reclamo, ahora));
+            eventos.publicar(new ReclamoApoyado(reclamo.getNumero(), ciudadano.getId(), ahora));
         }
         return estado(ciudadano, reclamo);
     }

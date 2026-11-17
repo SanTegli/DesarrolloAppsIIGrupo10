@@ -6,7 +6,7 @@ necesita cambiar un contrato, lo avisa al grupo antes, igual que con [el contrat
 | Integración | Contrato | Lo implementa |
 | --- | --- | --- |
 | SOAP de cobertura | [`soap/cobertura.xsd`](soap/cobertura.xsd) y [`soap/cobertura.wsdl`](soap/cobertura.wsdl) | Hecho en el PR 9: `servicios/servicio-cobertura` y `CoberturaSoap` en el backend |
-| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend. El PR 26 sumó `/api/categorias/sugerir` |
+| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend. El PR 26 sumó `/api/categorias/sugerir` y el PR 27, `/api/duplicados/comparar` |
 | Mensajes por RabbitMQ | [`mensajes.md`](mensajes.md) | Hecho en el PR 12: outbox en el backend y `servicios/servicio-notificaciones` |
 | REST 1 (API de reclamos) | [`../openapi/reclamos.yaml`](../openapi/README.md), generado del código | Backend |
 
@@ -173,4 +173,40 @@ se elige: tampoco datos personales.
 ```powershell
 Invoke-RestMethod http://localhost:8082/api/categorias/sugerir -Method Post -ContentType "application/json; charset=utf-8" `
   -Body '{"categoriaPropuesta": "Baldosas levantadas", "descripcion": "Baldosas sueltas en la vereda", "categorias": ["Bache", "Vereda rota"]}'
+```
+
+## REST 2: `POST /api/duplicados/comparar`
+
+PR 27. La tercera operación: ¿alguno de los reclamos abiertos cercanos describe el mismo problema que el que el
+vecino está por crear? La llama el backend durante el alta, antes de crear el reclamo, con la misma espera que la
+prioridad (4 s). Solo texto: la categoría y la descripción de cada reclamo, con ids que elige el backend (`1`,
+`2`…). Ni números de reclamo, ni nombres, ni direcciones, ni fotos.
+
+```json
+{
+  "nuevo": { "categoria": "Luminaria rota", "descripcion": "El farol de la esquina no prende hace tres días" },
+  "candidatos": [
+    { "id": "1", "categoria": "Bache", "descripcion": "Pozo enorme en la calle" },
+    { "id": "2", "categoria": "Otro problema", "descripcion": "No hay luz en la esquina, el poste está apagado" }
+  ]
+}
+```
+
+```json
+{ "similar": "2", "motivo": "Los dos hablan del mismo poste apagado en la esquina.", "proveedor": "gemini", "modelo": "gemini-3.5-flash-lite" }
+```
+
+- **`similar`** es uno de los ids recibidos, o `null` si ninguno es el mismo problema. El esquema JSON solo admite
+  esos ids o `NINGUNO`; un id inventado es `502 RESPUESTA_INVALIDA`.
+- **Hasta 10 candidatos**, con ids que no se repiten (`400` si se repiten).
+- **El prompt** (`instrucciones-duplicados.txt`) pide reconocer el mismo objeto o la misma falla aunque esté
+  contado con otras palabras o en otra categoría, y no confundir dos fallas distintas en el mismo lugar. Ante la
+  duda, `NINGUNO`: es mejor un reclamo repetido que sumar a un vecino a un problema que no es el suyo. Los textos
+  van como datos entre etiquetas.
+- **Errores:** los mismos códigos que las otras operaciones. El backend no reintenta: si falla, el alta muestra los
+  reclamos de la misma categoría, como antes del PR 27.
+
+```powershell
+Invoke-RestMethod http://localhost:8082/api/duplicados/comparar -Method Post -ContentType "application/json; charset=utf-8" `
+  -Body '{"nuevo": {"categoria": "Luminaria rota", "descripcion": "El farol no prende"}, "candidatos": [{"id": "1", "categoria": "Bache", "descripcion": "Pozo"}, {"id": "2", "categoria": "Otro problema", "descripcion": "No hay luz, el farol no anda"}]}'
 ```

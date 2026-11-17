@@ -692,6 +692,23 @@ td .secundario {
   font-size: 0.9375rem;
 }
 
+/* Duplicados comparados por la IA (PR 27) */
+.tarjeta-duplicado.mas-parecido {
+  border-color: var(--primario);
+  box-shadow: 0 0 0 1px var(--primario);
+}
+
+.insignia-ia {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--primario);
+  color: #ffffff;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 /* Foto del reclamo */
 .campo-foto {
   display: flex;

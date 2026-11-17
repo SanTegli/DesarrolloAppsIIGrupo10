@@ -100,7 +100,7 @@ public final class DoblesEnMemoria {
                                                           double latitudMaxima, double longitudMinima,
                                                           double longitudMaxima) {
             return guardados.stream()
-                    .filter(r -> r.getCategoria().getId().equals(categoriaId))
+                    .filter(r -> categoriaId == null || r.getCategoria().getId().equals(categoriaId))
                     .filter(Reclamo::puedeSerDuplicado)
                     .filter(r -> r.getUbicacion().getLatitud() >= latitudMinima
                             && r.getUbicacion().getLatitud() <= latitudMaxima

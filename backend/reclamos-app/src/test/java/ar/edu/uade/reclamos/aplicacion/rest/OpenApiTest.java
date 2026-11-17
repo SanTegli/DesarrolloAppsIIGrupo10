@@ -55,6 +55,9 @@ class OpenApiTest {
                 .isTrue();
         assertThat(contrato.at("/components/schemas/ReclamoResponse/properties").has("categoriaSugerida")).isTrue();
         assertThat(contrato.at("/components/schemas/CategoriaResponse/properties").has("otra")).isTrue();
+        assertThat(contrato.at("/paths/~1api~1reclamos~1candidatos-duplicados").has("post")).isTrue();
+        assertThat(contrato.at("/components/schemas/DuplicadosDelAltaResponse/properties").has("comparadoPorIA"))
+                .isTrue();
         assertThat(contrato.at("/components/schemas/SugerenciasUbicacionResponse/properties").has("disponible"))
                 .isTrue();
 

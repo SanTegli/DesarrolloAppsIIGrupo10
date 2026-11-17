@@ -1,6 +1,8 @@
 package ar.edu.uade.reclamos.dominio.repositorio;
 
 import ar.edu.uade.reclamos.dominio.modelo.Apoyo;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import java.util.List;
 import java.util.Optional;
 
 /** Apoyos de ciudadanos a reclamos de otros (PR 17). Un ciudadano apoya cada reclamo una sola vez. */
@@ -14,4 +16,7 @@ public interface ApoyoRepository {
     void eliminar(Apoyo apoyo);
 
     long contarPorReclamo(Long reclamoId);
+
+    /** Los ciudadanos que apoyan el reclamo, del primero al último (PR 27: reciben sus avisos). */
+    List<Ciudadano> buscarApoyantes(Long reclamoId);
 }
