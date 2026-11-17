@@ -19,12 +19,16 @@ prioridad:
   ia:
     # gemini (nivel gratuito, sin tarjeta) | openai (pago) | simulado (sin red ni clave; no es IA)
     proveedor: ${PRIORIDAD_IA_PROVEEDOR:gemini}
-    tiempo-limite: 5s            # el backend espera hasta 6 s a este servicio
+    # El backend espera 4 s en el alta y 10 s cuando la revisa de nuevo por la cola: con 9 s, una respuesta
+    # lenta de Gemini todavía llega a la segunda.
+    tiempo-limite: 9s
     instrucciones: classpath:instrucciones-prioridad.txt
     gemini:
       url: https://generativelanguage.googleapis.com
       clave: ${GEMINI_API_KEY:}
       modelo: ${GEMINI_MODELO:gemini-3.5-flash-lite}
+      # minimal | low | medium | high. Más razonamiento es más lento; clasificar una prioridad no lo necesita.
+      razonamiento: ${GEMINI_RAZONAMIENTO:minimal}
     openai:
       url: https://api.openai.com
       clave: ${OPENAI_API_KEY:}

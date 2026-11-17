@@ -24,6 +24,7 @@ export const ORIGENES_PRIORIDAD = {
   PALABRAS_CLAVE: 'por palabras clave',
   IA: 'sugerida por IA',
   RESPALDO: 'por categoría (la IA no respondió)',
+  PENDIENTE_IA: 'por categoría (la IA lo está revisando)',
 }
 
 /** "Alta, por palabras clave. La descripción menciona "peligro"." */

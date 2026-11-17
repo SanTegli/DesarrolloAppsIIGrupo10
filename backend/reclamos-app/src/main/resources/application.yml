@@ -14,6 +14,17 @@ spring:
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
     publisher-confirm-type: correlated   # un mensaje cuenta como publicado cuando el broker lo confirma
+    # El backend también consume: la cola reclamos.prioridad (reevaluación de la prioridad con IA). Un error
+    # inesperado se reintenta 3 veces y después el mensaje va a reclamos.prioridad.dlq. Que la IA no responda
+    # no es un error: eso se reintenta con la cola de espera (reclamos.prioridad.ia.reevaluacion).
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
   # Alta con foto (PR 16): el contenedor corta antes de leer un archivo de más de 5 MB.
   servlet:
     multipart:
@@ -53,10 +64,17 @@ reclamos:
     ia:
       url: http://localhost:8082
       tiempo-conexion: 1s
-      tiempo-respuesta: 6s
+      tiempo-respuesta: 4s       # lo que espera el alta: el ciudadano está esperando
       circuito:
         llamadas: 5              # si falla la mitad de las últimas 5 llamadas, deja de llamar...
         espera: 30s              # ...durante 30 segundos y después prueba de nuevo
+      # Si la IA no responde en el alta y la mensajería está encendida, el reclamo sale con la prioridad de la
+      # categoría (origen PENDIENTE_IA) y la IA lo revisa después, por la cola reclamos.prioridad.
+      reevaluacion:
+        habilitada: true
+        tiempo-respuesta: 10s    # acá nadie espera: se le da más tiempo a la IA
+        intentos: 4              # en total; después queda la prioridad de la categoría (RESPALDO)
+        espera: 20s              # entre intentos. Si se cambia, borrar la cola reclamos.prioridad.espera
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
   # Control de vencimientos (SLA): cada cuánto se buscan reclamos que pasaron su fecha límite.

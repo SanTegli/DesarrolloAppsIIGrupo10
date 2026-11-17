@@ -33,7 +33,7 @@ dice quién es.
 | `rol` | `CIUDADANO`, `AGENTE_MUNICIPAL`, `ADMINISTRADOR` |
 | `estado` | `INGRESADO`, `ASIGNADO`, `EN_PROCESO`, `RESUELTO`, `CERRADO`, `RECHAZADO`, `CANCELADO` |
 | `prioridad` | `BAJA`, `MEDIA`, `ALTA`, `CRITICA` |
-| `origenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` |
+| `origenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO`, `PENDIENTE_IA` |
 | `ubicacion.estado` | `CONFIRMADA`, `PENDIENTE` |
 
 ### Errores
@@ -132,8 +132,10 @@ Lo devuelven la creación, la consulta por número, el cambio de estado y la asi
   Es `null` en los reclamos creados antes de que la foto fuera obligatoria.
 - `cantidadApoyos` es cuántos vecinos apoyan el reclamo ([apoyos](#apoyos-y-posibles-duplicados)). No cambia la
   prioridad.
-- `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO` (la IA
-  no respondió y se usó la de la categoría). `motivoPrioridad` la explica. Es `null` cuando la prioridad es
+- `origenPrioridad` dice qué decidió la prioridad: `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` (la IA
+  no respondió y se usó la de la categoría) o `PENDIENTE_IA` (por ahora vale la de la categoría y la IA la
+  está revisando por la cola; en unos segundos pasa a `IA`, `CATEGORIA` o `RESPALDO`, sin que el reclamo
+  cambie de estado). `motivoPrioridad` la explica. Es `null` cuando la prioridad es
   la de la categoría sin otro análisis; con `reclamos.prioridad.estrategia: ia`, si la IA sugirió menos que
   la categoría, el origen queda `CATEGORIA` y el motivo dice qué sugirió la IA.
 - `asignacionPendiente` es `true` cuando el servicio de cobertura no respondió a tiempo o rechazó la

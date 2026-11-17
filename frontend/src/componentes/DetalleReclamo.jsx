@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { asignarArea, cambiarEstado, listarNotificaciones, obtenerReclamo } from '../api/reclamos.js'
 import {
   ESTADOS,
@@ -13,10 +13,16 @@ import { AvisoError, AvisoExito } from './Aviso.jsx'
 import { InsigniaEstado, InsigniaPrioridad, InsigniaVencido } from './Insignias.jsx'
 
 /**
+ * Mientras la IA revisa la prioridad en segundo plano, el detalle se consulta cada 5 s durante un minuto
+ * (la revisión suele tardar menos de 20 s) y se recarga cuando terminó.
+ */
+export const REVISION_IA = { cada: 5000, intentos: 12 }
+
+/**
  * Detalle de un reclamo con sus acciones. Los botones salen de accionesDisponibles, que calcula
  * el backend para el usuario actual: la interfaz no repite las reglas de transición.
  */
-export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, onVolver }) {
+export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, onVolver, revisionIA = REVISION_IA }) {
   const [observacion, setObservacion] = useState('')
   const [areaId, setAreaId] = useState('')
   const [errorAccion, setErrorAccion] = useState(null)
@@ -30,6 +36,35 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
       ),
     [usuario.id, numero],
   )
+
+  const esperandoIA = datos?.reclamo.origenPrioridad === 'PENDIENTE_IA'
+  useEffect(() => {
+    if (!esperandoIA) return undefined
+    let vigente = true
+    let intentos = 0
+    let temporizador
+    // Solo mira el reclamo; si la IA terminó, recarga todo (también los avisos, que traen el cambio).
+    const programar = () => {
+      temporizador = setTimeout(async () => {
+        intentos += 1
+        try {
+          const actual = await obtenerReclamo(numero)
+          if (vigente && actual.origenPrioridad !== 'PENDIENTE_IA') {
+            recargar()
+            return
+          }
+        } catch {
+          // Un error pasajero no corta la espera: se vuelve a probar en el próximo turno.
+        }
+        if (vigente && intentos < revisionIA.intentos) programar()
+      }, revisionIA.cada)
+    }
+    programar()
+    return () => {
+      vigente = false
+      clearTimeout(temporizador)
+    }
+  }, [esperandoIA, numero, recargar, revisionIA])
 
   async function ejecutar(operacion, mensajeExito) {
     setErrorAccion(null)

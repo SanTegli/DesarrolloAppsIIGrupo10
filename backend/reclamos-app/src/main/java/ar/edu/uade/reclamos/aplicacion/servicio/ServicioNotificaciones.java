@@ -84,6 +84,23 @@ public class ServicioNotificaciones {
     }
 
     /** Avisa al ciudadano y a quien debe actuar: el agente a cargo o, si nadie lo tomó, los agentes del área. */
+    /**
+     * La IA revisó en segundo plano la prioridad de un reclamo creado sin su respuesta, y la subió. Avisa al
+     * ciudadano y a quien lo atiende: el agente a cargo o, si nadie lo tomó, los agentes del área.
+     */
+    public void avisarPrioridadRevisada(String numero, Prioridad anterior, Prioridad nueva, LocalDateTime fecha) {
+        Reclamo reclamo = reclamo(numero);
+        notificar(reclamo, reclamo.getCiudadano(), "La IA reviso tu reclamo " + numero + ": la prioridad paso de "
+                + anterior + " a " + nueva + ".", fecha, TipoAviso.PRIORIDAD_REVISADA);
+        String aviso = "La IA subio la prioridad del reclamo " + numero + " de " + anterior + " a " + nueva + ".";
+        if (reclamo.getAgente() != null) {
+            notificar(reclamo, reclamo.getAgente(), aviso, fecha, TipoAviso.PRIORIDAD_REVISADA);
+        } else if (reclamo.getArea() != null) {
+            usuarios.buscarAgentesPorArea(reclamo.getArea().getId())
+                    .forEach(agente -> notificar(reclamo, agente, aviso, fecha, TipoAviso.PRIORIDAD_REVISADA));
+        }
+    }
+
     public void avisarVencimiento(String numero, Prioridad prioridadNueva, LocalDateTime fecha) {
         Reclamo reclamo = reclamo(numero);
         notificar(reclamo, reclamo.getCiudadano(), "Tu reclamo " + numero

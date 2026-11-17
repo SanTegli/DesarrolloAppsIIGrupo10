@@ -193,7 +193,7 @@ outbox (tabla `mensajes_salientes`) con un aviso que tiene que salir por RabbitM
 | `Prioridad` | `BAJA`, `MEDIA`, `ALTA`, `CRITICA` |
 | `Rol` | `CIUDADANO`, `AGENTE_MUNICIPAL`, `ADMINISTRADOR`, `SISTEMA` |
 | `CanalNotificacion` | `EMAIL`, `SMS`, `INTERNO` |
-| `OrigenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` |
+| `OrigenPrioridad` | `CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO`, `PENDIENTE_IA` |
 | `EstadoUbicacion` | `CONFIRMADA`, `PENDIENTE` |
 | `EstadoMensaje` | `PENDIENTE`, `PUBLICADO` |
 
@@ -221,6 +221,7 @@ habilitada, además salen por correo a través de la outbox.
 | Un reclamo guarda la referencia a su foto una sola vez; no se reemplaza | `Reclamo.registrarFoto` |
 | Solo un reclamo abierto y con la ubicación confirmada aparece como posible duplicado | `Reclamo.puedeSerDuplicado` |
 | Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad | Constructor de `Apoyo` |
+| La revisión por IA de un reclamo `PENDIENTE_IA` se aplica una sola vez, sube o mantiene la prioridad y nunca la baja (tampoco la que subió un vencimiento) | `Reclamo.completarPrioridadPorIA` y `abandonarRevisionPorIA` |
 
 Los tableros (PR 18) no usan estas clases para contar: leen por el puerto `ConsultasTablero` (paquete
 `dominio.reporte`), que devuelve proyecciones planas (`ConteoPorEstado`, `FilaPendientes`). Ver

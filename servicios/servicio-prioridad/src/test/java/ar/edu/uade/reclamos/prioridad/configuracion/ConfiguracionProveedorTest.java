@@ -41,6 +41,14 @@ class ConfiguracionProveedorTest {
     }
 
     @Test
+    void elNivelDeRazonamientoDeGeminiSeConfigura() {
+        contexto.withPropertyValues("prioridad.ia.gemini.razonamiento=low").run(ctx ->
+                assertThat(((GeminiAdapter) ctx.getBean(ProveedorIA.class)).razonamiento()).isEqualTo("low"));
+        contexto.run(ctx ->
+                assertThat(((GeminiAdapter) ctx.getBean(ProveedorIA.class)).razonamiento()).isNull());
+    }
+
+    @Test
     void openaiYSimuladoSeEligenPorPropiedad() {
         contexto.withPropertyValues("prioridad.ia.proveedor=openai", "prioridad.ia.openai.clave=sk-secreta")
                 .run(ctx -> {
@@ -54,7 +62,8 @@ class ConfiguracionProveedorTest {
 
     @ParameterizedTest
     @ValueSource(strings = {"prioridad.ia.proveedor=claude", "prioridad.ia.tiempo-limite=0s",
-            "prioridad.ia.gemini.url=", "prioridad.ia.instrucciones=classpath:no-existe.txt"})
+            "prioridad.ia.gemini.url=", "prioridad.ia.instrucciones=classpath:no-existe.txt",
+            "prioridad.ia.gemini.razonamiento=altisimo"})
     void configuracionInvalidaImpideArrancar(String propiedad) {
         contexto.withPropertyValues(propiedad).run(ctx -> assertThat(ctx).hasFailed());
     }

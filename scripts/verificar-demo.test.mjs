@@ -24,6 +24,8 @@ function escenarioNormal() {
       ],
     },
     origenPrioridad: 'IA',
+    revisionIA: [],
+    origenFinal: 'IA',
     correos: [
       { Subject: `Reclamo ${NUMERO}: lo recibimos`, To: [{ Address: 'ana@example.org' }] },
       { Subject: `Reclamo ${NUMERO}: lo asignamos`, To: [{ Address: 'ana@example.org' }] },
@@ -145,6 +147,12 @@ before(async () => {
           : { estado: 'PENDIENTE' },
       })
     }
+    if (ruta === `/backend/api/reclamos/${NUMERO}` && req.method === 'GET') {
+      if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
+      const origenPrioridad = escenario.revisionIA.shift() ?? escenario.origenFinal
+      const prioridad = origenPrioridad === 'IA' ? 'CRITICA' : 'MEDIA'
+      return responder(res, 200, { numero: NUMERO, prioridad, origenPrioridad, motivoPrioridad: 'Revisado.' })
+    }
     if (ruta === `/backend/api/reclamos/${NUMERO}/foto`) {
       if (!conSesion) return responder(res, 401, NO_AUTENTICADO)
       return escenario.fotoServida
@@ -195,6 +203,7 @@ function configuracion(cambios = {}) {
     rabbitmqClave: 'reclamos_dev',
     mailpitUrl: `${base}/mailpit`,
     esperaCorreoMs: 300,
+    esperaIaMs: 500,
     intervaloMs: 50,
     tiempoLimiteMs: 2000,
     ...cambios,
@@ -233,6 +242,38 @@ describe('verificarDemo', () => {
 
   test('si la prioridad salió del respaldo, el paso de la IA falla y explica qué revisar', async () => {
     escenario = { ...escenarioNormal(), origenPrioridad: 'RESPALDO' }
+    const resultados = await verificarDemo(configuracion())
+
+    const ia = resultados.find((r) => r.paso === 'Prioridad con IA')
+    assert.equal(ia.estado, FALLA)
+    assert.match(ia.detalle, /GEMINI_API_KEY/)
+  })
+
+  test('si la IA no respondió en el alta, espera la revisión por la cola y da bien cuando llega', async () => {
+    escenario = {
+      ...escenarioNormal(),
+      origenPrioridad: 'PENDIENTE_IA',
+      revisionIA: ['PENDIENTE_IA', 'PENDIENTE_IA'],
+      origenFinal: 'IA',
+    }
+    const resultados = await verificarDemo(configuracion())
+
+    const ia = resultados.find((r) => r.paso === 'Prioridad con IA')
+    assert.equal(ia.estado, OK)
+    assert.match(ia.detalle, /CRITICA, origen IA: Revisado\. \(la IA no respondió en el alta; se esperó su revisión \d+ s\)/)
+  })
+
+  test('si la revisión por la cola no termina a tiempo, falla y dice dónde mirar', async () => {
+    escenario = { ...escenarioNormal(), origenPrioridad: 'PENDIENTE_IA', origenFinal: 'PENDIENTE_IA' }
+    const resultados = await verificarDemo(configuracion())
+
+    const ia = resultados.find((r) => r.paso === 'Prioridad con IA')
+    assert.equal(ia.estado, FALLA)
+    assert.match(ia.detalle, /reclamos\.prioridad/)
+  })
+
+  test('si después de los reintentos quedó el respaldo, falla como sin IA', async () => {
+    escenario = { ...escenarioNormal(), origenPrioridad: 'PENDIENTE_IA', origenFinal: 'RESPALDO' }
     const resultados = await verificarDemo(configuracion())
 
     const ia = resultados.find((r) => r.paso === 'Prioridad con IA')

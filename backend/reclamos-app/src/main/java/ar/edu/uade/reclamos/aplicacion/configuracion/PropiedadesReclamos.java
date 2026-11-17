@@ -19,6 +19,15 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                                   @DefaultValue Mensajeria mensajeria, @DefaultValue Uso uso,
                                   @DefaultValue Reaperturas reaperturas, @DefaultValue Telegram telegram,
                                   @DefaultValue Fotos fotos, @DefaultValue Duplicados duplicados) {
+
+    /**
+     * Si la IA no responde en el alta, ¿se la vuelve a consultar después por la cola? Hace falta la estrategia
+     * {@code ia}, la mensajería encendida y {@code prioridad.ia.reevaluacion.habilitada}. Si no, la prioridad de
+     * la categoría queda como definitiva, con origen {@code RESPALDO}.
+     */
+    public boolean reevaluaPrioridadConIA() {
+        return "ia".equals(prioridad.estrategia()) && mensajeria.habilitada() && prioridad.ia().reevaluacion().habilitada();
+    }
     /**
      * Estrategia de prioridad: {@code categoria}, {@code palabras-clave} o {@code ia}. Con {@code ia} se usa
      * el servicio de prioridad (REST 2) en {@code ia.url}, con respaldo por categoría.
@@ -29,13 +38,15 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
      * Cliente del servicio de prioridad con IA.
      *
      * @param tiempoConexion  cuánto se espera para conectar
-     * @param tiempoRespuesta cuánto se espera la respuesta; el modelo puede tardar unos segundos
+     * @param tiempoRespuesta cuánto espera el alta la respuesta; corto, porque el ciudadano está esperando
      * @param circuito        cuándo dejar de llamar al servicio si falla seguido
+     * @param reevaluacion    la segunda oportunidad, por la cola, si la IA no respondió en el alta
      */
     public record Ia(@DefaultValue("http://localhost:8082") String url,
                      @DefaultValue("1s") Duration tiempoConexion,
-                     @DefaultValue("6s") Duration tiempoRespuesta,
-                     @DefaultValue Circuito circuito) {
+                     @DefaultValue("4s") Duration tiempoRespuesta,
+                     @DefaultValue Circuito circuito,
+                     @DefaultValue Reevaluacion reevaluacion) {
         public Ia {
             if (url == null || url.isBlank()) {
                 throw new IllegalArgumentException("reclamos.prioridad.ia.url no puede estar vacía");
@@ -55,6 +66,28 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                 throw new IllegalArgumentException("reclamos.prioridad.ia.circuito.llamadas debe ser mayor que cero");
             }
             requerirPositivo(espera, "reclamos.prioridad.ia.circuito.espera");
+        }
+    }
+
+    /**
+     * Reevaluación de la prioridad en segundo plano, por RabbitMQ.
+     *
+     * @param tiempoRespuesta cuánto se espera a la IA en cada intento; más que en el alta, porque nadie espera
+     * @param intentos        cuántas veces se le pregunta en total antes de dejar la prioridad de la categoría
+     * @param espera          cuánto pasa entre un intento y el siguiente (lo que el mensaje queda en la cola de
+     *                        espera). Si se cambia con la cola ya creada, hay que borrar {@code reclamos.prioridad.espera}
+     *                        en RabbitMQ: una cola no cambia su tiempo de vida
+     */
+    public record Reevaluacion(@DefaultValue("true") boolean habilitada,
+                               @DefaultValue("10s") Duration tiempoRespuesta,
+                               @DefaultValue("4") int intentos,
+                               @DefaultValue("20s") Duration espera) {
+        public Reevaluacion {
+            requerirPositivo(tiempoRespuesta, "reclamos.prioridad.ia.reevaluacion.tiempo-respuesta");
+            requerirPositivo(espera, "reclamos.prioridad.ia.reevaluacion.espera");
+            if (intentos < 1) {
+                throw new IllegalArgumentException("reclamos.prioridad.ia.reevaluacion.intentos debe ser mayor que cero");
+            }
         }
     }
 

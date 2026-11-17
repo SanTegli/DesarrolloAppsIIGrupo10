@@ -25,16 +25,21 @@ public record PropiedadesIA(@DefaultValue("gemini") String proveedor,
         }
     }
 
-    /** URL base, clave y modelo de un proveedor. {@link #toString()} no muestra la clave. */
-    public record Proveedor(String url, String clave, String modelo) {
+    /**
+     * URL base, clave y modelo de un proveedor. {@link #toString()} no muestra la clave.
+     *
+     * @param razonamiento nivel de razonamiento del modelo; por ahora solo lo usa Gemini
+     *                     ({@code minimal}, {@code low}, {@code medium} o {@code high}). Vacío: el del modelo
+     */
+    public record Proveedor(String url, String clave, String modelo, String razonamiento) {
         public boolean tieneClave() {
             return clave != null && !clave.isBlank();
         }
 
         @Override
         public String toString() {
-            return "Proveedor[url=" + url + ", modelo=" + modelo + ", clave=" + (tieneClave() ? "****" : "sin definir")
-                    + "]";
+            return "Proveedor[url=" + url + ", modelo=" + modelo + ", razonamiento=" + razonamiento + ", clave="
+                    + (tieneClave() ? "****" : "sin definir") + "]";
         }
     }
 }

@@ -54,20 +54,26 @@ public class ConfiguracionAplicacion {
 
     /**
      * Estrategia de prioridad activa. Con {@code ia}, la estrategia que llama a REST 2 va envuelta en el
-     * respaldo por categoría (Decorator): si la IA falla, el reclamo se crea igual.
+     * respaldo por categoría (Decorator): si la IA falla, el reclamo se crea igual. Con la mensajería
+     * encendida, ese respaldo es provisorio ({@code PENDIENTE_IA}) y la IA lo revisa después por la cola.
      */
     @Bean
     public EstrategiaPrioridad estrategiaPrioridad(PropiedadesReclamos propiedades) {
         return switch (propiedades.prioridad().estrategia()) {
             case "categoria" -> new PrioridadPorCategoria();
             case "palabras-clave" -> new PrioridadPorPalabrasClave();
-            case "ia" -> new PrioridadConRespaldo(new PrioridadPorIA(clienteIA(propiedades.prioridad().ia())),
-                    new PrioridadPorCategoria());
+            case "ia" -> {
+                PrioridadPorIA ia = new PrioridadPorIA(clienteIA(propiedades.prioridad().ia()));
+                yield propiedades.reevaluaPrioridadConIA()
+                        ? PrioridadConRespaldo.conRevisionPosterior(ia, new PrioridadPorCategoria())
+                        : new PrioridadConRespaldo(ia, new PrioridadPorCategoria());
+            }
             default -> throw new IllegalArgumentException(
                     "reclamos.prioridad.estrategia debe ser categoria, palabras-clave o ia");
         };
     }
 
+    /** El cliente del alta: espera poco, porque el ciudadano está esperando. */
     private static ClienteServicioPrioridad clienteIA(PropiedadesReclamos.Ia ia) {
         return ClienteServicioPrioridad.crear(ia.url(), ia.tiempoConexion(), ia.tiempoRespuesta(),
                 ia.circuito().llamadas(), ia.circuito().espera());

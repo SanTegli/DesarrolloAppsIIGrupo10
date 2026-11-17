@@ -31,7 +31,8 @@ public class ConfiguracionProveedor {
     public ProveedorIA proveedorIA(PropiedadesIA propiedades, RestClient.Builder http, ObjectMapper json) {
         ProveedorIA proveedor = switch (propiedades.proveedor()) {
             case "gemini" -> new GeminiAdapter(cliente(http, propiedades.gemini(), propiedades.tiempoLimite()),
-                    propiedades.gemini().clave(), propiedades.gemini().modelo(), json);
+                    propiedades.gemini().clave(), propiedades.gemini().modelo(), json,
+                    propiedades.gemini().razonamiento());
             case "openai" -> new OpenAiAdapter(cliente(http, propiedades.openai(), propiedades.tiempoLimite()),
                     propiedades.openai().clave(), propiedades.openai().modelo(), json);
             case "simulado" -> new SimuladoAdapter();
