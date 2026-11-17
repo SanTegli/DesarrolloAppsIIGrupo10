@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { asignarArea, cambiarEstado, listarNotificaciones, obtenerReclamo } from '../api/reclamos.js'
+import { asignarArea, cambiarEstado, listarNotificaciones, obtenerReclamo, recategorizar } from '../api/reclamos.js'
 import {
   ESTADOS,
   describirPrioridad,
@@ -7,14 +7,15 @@ import {
   esAccionDefinitiva,
   formatearFecha,
   nombreDeAccion,
+  ordenarCategorias,
 } from '../dominio/etiquetas.js'
 import { useCarga } from '../hooks/useCarga.js'
 import { AvisoError, AvisoExito } from './Aviso.jsx'
 import { InsigniaEstado, InsigniaPrioridad, InsigniaVencido } from './Insignias.jsx'
 
 /**
- * Mientras la IA revisa la prioridad en segundo plano, el detalle se consulta cada 5 s durante un minuto
- * (la revisión suele tardar menos de 20 s) y se recarga cuando terminó.
+ * Mientras la IA revisa la prioridad, o sugiere la categoría de un reclamo de "Otro problema", en segundo plano,
+ * el detalle se consulta cada 5 s durante un minuto (suele tardar menos de 20 s) y se recarga cuando terminó.
  */
 export const REVISION_IA = { cada: 5000, intentos: 12 }
 
@@ -22,9 +23,19 @@ export const REVISION_IA = { cada: 5000, intentos: 12 }
  * Detalle de un reclamo con sus acciones. Los botones salen de accionesDisponibles, que calcula
  * el backend para el usuario actual: la interfaz no repite las reglas de transición.
  */
-export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, onVolver, revisionIA = REVISION_IA }) {
+export default function DetalleReclamo({
+  usuario,
+  numero,
+  areas,
+  categorias = [],
+  avisoInicial,
+  onVolver,
+  revisionIA = REVISION_IA,
+}) {
   const [observacion, setObservacion] = useState('')
   const [areaId, setAreaId] = useState('')
+  // null: todavía no tocó la lista, y se ofrece la categoría que sugirió la IA.
+  const [categoriaNueva, setCategoriaNueva] = useState(null)
   const [errorAccion, setErrorAccion] = useState(null)
   const [aviso, setAviso] = useState(avisoInicial ?? '')
   const [enviando, setEnviando] = useState(false)
@@ -37,7 +48,10 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
     [usuario.id, numero],
   )
 
-  const esperandoIA = datos?.reclamo.origenPrioridad === 'PENDIENTE_IA'
+  const esOtra = (reclamo) => categorias.some((categoria) => categoria.otra && categoria.id === reclamo.categoria.id)
+  const esperaCategoria = (reclamo) => esOtra(reclamo) && !reclamo.motivoSugerencia
+  const esperandoIA =
+    Boolean(datos) && (datos.reclamo.origenPrioridad === 'PENDIENTE_IA' || esperaCategoria(datos.reclamo))
   useEffect(() => {
     if (!esperandoIA) return undefined
     let vigente = true
@@ -49,7 +63,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
         intentos += 1
         try {
           const actual = await obtenerReclamo(numero)
-          if (vigente && actual.origenPrioridad !== 'PENDIENTE_IA') {
+          if (vigente && actual.origenPrioridad !== 'PENDIENTE_IA' && !esperaCategoria(actual)) {
             recargar()
             return
           }
@@ -64,6 +78,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
       vigente = false
       clearTimeout(temporizador)
     }
+    // esperaCategoria depende solo de las categorías, que no cambian mientras el detalle está abierto.
   }, [esperandoIA, numero, recargar, revisionIA])
 
   async function ejecutar(operacion, mensajeExito) {
@@ -74,6 +89,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
       await operacion()
       setObservacion('')
       setAreaId('')
+      setCategoriaNueva(null)
       setAviso(mensajeExito)
       recargar()
     } catch (fallo) {
@@ -103,6 +119,13 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
     (area) => area.activa && area.id !== reclamo.area?.id && area.municipio?.id === reclamo.municipio.id,
   )
   const verboAsignar = reclamo.area ? 'Reasignar' : 'Asignar'
+  // Recategorizar: solo un administrador y antes de asignar un área (el backend lo vuelve a validar).
+  const puedeRecategorizar = usuario.rol === 'ADMINISTRADOR' && reclamo.estado === 'INGRESADO'
+  const categoriasElegibles = ordenarCategorias(categorias).filter(
+    (categoria) => !categoria.otra && categoria.id !== reclamo.categoria.id,
+  )
+  const categoriaElegida =
+    categoriaNueva ?? (reclamo.categoriaSugerida ? String(reclamo.categoriaSugerida.id) : '')
   // Reabrir exige explicar por qué: el backend responde 400 sin motivo, y la interfaz lo pide antes.
   const puedeReabrir = reclamo.estado === 'RESUELTO' && cambios.includes('EN_PROCESO')
   const faltaMotivo = puedeReabrir && observacion.trim() === ''
@@ -137,6 +160,12 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
           <dl className="datos">
             <dt>Categoría</dt>
             <dd>{reclamo.categoria.nombre}</dd>
+            {reclamo.categoriaPropuesta && (
+              <>
+                <dt>Tipo de problema</dt>
+                <dd>“{reclamo.categoriaPropuesta}”, en palabras del vecino</dd>
+              </>
+            )}
             <dt>Prioridad</dt>
             <dd>{describirPrioridad(reclamo)}</dd>
             <dt>Ubicación</dt>
@@ -239,6 +268,49 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
               )}
             </div>
           )}
+
+          {puedeRecategorizar && (
+            <form
+              className="panel-acciones recategorizacion"
+              onSubmit={(evento) => {
+                evento.preventDefault()
+                const nueva = categorias.find((categoria) => String(categoria.id) === categoriaElegida)
+                ejecutar(
+                  () => recategorizar(reclamo.numero, Number(categoriaElegida), observacion.trim()),
+                  `El reclamo ahora es de ${nueva?.nombre ?? 'la categoría elegida'}.`,
+                )
+              }}
+            >
+              <h3>Categoría</h3>
+              <SugerenciaIA reclamo={reclamo} esperando={esperaCategoria(reclamo)} />
+              <label>
+                <span>Cambiar la categoría</span>
+                <select
+                  value={categoriaElegida}
+                  onChange={(evento) => setCategoriaNueva(evento.target.value)}
+                  required
+                >
+                  <option value="">Elegí una categoría</option>
+                  {categoriasElegibles.map((categoria) => (
+                    <option key={categoria.id} value={categoria.id}>
+                      {categoria.id === reclamo.categoriaSugerida?.id
+                        ? `${categoria.nombre} (sugerida por la IA)`
+                        : categoria.nombre}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="ayuda">
+                Con la categoría nueva cambia el plazo de atención, y el reclamo se asigna solo si hay un área de{' '}
+                {reclamo.municipio.nombre} que la atienda. La observación de arriba también queda en el historial.
+              </p>
+              <div className="acciones">
+                <button type="submit" className="boton-primario" disabled={enviando}>
+                  Recategorizar
+                </button>
+              </div>
+            </form>
+          )}
         </div>
 
         <div>
@@ -274,6 +346,31 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
         </div>
       </div>
     </section>
+  )
+}
+
+/** Lo que dijo la IA sobre la categoría de un reclamo de "Otro problema": la ve el administrador al recategorizar. */
+function SugerenciaIA({ reclamo, esperando }) {
+  if (esperando) {
+    return (
+      <p className="sugerencia-ia" role="status">
+        La IA todavía está analizando qué categoría corresponde.
+      </p>
+    )
+  }
+  if (!reclamo.motivoSugerencia) {
+    return null
+  }
+  return (
+    <p className="sugerencia-ia">
+      {reclamo.categoriaSugerida ? (
+        <>
+          La IA sugiere <strong>{reclamo.categoriaSugerida.nombre}</strong>: {reclamo.motivoSugerencia}
+        </>
+      ) : (
+        <>La IA no sugirió ninguna categoría: {reclamo.motivoSugerencia}</>
+      )}
+    </p>
   )
 }
 

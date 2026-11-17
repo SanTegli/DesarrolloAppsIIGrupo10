@@ -16,7 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Casos de uso de escritura sobre un reclamo: crear, asignar y cambiar de estado.
+ * Casos de uso de escritura sobre un reclamo: crear, asignar, recategorizar y cambiar de estado.
  * Coordina fábrica, estrategia de prioridad, {@link ServicioAsignacion}, persistencia y eventos;
  * las reglas de transición y pertenencia las valida el dominio.
  */
@@ -91,13 +91,24 @@ public class ReclamoService {
     @Transactional
     public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          Ubicacion ubicacion, String referenciaFoto) {
+        return crear(usuarioId, categoriaId, municipioId, descripcion, direccion, ubicacion, referenciaFoto, null);
+    }
+
+    /**
+     * Alta completa.
+     *
+     * @param categoriaPropuesta qué tipo de problema es, en palabras del vecino; obligatoria con "Otro problema"
+     */
+    @Transactional
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
+                         Ubicacion ubicacion, String referenciaFoto, String categoriaPropuesta) {
         Ciudadano ciudadano = permisos.validarCreacion(usuario(usuarioId));
         controles.antesDeCrear(ciudadano, ahora());
         Categoria categoria = categorias.buscarPorId(categoriaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
         Municipio municipio = municipios.buscarPorId(municipioId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("municipio", municipioId));
-        Reclamo reclamo = factory.crear(ciudadano, categoria, municipio, descripcion, direccion);
+        Reclamo reclamo = factory.crear(ciudadano, categoria, municipio, descripcion, direccion, categoriaPropuesta);
         reclamo.registrarUbicacion(ubicacion);
         if (referenciaFoto != null) {
             reclamo.registrarFoto(referenciaFoto);
@@ -107,7 +118,7 @@ public class ReclamoService {
         asignacion.asignarAutomaticamente(reclamo, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
         eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, municipioId,
-                guardado.getPrioridad(), guardado.getFechaCreacion()));
+                categoria.esOtra(), guardado.getPrioridad(), guardado.getFechaCreacion()));
         if (guardado.getArea() != null) {
             publicarAsignacion(guardado, null);
         }
@@ -122,6 +133,31 @@ public class ReclamoService {
         asignacion.asignarManualmente(reclamo, areaId, actor, observacion, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
         publicarAsignacion(guardado, actor);
+        return guardado;
+    }
+
+    /**
+     * Un administrador cambia la categoría de un reclamo sin área (PR 26), típicamente uno de "Otro problema" con
+     * la sugerencia de la IA. Después intenta asignarlo automáticamente, como en el alta: si la categoría nueva
+     * tiene un área en el municipio, el reclamo queda {@code ASIGNADO}.
+     */
+    @Transactional
+    public Reclamo recategorizar(Long usuarioId, String numero, Long categoriaId, String observacion) {
+        Usuario actor = usuario(usuarioId);
+        Reclamo reclamo = reclamo(numero);
+        Categoria nueva = categorias.buscarPorId(categoriaId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
+        Categoria anterior = reclamo.getCategoria();
+        boolean sugeridaPorIA = nueva.equals(reclamo.getCategoriaSugerida());
+        LocalDateTime fecha = ahora();
+        reclamo.recategorizar(nueva, actor, observacion, fecha);
+        asignacion.asignarAutomaticamente(reclamo, fecha);
+        Reclamo guardado = reclamos.guardar(reclamo);
+        eventos.publicar(new ReclamoRecategorizado(guardado.getNumero(), anterior.getId(), anterior.getNombre(),
+                nueva.getId(), nueva.getNombre(), sugeridaPorIA, actor.getId(), fecha));
+        if (guardado.getArea() != null) {
+            publicarAsignacion(guardado, null);
+        }
         return guardado;
     }
 

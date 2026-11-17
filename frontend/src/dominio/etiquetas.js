@@ -35,6 +35,14 @@ export function nombreDeArea(area) {
   return area.municipio ? `${area.nombre} (${area.municipio.nombre})` : area.nombre
 }
 
+/**
+ * Las categorías en el orden del backend, con "Otro problema" al final: es la salida cuando ninguna sirve, no
+ * una opción más entre las otras.
+ */
+export function ordenarCategorias(categorias) {
+  return [...categorias.filter((categoria) => !categoria.otra), ...categorias.filter((categoria) => categoria.otra)]
+}
+
 /** "Alta, por palabras clave. La descripción menciona "peligro"." */
 export function describirPrioridad({ prioridad, origenPrioridad, motivoPrioridad }) {
   const texto = `${PRIORIDADES[prioridad] ?? prioridad}, ${ORIGENES_PRIORIDAD[origenPrioridad] ?? ORIGENES_PRIORIDAD.CATEGORIA}`

@@ -1,7 +1,8 @@
 -- Datos ficticios de desarrollo. Los IDs y jurisdicciones siguen docs/api-contract.md.
 -- PR 25: municipios en vez de barrios. Cada municipio tiene sus propias áreas; Avellaneda no tiene Alumbrado,
 -- así una luminaria en Avellaneda queda sin área y se asigna a mano. Es una semilla nueva (datos-dev-v2): una
--- base creada antes del PR 25 hay que borrarla una vez (docker compose down -v).
+-- base creada antes del PR 25 hay que borrarla una vez (docker compose down -v). Las categorías del PR 26 van
+-- en un bloque aparte, con su propia marca, y no hace falta borrar nada.
 -- Control tecnico exclusivo de la semilla de desarrollo: se aplica una vez por base.
 CREATE TABLE IF NOT EXISTS inicializaciones (
     identificador VARCHAR(80) NOT NULL PRIMARY KEY
@@ -17,14 +18,14 @@ INSERT INTO municipios (id, nombre, provincia)
 SELECT 3, 'Berazategui', 'Buenos Aires' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
 AND NOT EXISTS (SELECT 1 FROM municipios WHERE id = 3);
 
-INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base)
-SELECT 1, 'Luminaria rota', 'Farol apagado o dañado', 48, 'MEDIA' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 1, 'Luminaria rota', 'Farol apagado o dañado', 48, 'MEDIA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
 AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 1);
-INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base)
-SELECT 2, 'Bache', 'Pozo en la calzada', 120, 'BAJA' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 2, 'Bache', 'Pozo en la calzada', 120, 'BAJA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
 AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 2);
-INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base)
-SELECT 3, 'Residuos', 'Residuos en la vía pública', 72, 'MEDIA' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 3, 'Residuos', 'Residuos en la vía pública', 72, 'MEDIA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2')
 AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 3);
 
 INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
@@ -111,6 +112,66 @@ AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 9 AND categoria_id 
 INSERT INTO inicializaciones (identificador)
 SELECT 'datos-dev-v2' WHERE NOT EXISTS (
     SELECT 1 FROM inicializaciones WHERE identificador = 'datos-dev-v2'
+);
+
+-- PR 26: cinco categorías nuevas, con su propia marca para que una base de antes del PR 26 las reciba sin
+-- borrarse. "Otro problema" (8) no tiene áreas: el reclamo espera que un administrador lo recategorice con la
+-- sugerencia de la IA. Avellaneda tampoco tiene semáforos (no tiene Alumbrado).
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 4, 'Semáforo averiado', 'Semáforo apagado, trabado o con una luz quemada', 24, 'ALTA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 4);
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 5, 'Árbol caído o con riesgo', 'Árbol o rama caída, o que amenaza con caerse', 48, 'ALTA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 5);
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 6, 'Pérdida de agua', 'Agua que sale de la vereda o la calzada', 48, 'ALTA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 6);
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 7, 'Vereda rota', 'Baldosas sueltas, levantadas o faltantes', 168, 'BAJA', false WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 7);
+INSERT INTO categorias (id, nombre, descripcion, sla_horas, prioridad_base, otra)
+SELECT 8, 'Otro problema', 'Ninguna categoría corresponde: el vecino escribe qué tipo de problema es', 72, 'MEDIA', true WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM categorias WHERE id = 8);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 1, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 1 AND categoria_id = 4);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 7, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 7 AND categoria_id = 4);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 3, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 3 AND categoria_id = 5);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 6, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 6 AND categoria_id = 5);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 9, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 9 AND categoria_id = 5);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 2, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 2 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 5, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 5 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 8, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 8 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 2, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 2 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 4, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 4 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 5, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 5 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 8, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 8 AND categoria_id = 7);
+
+INSERT INTO inicializaciones (identificador)
+SELECT 'categorias-pr26' WHERE NOT EXISTS (
+    SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26'
 );
 
 -- Login (PR 14): contraseña de desarrollo "demo1234" para los ocho usuarios de la semilla, en BCrypt. Solo toca

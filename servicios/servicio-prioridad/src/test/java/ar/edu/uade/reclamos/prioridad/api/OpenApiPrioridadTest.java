@@ -38,6 +38,9 @@ class OpenApiPrioridadTest {
 
         assertThat(evaluar.path("responses").fieldNames()).toIterable()
                 .containsExactlyInAnyOrder("200", "400", "502", "503", "504");
+        // PR 26: la sugerencia de categoría de "Otro problema", con los mismos errores.
+        assertThat(contrato.path("paths").path("/api/categorias/sugerir").path("post").path("responses").fieldNames())
+                .toIterable().containsExactlyInAnyOrder("200", "400", "502", "503", "504");
         assertThat(contrato.path("components").path("schemas").path("EvaluacionResponse").path("properties")
                 .path("prioridad").path("enum").toString()).contains("BAJA", "MEDIA", "ALTA", "CRITICA");
         // Igual que el contrato escrito (docs/contratos/rest2-prioridad.yaml): las respuestas traen todos sus campos.

@@ -17,7 +17,9 @@ public class CorreoSmtp implements EnvioCorreo {
             "ReclamoAsignado", "ya tiene un área a cargo",
             "EstadoReclamoCambiado", "cambió de estado",
             "ReclamoResuelto", "está resuelto",
-            "ReclamoVencido", "venció el plazo de atención");
+            "ReclamoVencido", "venció el plazo de atención",
+            "PrioridadRevisada", "cambió de prioridad",
+            "ReclamoRecategorizado", "cambió de categoría");
 
     private final JavaMailSender correo;
     private final String remitente;

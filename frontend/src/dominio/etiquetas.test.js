@@ -6,6 +6,7 @@ import {
   esAccionDefinitiva,
   formatearFecha,
   nombreDeAccion,
+  ordenarCategorias,
 } from './etiquetas.js'
 
 describe('etiquetas', () => {
@@ -14,6 +15,15 @@ describe('etiquetas', () => {
       'https://www.google.com/maps/search/?api=1&query=-34.73614578%2C-58.3228998575',
     )
     expect(enlaceMapa(null, null)).toBeNull()
+  })
+
+  it('deja "Otro problema" al final de las categorías', () => {
+    const categorias = [
+      { id: 8, nombre: 'Otro problema', otra: true },
+      { id: 1, nombre: 'Luminaria rota', otra: false },
+      { id: 2, nombre: 'Bache', otra: false },
+    ]
+    expect(ordenarCategorias(categorias).map((categoria) => categoria.id)).toEqual([1, 2, 8])
   })
 
   it('nombra cada transición como la acción que ve el usuario', () => {

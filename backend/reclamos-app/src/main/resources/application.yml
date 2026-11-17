@@ -75,6 +75,9 @@ reclamos:
         tiempo-respuesta: 10s    # acá nadie espera: se le da más tiempo a la IA
         intentos: 4              # en total; después queda la prioridad de la categoría (RESPALDO)
         espera: 20s              # entre intentos. Si se cambia, borrar la cola reclamos.prioridad.espera
+      # PR 26: con la estrategia ia y la mensajería encendida, la IA sugiere la categoría de los reclamos de
+      # "Otro problema" por la cola reclamos.categoria, con los mismos tiempos e intentos de la reevaluación.
+      sugerir-categoria: true
   asignacion:
     estrategia: jurisdiccion     # jurisdiccion | carga-trabajo
   # Control de vencimientos (SLA): cada cuánto se buscan reclamos que pasaron su fecha límite.

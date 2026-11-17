@@ -12,7 +12,7 @@ class PublicadorEventosSpringTest {
     @Test
     void publicaLaMismaInstanciaDelEventoSinOtrasInteracciones() {
         ApplicationEventPublisher spring = mock(ApplicationEventPublisher.class);
-        var evento = new ReclamoCreado("REC-12345678", 1L, 2L, 3L, Prioridad.ALTA,
+        var evento = new ReclamoCreado("REC-12345678", 1L, 2L, 3L, false, Prioridad.ALTA,
                 LocalDateTime.of(2026, 10, 5, 10, 0));
         new PublicadorEventosSpring(spring).publicar(evento);
         verify(spring).publishEvent(same(evento));

@@ -27,6 +27,11 @@ public class DatosDePrueba {
             conId(new Categoria("Luminaria rota", "Farol apagado o dañado", 48, Prioridad.MEDIA), 1L);
     public final Categoria bache =
             conId(new Categoria("Bache", "Pozo en la calzada", 120, Prioridad.BAJA), 2L);
+    public final Categoria semaforo =
+            conId(new Categoria("Semáforo averiado", "Semáforo apagado o trabado", 24, Prioridad.ALTA), 4L);
+    /** "Otro problema" (PR 26): no la atiende ningún área. */
+    public final Categoria otro =
+            conId(new Categoria("Otro problema", "Ninguna categoría corresponde", 72, Prioridad.MEDIA, true), 8L);
 
     public final AreaMunicipal alumbrado =
             conId(new AreaMunicipal("Alumbrado", "alumbrado@quilmes.gob.ar", quilmes), 1L);
@@ -56,6 +61,14 @@ public class DatosDePrueba {
     public Reclamo reclamoIngresado() {
         return new Reclamo("REC-TEST0001", ana, luminaria, quilmes, "Farol apagado frente a la plaza",
                 "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(48));
+    }
+
+    /** Reclamo de Ana de "Otro problema" en Quilmes, recién ingresado, con 72 horas de plazo. */
+    public Reclamo reclamoDeOtroProblema() {
+        Reclamo reclamo = new Reclamo("REC-TEST0002", ana, otro, quilmes, "Hay baldosas sueltas en la vereda",
+                "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(72));
+        reclamo.proponerCategoria("Baldosas levantadas");
+        return reclamo;
     }
 
     /** El mismo reclamo, ya asignado automáticamente a Alumbrado. */

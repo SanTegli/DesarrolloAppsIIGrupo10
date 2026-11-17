@@ -6,7 +6,7 @@ necesita cambiar un contrato, lo avisa al grupo antes, igual que con [el contrat
 | Integración | Contrato | Lo implementa |
 | --- | --- | --- |
 | SOAP de cobertura | [`soap/cobertura.xsd`](soap/cobertura.xsd) y [`soap/cobertura.wsdl`](soap/cobertura.wsdl) | Hecho en el PR 9: `servicios/servicio-cobertura` y `CoberturaSoap` en el backend |
-| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend |
+| REST 2 de prioridad con IA | [`rest2-prioridad.yaml`](rest2-prioridad.yaml) y, generado del código, [`../openapi/prioridad.yaml`](../openapi/README.md) | Hecho en el PR 10: `servicios/servicio-prioridad` y `PrioridadPorIA` en el backend. El PR 26 sumó `/api/categorias/sugerir` |
 | Mensajes por RabbitMQ | [`mensajes.md`](mensajes.md) | Hecho en el PR 12: outbox en el backend y `servicios/servicio-notificaciones` |
 | REST 1 (API de reclamos) | [`../openapi/reclamos.yaml`](../openapi/README.md), generado del código | Backend |
 
@@ -135,3 +135,42 @@ Invoke-RestMethod http://localhost:8082/api/prioridades/evaluar -Method Post -Co
 ```
 
 O desde Swagger UI: `POST /api/prioridades/evaluar`, **Try it out** y **Execute**.
+
+## REST 2: `POST /api/categorias/sugerir`
+
+PR 26. La segunda operación del servicio de prioridad: qué categoría corresponde a un reclamo de "Otro
+problema". La llama el backend desde la cola `reclamos.categoria` ([mensajes](mensajes.md#sugerencia-de-categoría-por-ia-pr-26)),
+no durante el alta. Recibe lo que escribió el vecino, la descripción y los nombres de las categorías entre las que
+se elige: tampoco datos personales.
+
+```json
+{
+  "categoriaPropuesta": "Baldosas levantadas",
+  "descripcion": "En la vereda de la escuela hay baldosas sueltas y ya se cayó una señora",
+  "categorias": ["Luminaria rota", "Bache", "Residuos", "Semáforo averiado", "Árbol caído o con riesgo",
+                 "Pérdida de agua", "Vereda rota"]
+}
+```
+
+```json
+{
+  "categoria": "Vereda rota",
+  "motivo": "Las baldosas sueltas son un problema de la vereda.",
+  "proveedor": "gemini",
+  "modelo": "gemini-3.5-flash-lite"
+}
+```
+
+- **`categoria`** es uno de los nombres recibidos, o `null` si ninguno corresponde con claridad. El modelo
+  responde con un esquema JSON cuyo campo `categoria` solo admite esos nombres o `NINGUNA`. Si igual devuelve
+  otro, el servicio responde `502 RESPUESTA_INVALIDA`.
+- **Lo que escribió el vecino es un dato, no una instrucción.** Va entre etiquetas `<propuesta>` y
+  `<descripcion>`, con `<` y `>` neutralizados, y el prompt (`instrucciones-categoria.txt`) le dice al modelo
+  que ignore cualquier pedido escrito ahí.
+- **Errores:** los mismos códigos que `/api/prioridades/evaluar`. El backend reintenta por la cola de espera
+  y, si en el último intento sigue fallando, deja que el administrador elija sin sugerencia.
+
+```powershell
+Invoke-RestMethod http://localhost:8082/api/categorias/sugerir -Method Post -ContentType "application/json; charset=utf-8" `
+  -Body '{"categoriaPropuesta": "Baldosas levantadas", "descripcion": "Baldosas sueltas en la vereda", "categorias": ["Bache", "Vereda rota"]}'
+```

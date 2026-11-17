@@ -671,6 +671,27 @@ td .secundario {
   font-weight: 600;
 }
 
+/* "Otro problema" (PR 26): el vecino escribe qué tipo de problema es */
+.campo-propuesta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campo-propuesta .ayuda-campo {
+  margin: 0;
+}
+
+/* Recategorización: la sugerencia de la IA, para el administrador */
+.sugerencia-ia {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--primario);
+  background: var(--fondo);
+  border-radius: 0 var(--radio) var(--radio) 0;
+  font-size: 0.9375rem;
+}
+
 /* Foto del reclamo */
 .campo-foto {
   display: flex;

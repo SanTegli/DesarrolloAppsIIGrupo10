@@ -32,6 +32,8 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(usuarios.buscarPorId(7L)).isEmpty();
         assertThat(jdbc.queryForObject("select count(*) from inicializaciones where identificador = 'datos-dev-v2'",
                 Integer.class)).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from inicializaciones where identificador = 'categorias-pr26'",
+                Integer.class)).isEqualTo(1);
     }
 
     @Test void cargaDosVecesSinDuplicarYRespetaLosIdsDelContrato() {
@@ -45,6 +47,15 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(categorias.buscarPorId(1L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.MEDIA);
         assertThat(categorias.buscarPorId(2L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.BAJA);
         assertThat(categorias.buscarPorId(3L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.MEDIA);
+        // PR 26: cinco categorías más; solo "Otro problema" es "otra", y no la atiende ningún área.
+        // En orden alfabético, pero dónde cae "Árbol" depende de la intercalación de la base.
+        assertThat(categorias.buscarTodas()).extracting(Categoria::getNombre).containsExactlyInAnyOrder(
+                "Luminaria rota", "Bache", "Residuos", "Semáforo averiado", "Árbol caído o con riesgo", "Pérdida de agua",
+                "Vereda rota", "Otro problema");
+        assertThat(categorias.buscarTodas()).filteredOn(Categoria::esOtra).extracting(Categoria::getId)
+                .containsExactly(8L);
+        assertThat(categorias.buscarPorId(4L).orElseThrow().getSlaHoras()).isEqualTo(24);
+        assertThat(categorias.buscarPorId(7L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.BAJA);
         assertThat(areas.buscarTodas()).hasSize(9);
         assertThat(areas.buscarPorId(5L).orElseThrow().getMunicipio().getNombre()).isEqualTo("Avellaneda");
         assertThat(usuarios.buscarTodos()).extracting(Usuario::getId).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
@@ -66,7 +77,10 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(areas.buscarCandidatas(1L, 2L)).isEmpty();
         assertThat(areas.buscarCandidatas(1L, 3L)).extracting(AreaMunicipal::getId).containsExactly(7L);
         assertThat(areas.buscarCandidatas(3L, 3L)).extracting(AreaMunicipal::getId).containsExactly(9L);
-        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(9);
+        assertThat(areas.buscarCandidatas(4L, 2L)).isEmpty();
+        assertThat(areas.buscarCandidatas(7L, 1L)).extracting(AreaMunicipal::getId).containsExactly(2L, 4L);
+        assertThat(areas.buscarCandidatas(8L, 1L)).isEmpty();
+        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(21);
         assertThat(reclamos.buscarTodos()).isEmpty();
         assertThat(usuarios.buscarTodos()).allMatch(Usuario::tieneContrasena);
         assertThat(usuarios.buscarPorEmail("ana@example.org")).isPresent();

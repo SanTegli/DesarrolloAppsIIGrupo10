@@ -14,6 +14,7 @@ import ar.edu.uade.reclamos.aplicacion.prioridad.SolicitudesReevaluacion;
 import ar.edu.uade.reclamos.aplicacion.prioridad.TopologiaReevaluacion;
 import ar.edu.uade.reclamos.dominio.evento.PublicadorEventos;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
+import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MensajeSalienteRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import java.time.Duration;
@@ -31,6 +32,7 @@ class ConfiguracionMensajeriaTest {
     private final ApplicationContextRunner contexto = new ApplicationContextRunner()
             .withUserConfiguration(ConfiguracionAplicacion.class, ConfiguracionMensajeria.class)
             .withBean(ReclamoRepository.class, () -> mock(ReclamoRepository.class))
+            .withBean(CategoriaRepository.class, () -> mock(CategoriaRepository.class))
             .withBean(AreaMunicipalRepository.class, () -> mock(AreaMunicipalRepository.class))
             .withBean(MensajeSalienteRepository.class, () -> mock(MensajeSalienteRepository.class))
             .withBean(RabbitTemplate.class, () -> mock(RabbitTemplate.class))

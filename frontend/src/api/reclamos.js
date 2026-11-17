@@ -5,12 +5,16 @@ const ruta = (numero) => `/reclamos/${encodeURIComponent(numero)}`
 /**
  * POST /api/reclamos. Solo ciudadanos. Va como multipart/form-data: la parte `reclamo` con el JSON y la parte
  * `foto` con el archivo (obligatoria). `ubicacion` es la sugerencia elegida del mapa; sin ella, el reclamo queda
- * con la ubicación pendiente.
+ * con la ubicación pendiente. `categoriaPropuesta` es qué tipo de problema es, en palabras del vecino: solo con
+ * "Otro problema".
  */
-export function crearReclamo({ categoriaId, municipioId, descripcion, direccion, ubicacion, foto }) {
+export function crearReclamo({ categoriaId, municipioId, descripcion, direccion, ubicacion, foto, categoriaPropuesta }) {
   const reclamo = { categoriaId, municipioId, descripcion, direccion }
   if (ubicacion) {
     reclamo.ubicacion = ubicacion
+  }
+  if (categoriaPropuesta) {
+    reclamo.categoriaPropuesta = categoriaPropuesta
   }
   const formulario = new FormData()
   formulario.append('reclamo', new Blob([JSON.stringify(reclamo)], { type: 'application/json' }))
@@ -61,6 +65,14 @@ export function asignarArea(numero, areaId, observacion) {
   return pedir(`${ruta(numero)}/asignacion`, {
     metodo: 'PATCH',
     cuerpo: { areaId, observacion: observacion || null },
+  })
+}
+
+/** PATCH /api/reclamos/{numero}/categoria. Solo administradores y solo antes de asignar un área. */
+export function recategorizar(numero, categoriaId, observacion) {
+  return pedir(`${ruta(numero)}/categoria`, {
+    metodo: 'PATCH',
+    cuerpo: { categoriaId, observacion: observacion || null },
   })
 }
 

@@ -1,7 +1,9 @@
 package ar.edu.uade.reclamos.prioridad.configuracion;
 
 import ar.edu.uade.reclamos.prioridad.evaluacion.EvaluadorPrioridad;
+import ar.edu.uade.reclamos.prioridad.evaluacion.InstruccionesCategoria;
 import ar.edu.uade.reclamos.prioridad.evaluacion.InstruccionesPrioridad;
+import ar.edu.uade.reclamos.prioridad.evaluacion.SugeridorCategoria;
 import ar.edu.uade.reclamos.prioridad.proveedor.GeminiAdapter;
 import ar.edu.uade.reclamos.prioridad.proveedor.OpenAiAdapter;
 import ar.edu.uade.reclamos.prioridad.proveedor.ProveedorIA;
@@ -53,6 +55,18 @@ public class ConfiguracionProveedor {
             throws IOException {
         return new InstruccionesPrioridad(recursos.getResource(propiedades.instrucciones())
                 .getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    @Bean
+    public InstruccionesCategoria instruccionesCategoria(PropiedadesIA propiedades, ResourceLoader recursos)
+            throws IOException {
+        return new InstruccionesCategoria(recursos.getResource(propiedades.instruccionesCategoria())
+                .getContentAsString(StandardCharsets.UTF_8));
+    }
+
+    @Bean
+    public SugeridorCategoria sugeridorCategoria(InstruccionesCategoria instrucciones, ProveedorIA proveedor) {
+        return new SugeridorCategoria(instrucciones, proveedor);
     }
 
     @Bean

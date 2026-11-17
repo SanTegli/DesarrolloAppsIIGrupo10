@@ -62,6 +62,37 @@ class ClienteServicioPrioridadTest {
     }
 
     @Test
+    void sugerirCategoriaMandaLaPropuestaYLasCategoriasYLeeLaRespuesta() {
+        servidor.expect(requestTo("http://prioridad.test/api/categorias/sugerir"))
+                .andExpect(method(HttpMethod.POST))
+                .andExpect(jsonPath("$.categoriaPropuesta").value("Baldosas levantadas"))
+                .andExpect(jsonPath("$.descripcion").value("Baldosas sueltas"))
+                .andExpect(jsonPath("$.categorias[1]").value("Vereda rota"))
+                .andExpect(jsonPath("$.ciudadano").doesNotExist())
+                .andRespond(withSuccess("""
+                        {"categoria": "Vereda rota", "motivo": "Es la vereda.", "proveedor": "simulado",
+                         "modelo": "reglas"}""", MediaType.APPLICATION_JSON));
+        servidor.expect(requestTo("http://prioridad.test/api/categorias/sugerir"))
+                .andRespond(withSuccess("{\"categoria\": null, \"motivo\": \"Ninguna.\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(cliente.sugerirCategoria("Baldosas levantadas", "Baldosas sueltas",
+                java.util.List.of("Bache", "Vereda rota")))
+                .isEqualTo(new SugerenciaCategoria("Vereda rota", "Es la vereda.", "simulado", "reglas"));
+        assertThat(cliente.sugerirCategoria("Algo", "Algo raro", java.util.List.of("Bache")).categoria()).isNull();
+    }
+
+    @Test
+    void unaCategoriaQueNoEstabaEnLaListaEsServicioNoDisponible() {
+        servidor.expect(requestTo("http://prioridad.test/api/categorias/sugerir"))
+                .andRespond(withSuccess("{\"categoria\": \"Fuga de gas\", \"motivo\": \"x\"}",
+                        MediaType.APPLICATION_JSON));
+
+        assertThatThrownBy(() -> cliente.sugerirCategoria("Gas", "Olor a gas", java.util.List.of("Bache")))
+                .isInstanceOf(ServicioExternoNoDisponibleException.class).hasMessageContaining("no existe");
+    }
+
+    @Test
     void errorDelServicioEsServicioNoDisponible() {
         servidor.expect(requestTo(URL)).andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
 

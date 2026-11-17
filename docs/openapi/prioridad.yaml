@@ -1,13 +1,17 @@
 openapi: 3.1.0
 info:
   title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
-  description: Sugiere la prioridad de un reclamo a partir de su categoría y su descripción
-    con un modelo de lenguaje externo (Gemini u OpenAI). No recibe datos personales.
-  version: 1.0.0
+  description: "Sugiere la prioridad de un reclamo a partir de su categoría y su descripció\
+    n con un modelo de lenguaje externo (Gemini u OpenAI) y, desde la 1.1, la categorí\
+    a de un reclamo cargado como \"Otro problema\". No recibe datos personales."
+  version: 1.1.0
 servers:
 - url: http://localhost
   description: Generated server url
 tags:
+- name: Categorías
+  description: Categoría sugerida por un modelo de lenguaje para un reclamo de "Otro
+    problema"
 - name: Prioridades
   description: Prioridad sugerida por un modelo de lenguaje
 paths:
@@ -33,6 +37,52 @@ paths:
             '*/*':
               schema:
                 $ref: "#/components/schemas/EvaluacionResponse"
+        "400":
+          description: Entrada inválida (DATOS_INVALIDOS)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "502":
+          description: El modelo respondió algo inválido (RESPUESTA_INVALIDA)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: "Proveedor caído, sin clave o sin cuota (PROVEEDOR_NO_DISPONIBLE)"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "504":
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/categorias/sugerir:
+    post:
+      tags:
+      - Categorías
+      summary: Sugerir la categoría de un reclamo de "Otro problema"
+      description: "Le pide al modelo configurado cuál de las categorías recibidas\
+        \ corresponde, o ninguna, con una explicación breve. Es una sugerencia: la\
+        \ recategorización la decide un administrador."
+      operationId: sugerir
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SugerenciaCategoriaRequest"
+        required: true
+      responses:
+        "200":
+          description: "Categoría sugerida, o null si ninguna corresponde"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SugerenciaCategoriaResponse"
         "400":
           description: Entrada inválida (DATOS_INVALIDOS)
           content:
@@ -135,4 +185,56 @@ components:
       - modelo
       - motivo
       - prioridad
+      - proveedor
+    SugerenciaCategoriaRequest:
+      type: object
+      properties:
+        categoriaPropuesta:
+          type: string
+          example: Baldosas levantadas
+          maxLength: 80
+          minLength: 0
+        descripcion:
+          type: string
+          example: En la vereda de la escuela hay baldosas sueltas y ya se cayó una
+            señora
+          maxLength: 1000
+          minLength: 0
+        categorias:
+          type: array
+          items:
+            type: string
+            example: Vereda rota
+            maxLength: 80
+            minLength: 0
+          maxItems: 30
+          minItems: 0
+      required:
+      - categoriaPropuesta
+      - categorias
+      - descripcion
+    SugerenciaCategoriaResponse:
+      type: object
+      properties:
+        categoria:
+          type: string
+          description: null si ninguna categoría corresponde
+          example: Vereda rota
+        motivo:
+          type: string
+          example: Las baldosas sueltas son un problema de la vereda.
+          maxLength: 300
+        proveedor:
+          type: string
+          enum:
+          - gemini
+          - openai
+          - simulado
+          example: gemini
+        modelo:
+          type: string
+          example: gemini-3.5-flash-lite
+      required:
+      - modelo
+      - motivo
       - proveedor

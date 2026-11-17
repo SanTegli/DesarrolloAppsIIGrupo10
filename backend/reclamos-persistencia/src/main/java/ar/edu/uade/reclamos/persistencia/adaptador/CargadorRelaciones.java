@@ -36,6 +36,7 @@ final class CargadorRelaciones {
     static Reclamo cargar(Reclamo reclamo) {
         cargar(reclamo.getCiudadano());
         Hibernate.initialize(reclamo.getCategoria());
+        Hibernate.initialize(reclamo.getCategoriaSugerida());
         Hibernate.initialize(reclamo.getMunicipio());
         cargar(reclamo.getArea());
         if (reclamo.getAgente() != null) {

@@ -26,14 +26,19 @@ public class GeminiAdapter implements ProveedorIA {
 
     static final String RUTA = "/v1beta/models/{modelo}:generateContent";
 
-    /** Esquema de Gemini (subconjunto de OpenAPI, tipos en mayúscula). */
-    static final Map<String, Object> ESQUEMA = Map.of(
-            "type", "OBJECT",
-            "properties", Map.of(
-                    EsquemaRespuesta.CAMPO_PRIORIDAD, Map.of("type", "STRING", "enum", EsquemaRespuesta.PRIORIDADES),
-                    EsquemaRespuesta.CAMPO_MOTIVO, Map.of("type", "STRING")),
-            "required", List.of(EsquemaRespuesta.CAMPO_PRIORIDAD, EsquemaRespuesta.CAMPO_MOTIVO),
-            "propertyOrdering", List.of(EsquemaRespuesta.CAMPO_PRIORIDAD, EsquemaRespuesta.CAMPO_MOTIVO));
+    /** Esquema de la prioridad. */
+    static final Map<String, Object> ESQUEMA = esquema(FormatoRespuesta.PRIORIDAD);
+
+    /** Esquema de Gemini (subconjunto de OpenAPI, tipos en mayúscula) para el formato pedido. */
+    static Map<String, Object> esquema(FormatoRespuesta formato) {
+        return Map.of(
+                "type", "OBJECT",
+                "properties", Map.of(
+                        formato.campo(), Map.of("type", "STRING", "enum", formato.valores()),
+                        EsquemaRespuesta.CAMPO_MOTIVO, Map.of("type", "STRING")),
+                "required", List.of(formato.campo(), EsquemaRespuesta.CAMPO_MOTIVO),
+                "propertyOrdering", List.of(formato.campo(), EsquemaRespuesta.CAMPO_MOTIVO));
+    }
 
     private final RestClient http;
     private final String clave;
@@ -86,7 +91,7 @@ public class GeminiAdapter implements ProveedorIA {
         }
         Map<String, Object> generacion = new LinkedHashMap<>();
         generacion.put("responseMimeType", "application/json");
-        generacion.put("responseSchema", ESQUEMA);
+        generacion.put("responseSchema", esquema(consulta.formato()));
         if (razonamiento != null) {
             generacion.put("thinkingConfig", Map.of("thinkingLevel", razonamiento));
         }
@@ -105,7 +110,7 @@ public class GeminiAdapter implements ProveedorIA {
         } catch (RestClientException error) {
             throw ErroresProveedor.traducir("Gemini", error);
         }
-        return LectorRespuesta.leer(json, "Gemini", texto(respuesta));
+        return LectorRespuesta.leer(json, "Gemini", texto(respuesta), consulta.formato());
     }
 
     /** Texto de la primera respuesta candidata, sin las partes de razonamiento interno. */

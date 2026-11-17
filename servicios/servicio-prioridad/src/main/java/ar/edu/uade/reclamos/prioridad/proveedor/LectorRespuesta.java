@@ -5,7 +5,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
- * Lee el JSON que escribió el modelo ({@code {"prioridad": "...", "motivo": "..."}}). Es igual para todos los
+ * Lee el JSON que escribió el modelo ({@code {"prioridad": "...", "motivo": "..."}}, o con {@code categoria}). Es igual para todos los
  * proveedores: lo que cambia entre ellos es dónde viene ese texto dentro de la respuesta HTTP.
  */
 final class LectorRespuesta {
@@ -13,7 +13,7 @@ final class LectorRespuesta {
     private LectorRespuesta() {
     }
 
-    static RespuestaIA leer(ObjectMapper json, String proveedor, String texto) {
+    static RespuestaIA leer(ObjectMapper json, String proveedor, String texto, FormatoRespuesta formato) {
         if (texto == null || texto.isBlank()) {
             throw new RespuestaInvalidaException(proveedor + " no devolvió texto");
         }
@@ -31,7 +31,7 @@ final class LectorRespuesta {
         if (objeto == null || !objeto.isObject()) {
             throw new RespuestaInvalidaException(proveedor + " no devolvió un objeto JSON");
         }
-        return new RespuestaIA(texto(objeto, EsquemaRespuesta.CAMPO_PRIORIDAD),
+        return new RespuestaIA(texto(objeto, formato.campo()),
                 texto(objeto, EsquemaRespuesta.CAMPO_MOTIVO));
     }
 

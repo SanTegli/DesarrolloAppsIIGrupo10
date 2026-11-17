@@ -29,7 +29,7 @@ public class EvaluadorPrioridad {
         RespuestaIA respuesta = proveedor.sugerir(instrucciones.armar(categoria, descripcion));
         Prioridad prioridad = Prioridad.leer(respuesta.prioridad()).orElseThrow(() ->
                 new RespuestaInvalidaException(proveedor.nombre() + " sugirió una prioridad que no existe"));
-        String motivo = acotar(respuesta.motivo());
+        String motivo = acotar(proveedor.nombre(), respuesta.motivo());
         // Sin la descripción en el log: solo su largo, para medir sin guardar lo que escribió el vecino.
         LOGGER.info("Prioridad {} sugerida por {} ({}) en {} ms; descripción de {} caracteres", prioridad,
                 proveedor.nombre(), proveedor.modelo(), (System.nanoTime() - inicio) / 1_000_000,
@@ -37,9 +37,10 @@ public class EvaluadorPrioridad {
         return new Evaluacion(prioridad, motivo, proveedor.nombre(), proveedor.modelo());
     }
 
-    private String acotar(String motivo) {
+    /** El motivo en una línea y de hasta {@value #LONGITUD_MAXIMA_MOTIVO} caracteres; vacío es un error. */
+    static String acotar(String nombreProveedor, String motivo) {
         if (motivo == null || motivo.isBlank()) {
-            throw new RespuestaInvalidaException(proveedor.nombre() + " no explicó el motivo");
+            throw new RespuestaInvalidaException(nombreProveedor + " no explicó el motivo");
         }
         String limpio = motivo.strip().replaceAll("\\s+", " ");
         if (limpio.length() <= LONGITUD_MAXIMA_MOTIVO) {

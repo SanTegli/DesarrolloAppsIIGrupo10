@@ -76,6 +76,8 @@ classDiagram
     -String nombre
     -int slaHoras
     -Prioridad prioridadBase
+    -boolean otra
+    +esOtra() boolean
   }
   class AreaMunicipal {
     -String nombre
@@ -95,6 +97,8 @@ classDiagram
     -boolean vencido
     -boolean asignacionPendiente
     -String foto
+    -String categoriaPropuesta
+    -String motivoSugerencia
     -LocalDateTime fechaCreacion
     -LocalDateTime fechaLimite
     -long version
@@ -108,6 +112,9 @@ classDiagram
     +registrarUbicacion(Ubicacion)
     +registrarFoto(String)
     +marcarAsignacionPendiente()
+    +proponerCategoria(String)
+    +registrarSugerenciaCategoria(Categoria, String) boolean
+    +recategorizar(Categoria, Usuario, String, LocalDateTime)
     +perteneceA(Usuario) boolean
   }
   class Ubicacion {
@@ -147,7 +154,7 @@ classDiagram
     +destinosPosibles(EstadoReclamo, Rol)$ Set
   }
   class ReclamoFactory {
-    +crear(Ciudadano, Categoria, Municipio, String, String) Reclamo
+    +crear(Ciudadano, Categoria, Municipio, String, String, String) Reclamo
   }
 
   Entidad <|-- Usuario
@@ -165,6 +172,7 @@ classDiagram
   AgenteMunicipal "*" --> "1" AreaMunicipal
   Reclamo "*" --> "1" Ciudadano
   Reclamo "*" --> "1" Categoria
+  Reclamo "*" --> "0..1" Categoria : sugerida por la IA
   Reclamo "*" --> "1" Municipio
   Reclamo "*" --> "0..1" AreaMunicipal
   Reclamo "*" --> "0..1" AgenteMunicipal
@@ -217,6 +225,9 @@ habilitada, además salen por correo a través de la outbox.
 | Un reclamo guarda la referencia a su foto una sola vez; no se reemplaza | `Reclamo.registrarFoto` |
 | Solo un reclamo abierto y con la ubicación confirmada aparece como posible duplicado | `Reclamo.puedeSerDuplicado` |
 | Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad | Constructor de `Apoyo` |
+| Un reclamo de "Otro problema" lleva qué tipo de problema es, en palabras del vecino (hasta 80 caracteres); las demás categorías no | `ReclamoFactory.crear` y `Reclamo.proponerCategoria` |
+| La sugerencia de categoría de la IA se guarda una sola vez, solo en un reclamo de "Otro problema", nunca es "Otro problema" y no cambia la categoría | `Reclamo.registrarSugerenciaCategoria` |
+| Recategorizar: solo un administrador, solo sin área (`INGRESADO`), a una categoría concreta y distinta. El plazo se recalcula desde la creación y la prioridad no baja | `Reclamo.recategorizar` |
 | La revisión por IA de un reclamo `PENDIENTE_IA` se aplica una sola vez, sube o mantiene la prioridad y nunca la baja (tampoco la que subió un vencimiento) | `Reclamo.completarPrioridadPorIA` y `abandonarRevisionPorIA` |
 
 Los tableros (PR 18) no usan estas clases para contar: leen por el puerto `ConsultasTablero` (paquete
@@ -239,6 +250,7 @@ erDiagram
   usuarios ||--o{ reclamos : "ciudadano_id"
   usuarios |o--o{ reclamos : "agente_id"
   categorias ||--o{ reclamos : "categoria_id"
+  categorias |o--o{ reclamos : "categoria_sugerida_id"
   municipios ||--o{ reclamos : "municipio_id"
   areas_municipales |o--o{ reclamos : "area_id"
   reclamos ||--|{ historial_estados : registra
@@ -275,6 +287,7 @@ erDiagram
     string descripcion
     int sla_horas
     string prioridad_base
+    boolean otra "PR 26: Otro problema"
   }
   areas_municipales {
     bigint id PK
@@ -295,6 +308,9 @@ erDiagram
     boolean vencido
     boolean asignacion_pendiente
     string foto "referencia en el almacén; nula antes del PR 16"
+    string categoria_propuesta "PR 26; solo Otro problema"
+    bigint categoria_sugerida_id FK "PR 26; la sugerida por la IA"
+    string motivo_sugerencia "PR 26"
     datetime fecha_creacion
     datetime fecha_limite
     bigint version "bloqueo optimista"

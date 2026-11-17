@@ -65,12 +65,12 @@ class GestionReclamosFacadeTest {
         var pendiente = Ubicacion.pendiente();
         when(fotos.preparar(foto)).thenReturn("ref.jpg");
         when(ubicaciones.confirmar(3L, null)).thenReturn(pendiente);
-        when(escritura.crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg")).thenReturn(reclamo);
+        when(escritura.crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg", null)).thenReturn(reclamo);
 
         assertThat(facade.crear(1L, 2L, 3L, "Pozo", "Calle", null, foto)).isSameAs(reclamo);
         var orden = inOrder(fotos, escritura);
         orden.verify(fotos).preparar(foto);
-        orden.verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg");
+        orden.verify(escritura).crear(1L, 2L, 3L, "Pozo", "Calle", pendiente, "ref.jpg", null);
         orden.verify(fotos).confirmar("ref.jpg");
         verify(fotos, never()).descartar(any());
     }
@@ -80,7 +80,7 @@ class GestionReclamosFacadeTest {
         var error = new RecursoNoEncontradoException("categoría", 2L);
         when(fotos.preparar(foto)).thenReturn("ref.jpg");
         when(ubicaciones.confirmar(3L, null)).thenReturn(Ubicacion.pendiente());
-        when(escritura.crear(anyLong(), anyLong(), anyLong(), any(), any(), any(Ubicacion.class), eq("ref.jpg")))
+        when(escritura.crear(anyLong(), anyLong(), anyLong(), any(), any(), any(Ubicacion.class), eq("ref.jpg"), any()))
                 .thenThrow(error);
 
         assertThatThrownBy(() -> facade.crear(1L, 2L, 3L, "Pozo", "Calle", null, foto)).isSameAs(error);

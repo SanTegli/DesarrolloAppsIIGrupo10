@@ -23,6 +23,8 @@ public class Reclamo extends Entidad {
     public static final int LONGITUD_MAXIMA_DIRECCION = 200;
     public static final int LONGITUD_MAXIMA_MOTIVO_PRIORIDAD = 300;
     public static final int LONGITUD_MAXIMA_REFERENCIA_FOTO = 64;
+    public static final int LONGITUD_MAXIMA_CATEGORIA_PROPUESTA = 80;
+    public static final int LONGITUD_MAXIMA_MOTIVO_SUGERENCIA = 300;
 
     private String numero;
     private String descripcion;
@@ -45,6 +47,12 @@ public class Reclamo extends Entidad {
     private Categoria categoria;
     private Municipio municipio;
     private AreaMunicipal area;
+    /** PR 26: qué tipo de problema escribió el vecino al elegir la categoría "otra"; {@code null} en las demás. */
+    private String categoriaPropuesta;
+    /** PR 26: la categoría que sugirió la IA para un reclamo de "otra"; {@code null} si no sugirió ninguna. */
+    private Categoria categoriaSugerida;
+    /** PR 26: por qué la IA sugirió esa categoría, o por qué no sugirió; {@code null} mientras no respondió. */
+    private String motivoSugerencia;
     private List<HistorialEstado> historial = new ArrayList<>();
 
     /** Requerido por JPA. */
@@ -253,6 +261,90 @@ public class Reclamo extends Entidad {
         }
     }
 
+    /**
+     * Guarda qué tipo de problema escribió el vecino al elegir la categoría "otra". Lo llama la fábrica al crear
+     * el reclamo; en las demás categorías no se usa.
+     */
+    public void proponerCategoria(String propuesta) {
+        if (!categoria.esOtra()) {
+            throw new DatosInvalidosException("La categoría " + categoria.getNombre()
+                    + " no lleva un tipo de problema escrito: eso es solo para \"Otro problema\".");
+        }
+        if (categoriaPropuesta != null) {
+            throw new ReglaNegocioException("El reclamo " + numero + " ya tiene una categoría propuesta.");
+        }
+        this.categoriaPropuesta = Validador.requerirTexto(propuesta, "tipo de problema",
+                LONGITUD_MAXIMA_CATEGORIA_PROPUESTA);
+    }
+
+    /** La IA ya respondió sobre la categoría, con una sugerencia o sin ella. */
+    public boolean tieneSugerenciaDeCategoria() {
+        return motivoSugerencia != null;
+    }
+
+    /**
+     * Guarda la categoría que sugirió la IA para un reclamo de "otra". Es solo una sugerencia: la categoría no
+     * cambia hasta que un administrador recategoriza.
+     *
+     * @param sugerida la categoría sugerida, o {@code null} si la IA no encontró ninguna o no respondió
+     * @param motivo   por qué; obligatorio, porque también explica la falta de sugerencia
+     * @return {@code false} si no correspondía guardarla: el reclamo ya se recategorizó o ya tenía una sugerencia
+     *         (el mensaje de la cola puede llegar dos veces o tarde)
+     */
+    public boolean registrarSugerenciaCategoria(Categoria sugerida, String motivo) {
+        if (!categoria.esOtra() || tieneSugerenciaDeCategoria()) {
+            return false;
+        }
+        if (sugerida != null && sugerida.esOtra()) {
+            throw new DatosInvalidosException("La categoría sugerida no puede ser \"" + sugerida.getNombre() + "\".");
+        }
+        this.motivoSugerencia = Validador.requerirTexto(motivo, "motivo", LONGITUD_MAXIMA_MOTIVO_SUGERENCIA);
+        this.categoriaSugerida = sugerida;
+        return true;
+    }
+
+    /**
+     * Cambia la categoría de un reclamo que todavía no tiene área, típicamente uno de "otra". Lo hace un
+     * administrador. El plazo se vuelve a calcular desde la fecha de creación con el de la categoría nueva, y la
+     * prioridad no baja: queda la mayor entre la actual y la base de la nueva. Deja un registro en el historial,
+     * sin cambio de estado.
+     *
+     * @throws AccesoDenegadoException si no lo pide un administrador
+     * @throws ReglaNegocioException   si el reclamo ya tiene área o la categoría es la misma
+     */
+    public void recategorizar(Categoria nueva, Usuario actor, String observacion, LocalDateTime ahora) {
+        Validador.requerirNoNulo(nueva, "categoría");
+        Validador.requerirNoNulo(actor, "usuario");
+        if (actor.getRol() != Rol.ADMINISTRADOR) {
+            throw new AccesoDenegadoException("Solo un administrador puede cambiar la categoría de un reclamo.");
+        }
+        if (estado != EstadoReclamo.INGRESADO) {
+            throw new ReglaNegocioException("El reclamo " + numero + " ya está " + estado
+                    + ": la categoría se cambia solo antes de asignarle un área.");
+        }
+        if (nueva.esOtra()) {
+            throw new ReglaNegocioException("Elegí una categoría concreta, no \"" + nueva.getNombre() + "\".");
+        }
+        if (nueva.equals(categoria)) {
+            throw new ReglaNegocioException("El reclamo ya es de la categoría " + nueva.getNombre() + ".");
+        }
+        String nota = "Categoría: " + categoria.getNombre() + " → " + nueva.getNombre() + "."
+                + (observacion == null || observacion.isBlank() ? "" : " " + observacion.strip());
+        this.categoria = nueva;
+        this.fechaLimite = fechaCreacion.plusHours(nueva.getSlaHoras());
+        if (vencido && !ahora.isAfter(fechaLimite)) {
+            this.vencido = false;
+        }
+        if (nueva.getPrioridadBase().esMayorQue(prioridad)) {
+            this.prioridad = nueva.getPrioridadBase();
+            if (!estaPendienteDeIA()) {
+                this.origenPrioridad = OrigenPrioridad.CATEGORIA;
+                this.motivoPrioridad = null;
+            }
+        }
+        registrarCambio(estado, actor, nota, ahora);
+    }
+
     /** Guarda dónde ocurre el reclamo; reemplaza la ubicación anterior. */
     public void registrarUbicacion(Ubicacion nuevaUbicacion) {
         this.ubicacion = Validador.requerirNoNulo(nuevaUbicacion, "ubicación");
@@ -385,6 +477,21 @@ public class Reclamo extends Entidad {
     /** {@code null} mientras el reclamo está sin asignar. */
     public AreaMunicipal getArea() {
         return area;
+    }
+
+    /** Qué tipo de problema escribió el vecino al elegir "otra"; {@code null} en las demás categorías. */
+    public String getCategoriaPropuesta() {
+        return categoriaPropuesta;
+    }
+
+    /** {@code null} si la IA no sugirió ninguna categoría, todavía no respondió o el reclamo no es de "otra". */
+    public Categoria getCategoriaSugerida() {
+        return categoriaSugerida;
+    }
+
+    /** {@code null} mientras la IA no respondió sobre la categoría. */
+    public String getMotivoSugerencia() {
+        return motivoSugerencia;
     }
 
     /** Cambios de estado en orden cronológico. El primero es el ingreso. */

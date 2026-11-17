@@ -6,6 +6,7 @@ import ar.edu.uade.reclamos.dominio.evento.EventoDominio;
 import ar.edu.uade.reclamos.dominio.evento.PublicadorEventos;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoAsignado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoCreado;
+import ar.edu.uade.reclamos.dominio.evento.ReclamoRecategorizado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoResuelto;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoVencido;
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
@@ -304,6 +305,7 @@ public final class DoblesEnMemoria {
                 case EstadoReclamoCambiado cambio -> listener.estadoCambiado(cambio);
                 case ReclamoResuelto resuelto -> listener.resuelto(resuelto);
                 case ReclamoVencido vencido -> listener.vencido(vencido);
+                case ReclamoRecategorizado recategorizado -> listener.recategorizado(recategorizado);
                 default -> throw new IllegalArgumentException("Evento sin listener: " + evento.nombre());
             }
         }

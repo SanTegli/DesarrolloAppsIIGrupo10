@@ -8,17 +8,22 @@
   "categorias": [
     { "id": 1, "nombre": "Luminaria rota" },
     { "id": 2, "nombre": "Bache" },
-    { "id": 3, "nombre": "Residuos" }
+    { "id": 3, "nombre": "Residuos" },
+    { "id": 4, "nombre": "Semáforo averiado" },
+    { "id": 5, "nombre": "Árbol caído o con riesgo" },
+    { "id": 6, "nombre": "Pérdida de agua" },
+    { "id": 7, "nombre": "Vereda rota" },
+    { "id": 8, "nombre": "Otro problema" }
   ],
   "areas": [
-    { "id": 1, "nombre": "Alumbrado", "municipioId": 1, "categorias": [1] },
-    { "id": 2, "nombre": "Obras Públicas", "municipioId": 1, "categorias": [2] },
-    { "id": 3, "nombre": "Higiene Urbana", "municipioId": 1, "categorias": [3] },
-    { "id": 4, "nombre": "Mantenimiento Vial", "municipioId": 1, "categorias": [2] },
-    { "id": 5, "nombre": "Obras Públicas", "municipioId": 2, "categorias": [2] },
-    { "id": 6, "nombre": "Higiene Urbana", "municipioId": 2, "categorias": [3] },
-    { "id": 7, "nombre": "Alumbrado", "municipioId": 3, "categorias": [1] },
-    { "id": 8, "nombre": "Obras Públicas", "municipioId": 3, "categorias": [2] },
-    { "id": 9, "nombre": "Higiene Urbana", "municipioId": 3, "categorias": [3] }
+    { "id": 1, "nombre": "Alumbrado", "municipioId": 1, "categorias": [1, 4] },
+    { "id": 2, "nombre": "Obras Públicas", "municipioId": 1, "categorias": [2, 6, 7] },
+    { "id": 3, "nombre": "Higiene Urbana", "municipioId": 1, "categorias": [3, 5] },
+    { "id": 4, "nombre": "Mantenimiento Vial", "municipioId": 1, "categorias": [2, 7] },
+    { "id": 5, "nombre": "Obras Públicas", "municipioId": 2, "categorias": [2, 6, 7] },
+    { "id": 6, "nombre": "Higiene Urbana", "municipioId": 2, "categorias": [3, 5] },
+    { "id": 7, "nombre": "Alumbrado", "municipioId": 3, "categorias": [1, 4] },
+    { "id": 8, "nombre": "Obras Públicas", "municipioId": 3, "categorias": [2, 6, 7] },
+    { "id": 9, "nombre": "Higiene Urbana", "municipioId": 3, "categorias": [3, 5] }
   ]
 }

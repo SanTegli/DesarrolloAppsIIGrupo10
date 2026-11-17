@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import { MUNICIPIOS, CATEGORIAS, TOKEN_CSRF, archivoFoto, reclamo, simularApi } from '../pruebas/apiFalsa.js'
@@ -127,3 +127,45 @@ describe('FormularioReclamo: municipio', () => {
     expect(municipio).toHaveValue('2')
   })
 })
+
+describe('FormularioReclamo: otro problema', () => {
+  it('"Otro problema" va al final de la lista', () => {
+    mostrar()
+
+    const opciones = within(screen.getByLabelText(/Categoría/)).getAllByRole('option').map((opcion) => opcion.textContent)
+    expect(opciones).toEqual(['Elegí una categoría', 'Luminaria rota', 'Bache', 'Vereda rota', 'Otro problema'])
+  })
+
+  it('con "Otro problema" pide qué tipo de problema es y lo manda en el alta', async () => {
+    const { llamadas, onCreado, usuario } = mostrar({ 'POST /api/reclamos': { status: 201, cuerpo: reclamo() } })
+
+    expect(screen.queryByLabelText('¿Qué tipo de problema es?')).not.toBeInTheDocument()
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Otro problema')
+    const propuesta = screen.getByLabelText('¿Qué tipo de problema es?')
+    expect(propuesta).toBeRequired()
+    expect(propuesta).toHaveAttribute('maxLength', '80')
+    await usuario.type(propuesta, '  Baldosas levantadas ')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
+    await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
+    await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Baldosas sueltas')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
+    await usuario.click(screen.getByRole('button', { name: 'Crear reclamo' }))
+
+    await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
+    expect(llamadas[0].cuerpo).toMatchObject({ categoriaId: 8, categoriaPropuesta: 'Baldosas levantadas' })
+  })
+
+  it('con otra categoría no manda propuesta', async () => {
+    const { llamadas, onCreado, usuario } = mostrar({ 'POST /api/reclamos': { status: 201, cuerpo: reclamo() } })
+
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Otro problema')
+    await usuario.type(screen.getByLabelText('¿Qué tipo de problema es?'), 'Algo')
+    await completar(usuario)
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
+    await usuario.click(screen.getByRole('button', { name: 'Crear reclamo' }))
+
+    await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
+    expect(llamadas[0].cuerpo.categoriaPropuesta).toBeUndefined()
+  })
+})
+

@@ -277,9 +277,10 @@ Los servicios se integran entre sí de dos formas:
   (Telegram o simulado), `ControlDeUso` (cada control de la cadena) y `SalidaDeAvisos` (la outbox o
   ninguna, según `reclamos.mensajeria.habilitada`).
 - **Por eventos de dominio.** `ReclamoService` y `ServicioVencimientos` publican `ReclamoCreado`,
-  `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto` y `ReclamoVencido`. Dos listeners
-  reaccionan sin que quien publica los conozca: `NotificacionesReclamoListener` genera los avisos
-  y `AuditoriaListener` registra cada evento.
+  `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido` y, desde el PR 26,
+  `ReclamoRecategorizado`. Los listeners reaccionan sin que quien publica los conozca:
+  `NotificacionesReclamoListener` genera los avisos, `AuditoriaListener` registra cada evento y
+  `ReevaluacionPrioridadListener` y `SugerenciaCategoriaListener` dejan los pedidos a la IA en la outbox.
 
 Hay tres tareas programadas:
 
@@ -461,6 +462,7 @@ sequenceDiagram
 | `PrioridadPorIA` | La IA puede subir la prioridad de la categoría, pero no bajarla |
 | `PrioridadConRespaldo` | Si la IA no responde, usa la prioridad de la categoría. Con la mensajería prendida marca el origen `PENDIENTE_IA` para que la IA lo revise después; sin ella, `RESPALDO` |
 | `ServicioReevaluacionPrioridad` | Consume la cola `reclamos.prioridad`, vuelve a llamar a la IA y completa la prioridad. Si falla, reprograma el intento por la cola de espera; después de 4, deja `RESPALDO` |
+| `ServicioSugerenciaCategoria` (PR 26) | Consume la cola `reclamos.categoria` y le pide a REST 2 la categoría de un reclamo de "Otro problema". Guarda la sugerencia; la recategorización la hace un administrador |
 
 La IA se llama dentro de la transacción del alta: en el peor caso, el alta tarda unos 4 segundos más. Con
 el circuito abierto, el respaldo es inmediato.
@@ -510,6 +512,54 @@ sequenceDiagram
 - **Mensajes inválidos:** van a `reclamos.prioridad.dlq`, separada de la de notificaciones.
 - **Interfaz:** el detalle muestra «por categoría (la IA lo está revisando)» y se actualiza solo cuando la
   IA termina.
+
+#### "Otro problema": la IA sugiere, el administrador decide (PR 26)
+
+Cuando ninguna categoría le sirve, el vecino elige "Otro problema" y escribe qué tipo de problema es
+("Baldosas levantadas"). Ningún área atiende esa categoría, así que el reclamo queda `INGRESADO`. La IA sugiere
+la categoría y un administrador la confirma o elige otra:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  actor V as Vecino
+  participant RS as ReclamoService
+  participant CL as SugerenciaCategoriaListener<br/>(Observer)
+  participant MQ as Outbox y RabbitMQ
+  participant SC as ServicioSugerenciaCategoria
+  participant SP as servicio-prioridad
+  actor A as Administrador
+
+  V->>RS: alta con "Otro problema" y "Baldosas levantadas"
+  RS->>RS: queda INGRESADO, sin área
+  RS-)CL: ReclamoCreado con categoriaOtra (misma transacción)
+  CL->>MQ: CategoriaPendiente, intento 1 → cola reclamos.categoria
+  MQ-)SC: mensaje (solo número de reclamo e intento)
+  SC->>SP: POST /api/categorias/sugerir con la propuesta, la descripción y las categorías
+  alt la IA responde
+    SP-->>SC: Vereda rota y el motivo, o ninguna
+    SC->>SC: registrarSugerenciaCategoria: guarda la sugerencia, la categoría no cambia
+  else falla
+    SC->>MQ: intento n+1 por reclamos.categoria.espera, y en el último deja "elegí a mano"
+  end
+  A->>RS: PATCH /api/reclamos/REC-…/categoria (la sugerida ya viene elegida)
+  RS->>RS: recategorizar: plazo nuevo, la prioridad no baja, registro en el historial
+  RS->>RS: asignación automática con la categoría nueva → ASIGNADO a Obras Públicas
+  RS-)V: aviso "paso de Otro problema a Vereda rota" y aviso de asignación
+```
+
+- **La IA sugiere, no decide.** El reclamo no cambia de categoría hasta que un administrador lo recategoriza:
+  una sugerencia equivocada no lo manda a un área que no corresponde. Por eso la sugerencia va siempre por la
+  cola, sin hacer esperar al vecino.
+- **Un esquema cerrado.** REST 2 le pasa al modelo la lista de categorías como los únicos valores posibles del
+  campo `categoria` (más `NINGUNA`). Si el modelo inventa una, el servicio responde `502` y el backend
+  reintenta.
+- **Privacidad y prompt injection:** lo que escribió el vecino viaja a la IA, porque es justamente lo que hay
+  que clasificar, pero sin datos que lo identifiquen. Va entre etiquetas y el prompt lo trata como dato.
+- **Recategorizar sirve para cualquier categoría**, no solo "Otro problema": un reclamo que entró como
+  Luminaria rota y es un semáforo se corrige igual, mientras no tenga área.
+- **El SLA se recalcula desde la creación:** el vecino no pierde el tiempo que el reclamo esperó la
+  recategorización, pero tampoco lo gana.
 
 ### Ubicación con Georef (API externa)
 

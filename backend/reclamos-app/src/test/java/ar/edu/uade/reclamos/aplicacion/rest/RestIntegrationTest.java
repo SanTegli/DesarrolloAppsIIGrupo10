@@ -134,7 +134,8 @@ class RestIntegrationTest {
         assertThat(dto.get("numero").asText()).matches("REC-[0-9A-F]{8}");
         campos(dto, "numero", "descripcion", "direccion", "ubicacion", "foto", "cantidadApoyos", "estado", "prioridad", "origenPrioridad",
                 "motivoPrioridad", "vencido", "asignacionPendiente", "fechaCreacion", "fechaLimite", "categoria",
-                "municipio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
+                "municipio", "ciudadano", "area", "agente", "historial", "accionesDisponibles", "categoriaPropuesta",
+                "categoriaSugerida", "motivoSugerencia");
         campos(dto.get("ubicacion"), "estado", "latitud", "longitud", "direccionNormalizada", "proveedor");
         assertThat(dto.get("foto").asText()).isEqualTo("/api/reclamos/" + dto.get("numero").asText() + "/foto");
         assertThat(dto.get("ubicacion").get("estado").asText()).isEqualTo("PENDIENTE");
@@ -434,7 +435,7 @@ class RestIntegrationTest {
                 "ACCESO_DENEGADO", "/api/usuarios/" + datos.otroCiudadano());
         JsonNode categoria = leer(mvc.perform(get("/api/categorias")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2))).andReturn()).get(0);
-        campos(categoria, "id", "nombre", "descripcion", "slaHoras", "prioridadBase");
+        campos(categoria, "id", "nombre", "descripcion", "slaHoras", "prioridadBase", "otra");
         JsonNode municipio = leer(mvc.perform(get("/api/municipios")).andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].nombre").value("Quilmes")).andReturn()).get(0);
         campos(municipio, "id", "nombre", "provincia");

@@ -72,6 +72,9 @@ export const CAPTURAS = {
   '25-mailpit': ['CP33', 'Correos de los avisos en Mailpit'],
   '26-rabbitmq-exchanges': ['CP33', 'Exchanges en la consola de RabbitMQ'],
   '27-rabbitmq-colas': ['CP33, CP36', 'Colas de RabbitMQ, con la cola de errores'],
+  '28-otro-problema-alta': ['CP73', 'Ana elige "Otro problema" y escribe qué tipo de problema es'],
+  '29-otro-problema-sugerencia-ia': ['CP73, CP74', 'Elena ve la categoría que sugirió la IA, ya elegida en la lista'],
+  '30-otro-problema-recategorizado': ['CP74', 'Recategorizado: el reclamo se asignó solo al área de la categoría nueva'],
 }
 
 export async function ejecutar(config, { chromium, registro = console } = {}) {
@@ -407,6 +410,46 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     await desbloquear.click()
     await bloquear.waitFor()
     estado.elena = elena
+  })
+
+  await seccion('Otro problema y recategorización', async () => {
+    const ana = estado.ana ?? (await pagina())
+    if (!estado.ana) {
+      await entrar(ana, 'ana@example.org')
+    }
+    await completarAlta(ana, {
+      categoria: 'Otro problema',
+      municipio: 'Quilmes',
+      descripcion: `Evidencia ${sello}: hay baldosas sueltas en la vereda de la escuela y ya se tropezó una señora.`,
+    })
+    await ana.getByLabel('¿Qué tipo de problema es?').fill('Baldosas levantadas')
+    await captura(ana, '28-otro-problema-alta')
+    const numero = await crear(ana)
+
+    const elena = estado.elena ?? (await pagina())
+    if (!estado.elena) {
+      await entrar(elena, 'elena@example.org')
+    }
+    await abrirReclamo(elena, numero)
+    // La sugerencia llega por la cola. El detalle se actualiza solo durante un minuto; si la IA tarda más
+    // (reintentos), se recarga.
+    const respuesta = elena.getByText(/La IA (sugiere|no sugirió)/)
+    for (let intento = 0; intento < 6 && !(await respuesta.isVisible()); intento += 1) {
+      await respuesta.waitFor({ timeout: 20000 }).catch(async () => {
+        await elena.reload()
+        await abrirReclamo(elena, numero)
+      })
+    }
+    await respuesta.waitFor({ timeout: 5000 })
+    await captura(elena, '29-otro-problema-sugerencia-ia')
+    const selector = elena.getByLabel('Cambiar la categoría')
+    if (!(await selector.inputValue())) {
+      await selector.selectOption({ label: 'Vereda rota' })
+    }
+    await elena.getByLabel(/Observación/).fill('Baldosas sueltas: es una vereda rota.')
+    await elena.getByRole('button', { name: 'Recategorizar' }).click()
+    await elena.getByText(/El reclamo ahora es de/).waitFor()
+    await captura(elena, '30-otro-problema-recategorizado')
   })
 
   await seccion('Tableros', async () => {

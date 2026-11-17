@@ -60,6 +60,8 @@
       <basic name="descripcion"><column name="descripcion" nullable="true" length="1000"/></basic>
       <basic name="slaHoras"><column name="sla_horas" nullable="false"/></basic>
       <basic name="prioridadBase"><column name="prioridad_base" nullable="false" length="16"/><enumerated>STRING</enumerated></basic>
+      <!-- PR 26: "Otro problema". En una base existente, MySQL completa las filas viejas con false. -->
+      <basic name="otra"><column name="otra" nullable="false"/></basic>
     </attributes>
   </entity>
   <entity class="AreaMunicipal" access="FIELD" metadata-complete="true">
@@ -93,6 +95,9 @@
       <basic name="asignacionPendiente"><column name="asignacion_pendiente" nullable="false"/></basic>
       <!-- PR 16: referencia al archivo en el almacén de fotos; nula en los reclamos anteriores. -->
       <basic name="foto"><column name="foto" nullable="true" length="64"/></basic>
+      <!-- PR 26: lo que escribió el vecino en "Otro problema" y lo que sugirió la IA. Nulas en los demás. -->
+      <basic name="categoriaPropuesta"><column name="categoria_propuesta" nullable="true" length="80"/></basic>
+      <basic name="motivoSugerencia"><column name="motivo_sugerencia" nullable="true" length="300"/></basic>
       <basic name="fechaCreacion"><column name="fecha_creacion" nullable="false"/></basic>
       <basic name="fechaLimite"><column name="fecha_limite" nullable="false"/></basic>
       <!-- Bloqueo optimista: una copia desactualizada del reclamo no pisa el cambio de otra operación. -->
@@ -103,6 +108,7 @@
       <!-- PR 25: el reclamo es de un municipio; los barrios ya no existen. -->
       <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
       <many-to-one name="area" target-entity="AreaMunicipal" fetch="LAZY" optional="true"><join-column name="area_id" nullable="true"/></many-to-one>
+      <many-to-one name="categoriaSugerida" target-entity="Categoria" fetch="LAZY" optional="true"><join-column name="categoria_sugerida_id" nullable="true"/></many-to-one>
       <one-to-many name="historial" target-entity="HistorialEstado" mapped-by="reclamo" fetch="LAZY">
         <order-by>fecha ASC, id ASC</order-by>
         <cascade><cascade-persist/><cascade-merge/></cascade>

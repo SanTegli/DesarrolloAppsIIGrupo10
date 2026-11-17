@@ -159,18 +159,19 @@ elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA
 servicio llamara directamente a quien avisa, cada reacción nueva (auditoría, broker, estadísticas)
 obligaría a modificarlo.
 
-**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay tres
-observadores independientes; el tercero, el de la revisión de la prioridad por IA, se agregó en el PR 24
-sin tocar ni a los servicios ni a los otros dos.
+**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay cuatro
+observadores independientes. El tercero, el de la revisión de la prioridad por IA, se agregó en el PR 24, y el
+cuarto, el de la sugerencia de categoría, en el PR 26, sin tocar ni a los servicios ni a los demás.
 
 | Pieza | Rol en el patrón |
 | --- | --- |
 | `PublicadorEventos` (interfaz del dominio) | Sujeto: por donde se publica |
 | `PublicadorEventosSpring` | Implementación con `ApplicationEventPublisher` |
-| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido`, `PrioridadRevisada` | Eventos de dominio |
+| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido`, `PrioridadRevisada`, `ReclamoRecategorizado`, `CategoriaSugerida` | Eventos de dominio |
 | `NotificacionesReclamoListener` | Observador 1: genera los avisos, dentro de la transacción |
 | `AuditoriaListener` | Observador 2: registra cada evento en el log, después del commit |
 | `ReevaluacionPrioridadListener` | Observador 3 (PR 24): si el reclamo se creó sin la respuesta de la IA, guarda el pedido de revisión en la outbox, dentro de la transacción. Se sumó sin tocar `ReclamoService` ni los otros dos |
+| `SugerenciaCategoriaListener` | Observador 4 (PR 26): si el vecino eligió "Otro problema" (`ReclamoCreado.categoriaOtra`), guarda el pedido de sugerencia de categoría en la outbox, dentro de la transacción |
 
 | Evento | Quién lo publica | Avisos que genera |
 | --- | --- | --- |
@@ -180,11 +181,13 @@ sin tocar ni a los servicios ni a los otros dos.
 | `ReclamoResuelto` | `ReclamoService.cambiarEstado` | Ciudadano |
 | `ReclamoVencido` | `ServicioVencimientos.marcarVencidos` | Ciudadano y agente a cargo, o agentes del área |
 | `PrioridadRevisada` | `ServicioReevaluacionPrioridad.reevaluar` | Solo si la prioridad cambió: ciudadano y agente a cargo, o agentes del área |
+| `ReclamoRecategorizado` | `ReclamoService.recategorizar` | Ciudadano. Si quedó asignado, además sale `ReclamoAsignado` |
+| `CategoriaSugerida` | `ServicioSugerenciaCategoria.sugerir` | Ninguno: es para la auditoría |
 
 ```java
 // ReclamoService: publica y sigue
 eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, municipioId,
-        guardado.getPrioridad(), guardado.getFechaCreacion()));
+        categoria.esOtra(), guardado.getPrioridad(), guardado.getFechaCreacion()));
 
 // Observador 1: delega en ServicioNotificaciones, que decide a quién avisar
 @EventListener

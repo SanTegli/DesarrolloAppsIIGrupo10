@@ -113,4 +113,24 @@ class ReclamoFactoryTest {
         assertThrows(ReglaNegocioException.class,
                 () -> factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo profundo", "Zapiola 120"));
     }
+
+    @Test
+    @DisplayName("\"Otro problema\" exige que el vecino escriba qué tipo de problema es")
+    void otroProblemaPideLaPropuesta() {
+        Reclamo reclamo = factory.crear(datos.ana, datos.otro, datos.quilmes, "Baldosas sueltas",
+                "Belgrano 450", "  Baldosas levantadas ");
+
+        assertEquals("Baldosas levantadas", reclamo.getCategoriaPropuesta());
+        assertEquals(CREACION.plusHours(72), reclamo.getFechaLimite());
+        assertThrows(DatosInvalidosException.class, () -> factory.crear(datos.ana, datos.otro, datos.quilmes,
+                "Baldosas sueltas", "Belgrano 450", " "));
+    }
+
+    @Test
+    @DisplayName("En las demás categorías la propuesta se ignora")
+    void propuestaIgnoradaEnLasDemas() {
+        Reclamo reclamo = factory.crear(datos.ana, datos.bache, datos.quilmes, "Pozo", "Belgrano 450", "Pozo");
+
+        assertNull(reclamo.getCategoriaPropuesta());
+    }
 }

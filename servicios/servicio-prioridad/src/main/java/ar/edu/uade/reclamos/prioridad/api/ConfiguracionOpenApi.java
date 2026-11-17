@@ -12,8 +12,9 @@ public class ConfiguracionOpenApi {
     public OpenAPI contratoPrioridad() {
         return new OpenAPI().info(new Info()
                 .title("Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)")
-                .version("1.0.0")
+                .version("1.1.0")
                 .description("Sugiere la prioridad de un reclamo a partir de su categoría y su descripción con "
-                        + "un modelo de lenguaje externo (Gemini u OpenAI). No recibe datos personales."));
+                        + "un modelo de lenguaje externo (Gemini u OpenAI) y, desde la 1.1, la categoría de un "
+                        + "reclamo cargado como \"Otro problema\". No recibe datos personales."));
     }
 }

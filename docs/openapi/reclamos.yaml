@@ -700,6 +700,64 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/reclamos/{numero}/categoria:
+    patch:
+      tags:
+      - Reclamos
+      summary: Cambiar la categoría de un reclamo sin área (solo administradores)
+      operationId: recategorizar
+      parameters:
+      - name: numero
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RecategorizarReclamoRequest"
+        required: true
+      responses:
+        "409":
+          description: "El reclamo ya tiene área, o la categoría es la misma o es\
+            \ \"Otro problema\" (REGLA_NEGOCIO)"
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReclamoResponse"
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/reclamos/{numero}/asignacion:
     patch:
       tags:
@@ -1686,6 +1744,10 @@ components:
           minLength: 0
         ubicacion:
           $ref: "#/components/schemas/UbicacionElegidaRequest"
+        categoriaPropuesta:
+          type: string
+          maxLength: 80
+          minLength: 0
       required:
       - categoriaId
       - descripcion
@@ -1825,6 +1887,12 @@ components:
             - RECHAZADO
             - CANCELADO
           uniqueItems: true
+        categoriaPropuesta:
+          type: string
+        categoriaSugerida:
+          $ref: "#/components/schemas/ReferenciaResponse"
+        motivoSugerencia:
+          type: string
     UbicacionResponse:
       type: object
       properties:
@@ -1938,6 +2006,18 @@ components:
           minLength: 0
       required:
       - estado
+    RecategorizarReclamoRequest:
+      type: object
+      properties:
+        categoriaId:
+          type: integer
+          format: int64
+        observacion:
+          type: string
+          maxLength: 1000
+          minLength: 0
+      required:
+      - categoriaId
     AsignarReclamoRequest:
       type: object
       properties:
@@ -2211,6 +2291,8 @@ components:
           - MEDIA
           - ALTA
           - CRITICA
+        otra:
+          type: boolean
     AreaResponse:
       type: object
       properties:

@@ -11,6 +11,8 @@
 // Posibles duplicados y apoyos (PR 17): al arrancar hay un reclamo de Bruno sobre un farol en Belgrano 450,
 // Bernal, ubicado en el mapa. Si Ana reclama lo mismo eligiendo esa dirección, aparece como posible duplicado.
 // Tableros (PR 18): GET /api/dashboard/publico (sin sesión) y /api/dashboard/gestion.
+// "Otro problema" (PR 26): el vecino escribe qué tipo de problema es y, a los SEGUNDOS_IA_CATEGORIA (3 s), una "IA"
+// de reglas (como el proveedor simulado de REST 2) sugiere la categoría. Elena recategoriza con PATCH .../categoria.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -28,29 +30,44 @@ const CODIGOS_POR_HORA = 3
 const VIGENCIA_CODIGO_SEGUNDOS = 10 * 60
 const MAXIMO_REAPERTURAS = 1
 const PLAZO_REAPERTURA_SEGUNDOS = 7 * 24 * 3600
+const SEGUNDOS_IA_CATEGORIA = Number(process.env.SEGUNDOS_IA_CATEGORIA ?? 3)
 
-// Datos semilla acordados en el contrato (datos-dev.sql, PR 25: municipios en vez de barrios).
+// Datos semilla acordados en el contrato (datos-dev.sql, PR 25: municipios en vez de barrios; PR 26: categorías 4 a 8).
 const municipios = [
   { id: 1, nombre: 'Quilmes', provincia: 'Buenos Aires' },
   { id: 2, nombre: 'Avellaneda', provincia: 'Buenos Aires' },
   { id: 3, nombre: 'Berazategui', provincia: 'Buenos Aires' },
 ]
+const nuevaCategoria = (id, nombre, descripcion, slaHoras, prioridadBase, otra = false) => ({
+  id,
+  nombre,
+  descripcion,
+  slaHoras,
+  prioridadBase,
+  otra,
+})
 const categorias = [
-  { id: 1, nombre: 'Luminaria rota', descripcion: 'Farol apagado o dañado', slaHoras: 48, prioridadBase: 'MEDIA' },
-  { id: 2, nombre: 'Bache', descripcion: 'Pozo en la calzada', slaHoras: 120, prioridadBase: 'BAJA' },
-  { id: 3, nombre: 'Residuos', descripcion: 'Residuos en la vía pública', slaHoras: 72, prioridadBase: 'MEDIA' },
+  nuevaCategoria(1, 'Luminaria rota', 'Farol apagado o dañado', 48, 'MEDIA'),
+  nuevaCategoria(2, 'Bache', 'Pozo en la calzada', 120, 'BAJA'),
+  nuevaCategoria(3, 'Residuos', 'Residuos en la vía pública', 72, 'MEDIA'),
+  nuevaCategoria(4, 'Semáforo averiado', 'Semáforo apagado, trabado o con una luz quemada', 24, 'ALTA'),
+  nuevaCategoria(5, 'Árbol caído o con riesgo', 'Árbol o rama caída, o que amenaza con caerse', 48, 'ALTA'),
+  nuevaCategoria(6, 'Pérdida de agua', 'Agua que sale de la vereda o la calzada', 48, 'ALTA'),
+  nuevaCategoria(7, 'Vereda rota', 'Baldosas sueltas, levantadas o faltantes', 168, 'BAJA'),
+  nuevaCategoria(8, 'Otro problema', 'Ninguna categoría corresponde: el vecino escribe qué tipo de problema es', 72, 'MEDIA', true),
 ]
 // Cada área es de un municipio. Avellaneda no tiene Alumbrado: una luminaria ahí queda sin asignar.
+// "Otro problema" (8) no la atiende ningún área.
 const areas = [
-  { id: 1, nombre: 'Alumbrado', activa: true, municipioId: 1, categorias: [1] },
-  { id: 2, nombre: 'Obras Públicas', activa: true, municipioId: 1, categorias: [2] },
-  { id: 3, nombre: 'Higiene Urbana', activa: true, municipioId: 1, categorias: [3] },
-  { id: 4, nombre: 'Mantenimiento Vial', activa: true, municipioId: 1, categorias: [2] },
-  { id: 5, nombre: 'Obras Públicas', activa: true, municipioId: 2, categorias: [2] },
-  { id: 6, nombre: 'Higiene Urbana', activa: true, municipioId: 2, categorias: [3] },
-  { id: 7, nombre: 'Alumbrado', activa: true, municipioId: 3, categorias: [1] },
-  { id: 8, nombre: 'Obras Públicas', activa: true, municipioId: 3, categorias: [2] },
-  { id: 9, nombre: 'Higiene Urbana', activa: true, municipioId: 3, categorias: [3] },
+  { id: 1, nombre: 'Alumbrado', activa: true, municipioId: 1, categorias: [1, 4] },
+  { id: 2, nombre: 'Obras Públicas', activa: true, municipioId: 1, categorias: [2, 6, 7] },
+  { id: 3, nombre: 'Higiene Urbana', activa: true, municipioId: 1, categorias: [3, 5] },
+  { id: 4, nombre: 'Mantenimiento Vial', activa: true, municipioId: 1, categorias: [2, 7] },
+  { id: 5, nombre: 'Obras Públicas', activa: true, municipioId: 2, categorias: [2, 6, 7] },
+  { id: 6, nombre: 'Higiene Urbana', activa: true, municipioId: 2, categorias: [3, 5] },
+  { id: 7, nombre: 'Alumbrado', activa: true, municipioId: 3, categorias: [1, 4] },
+  { id: 8, nombre: 'Obras Públicas', activa: true, municipioId: 3, categorias: [2, 6, 7] },
+  { id: 9, nombre: 'Higiene Urbana', activa: true, municipioId: 3, categorias: [3, 5] },
 ]
 // Solo es una ayuda de desarrollo: las contraseñas quedan en memoria y en texto. El backend guarda BCrypt.
 const CONTRASENA_SEMILLA = 'demo1234'
@@ -509,6 +526,9 @@ function detalle(usuario, reclamo) {
       usuario: referenciaUsuario(usuarios.find((u) => u.id === cambio.usuario)),
     })),
     accionesDisponibles: accionesDisponibles(usuario, reclamo),
+    categoriaPropuesta: reclamo.categoriaPropuesta ?? null,
+    categoriaSugerida: referencia(categorias.find((c) => c.id === reclamo.categoriaSugeridaId)),
+    motivoSugerencia: reclamo.motivoSugerencia ?? null,
   }
 }
 
@@ -572,10 +592,17 @@ function crear(usuario, cuerpo) {
   if (typeof cuerpo.direccion !== 'string' || !cuerpo.direccion.trim() || cuerpo.direccion.length > 200) {
     detalles.push('direccion: es obligatoria, hasta 200 caracteres')
   }
+  if (cuerpo.categoriaPropuesta != null && (typeof cuerpo.categoriaPropuesta !== 'string' || cuerpo.categoriaPropuesta.length > 80)) {
+    detalles.push('categoriaPropuesta: hasta 80 caracteres')
+  }
   if (detalles.length) throw invalido('Los datos recibidos no son validos.', detalles)
   if (usuario.rol !== 'CIUDADANO') throw denegado('Solo un ciudadano puede crear reclamos.')
   controlarUso(usuario, true)
   const categoria = buscar(categorias, cuerpo.categoriaId, 'categoría')
+  const propuesta = categoria.otra ? String(cuerpo.categoriaPropuesta ?? '').trim() : null
+  if (categoria.otra && !propuesta) {
+    throw invalido(`Elegiste "${categoria.nombre}": contanos qué tipo de problema es.`)
+  }
   const municipio = buscar(municipios, cuerpo.municipioId, 'municipio')
   const ubicacion = confirmarUbicacion(municipio, cuerpo.ubicacion)
 
@@ -608,6 +635,9 @@ function crear(usuario, cuerpo) {
     areaId: null,
     agenteId: null,
     historial: [],
+    categoriaPropuesta: propuesta,
+    categoriaSugeridaId: null,
+    motivoSugerencia: null,
   }
   registrar(reclamo, null, usuario, 'Reclamo ingresado', fecha)
   notificar(reclamo, usuario.id, `Tu reclamo ${reclamo.numero} fue ingresado.`, fecha)
@@ -617,14 +647,77 @@ function crear(usuario, cuerpo) {
     .sort((a, b) =>
       ESTRATEGIA_ASIGNACION === 'carga-trabajo' ? pendientes(a.id) - pendientes(b.id) || a.id - b.id : a.id - b.id,
     )
+  asignarAutomaticamente(reclamo, fecha)
+  reclamos.unshift(reclamo)
+  if (categoria.otra) setTimeout(() => sugerirCategoria(reclamo), SEGUNDOS_IA_CATEGORIA * 1000)
+  return reclamo
+}
+
+// Igual que ServicioAsignacion.asignarAutomaticamente con la estrategia configurada.
+function asignarAutomaticamente(reclamo, fecha) {
+  const candidatas = areas
+    .filter((a) => a.activa && a.categorias.includes(reclamo.categoriaId) && a.municipioId === reclamo.municipioId)
+    .sort((a, b) =>
+      ESTRATEGIA_ASIGNACION === 'carga-trabajo' ? pendientes(a.id) - pendientes(b.id) || a.id - b.id : a.id - b.id,
+    )
   if (candidatas.length) {
     reclamo.areaId = candidatas[0].id
     reclamo.estado = 'ASIGNADO'
     registrar(reclamo, 'INGRESADO', null, 'Asignación automática', fecha)
     notificarAsignacion(reclamo, candidatas[0], fecha)
   }
-  reclamos.unshift(reclamo)
-  return reclamo
+}
+
+const normalizar = (texto) =>
+  texto.normalize('NFD').replace(/\p{M}/gu, '').toLowerCase()
+
+// Como SimuladoAdapter de REST 2: la primera categoría cuyo nombre tiene una palabra de 4 letras o más (sin la
+// última letra si es larga, para "vereda" y "veredas") que aparezca en lo que escribió el vecino. Si no, ninguna.
+function sugerirCategoria(reclamo) {
+  const actual = categorias.find((c) => c.id === reclamo.categoriaId)
+  if (!actual?.otra || reclamo.motivoSugerencia) return
+  const texto = normalizar(`${reclamo.categoriaPropuesta} ${reclamo.descripcion}`)
+  const sugerida = categorias
+    .filter((c) => !c.otra)
+    .find((c) =>
+      normalizar(c.nombre)
+        .split(/[^a-z]+/)
+        .filter((palabra) => palabra.length >= 4)
+        .some((palabra) => texto.includes(palabra.length > 4 ? palabra.slice(0, -1) : palabra)),
+    )
+  reclamo.categoriaSugeridaId = sugerida?.id ?? null
+  reclamo.motivoSugerencia = sugerida
+    ? `Simulado: lo que describe el vecino coincide con "${sugerida.nombre}".`
+    : 'Simulado: ninguna categoría coincide con lo que describe el vecino.'
+  console.log(`IA simulada: ${reclamo.numero} -> ${sugerida?.nombre ?? 'ninguna'}`)
+}
+
+// Igual que Reclamo.recategorizar y ReclamoService.recategorizar: solo un administrador, solo sin área.
+function recategorizar(usuario, reclamo, cuerpo) {
+  if (!Number.isInteger(cuerpo.categoriaId) || cuerpo.categoriaId <= 0) {
+    throw invalido('Los datos recibidos no son validos.', ['categoriaId: es obligatorio'])
+  }
+  const nueva = buscar(categorias, cuerpo.categoriaId, 'categoría')
+  if (usuario.rol !== 'ADMINISTRADOR') throw denegado('Solo un administrador puede cambiar la categoría de un reclamo.')
+  if (reclamo.estado !== 'INGRESADO') {
+    throw regla(`El reclamo ${reclamo.numero} ya está ${reclamo.estado}: la categoría se cambia solo antes de asignarle un área.`)
+  }
+  if (nueva.otra) throw regla(`Elegí una categoría concreta, no "${nueva.nombre}".`)
+  if (nueva.id === reclamo.categoriaId) throw regla(`El reclamo ya es de la categoría ${nueva.nombre}.`)
+  const anterior = categorias.find((c) => c.id === reclamo.categoriaId)
+  const fecha = ahora()
+  reclamo.categoriaId = nueva.id
+  reclamo.fechaLimite = sumarSegundos(reclamo.fechaCreacion, SLA_SEGUNDOS ?? nueva.slaHoras * 3600)
+  if (reclamo.vencido && reclamo.fechaLimite >= fecha) reclamo.vencido = false
+  if (PRIORIDADES.indexOf(nueva.prioridadBase) > PRIORIDADES.indexOf(reclamo.prioridad)) {
+    reclamo.prioridad = nueva.prioridadBase
+    reclamo.origenPrioridad = 'CATEGORIA'
+    reclamo.motivoPrioridad = null
+  }
+  const observacion = String(cuerpo.observacion ?? '').trim()
+  registrar(reclamo, 'INGRESADO', usuario, `Categoría: ${anterior.nombre} → ${nueva.nombre}.${observacion ? ` ${observacion}` : ''}`, fecha)
+  notificar(reclamo, reclamo.ciudadanoId, `Revisamos tu reclamo ${reclamo.numero}: paso de ${anterior.nombre} a ${nueva.nombre}.`, fecha)
+  asignarAutomaticamente(reclamo, fecha)
 }
 
 function cambiarEstado(usuario, reclamo, cuerpo) {
@@ -865,6 +958,13 @@ async function atender(peticion, contexto) {
           fechaEnvio: n.fechaEnvio,
         }))
       return [200, lista]
+    }
+    if (partes.length === 4 && metodo === 'PATCH' && partes[3] === 'categoria') {
+      const cuerpo = await leerCuerpo(peticion)
+      const reclamo = reclamos.find((candidato) => candidato.numero === partes[2])
+      if (!reclamo) throw inexistente('reclamo', partes[2])
+      recategorizar(usuario, reclamo, cuerpo)
+      return [200, detalle(usuario, reclamo)]
     }
     if (partes.length === 4 && metodo === 'PATCH' && (partes[3] === 'estado' || partes[3] === 'asignacion')) {
       const cuerpo = await leerCuerpo(peticion)
