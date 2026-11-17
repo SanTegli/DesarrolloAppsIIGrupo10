@@ -41,7 +41,7 @@ documento donde está la decisión.
 | --- | --- | --- | --- |
 | RNF-1 | Disponibilidad | El reclamo se crea aunque fallen Georef, la IA, el servicio SOAP, RabbitMQ, el servicio de notificaciones o el correo. Cada falla tiene su respaldo y se recupera sola o con un paso manual documentado. Solo la base de datos no tiene respaldo | [Matriz de fallos](demo.md#matriz-de-fallos), CP20, CP24, CP30, CP35, CP36, CP39 |
 | RNF-2 | Tiempo de respuesta del alta | Una integración lenta no traba el alta más que su tiempo límite: 4 s la IA y 2 s el SOAP, unos 6 s en el peor caso. Lo que la IA no alcanza a responder lo revisa después por la cola, sin que el vecino espere. Georef se consulta antes, en la búsqueda, con 3 s. Con el circuito de la IA abierto, el respaldo es inmediato | `PrioridadPorIAIntegrationTest.siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `ClienteServicioPrioridadTest.despuesDeVariasFallasElCircuitoSeAbreYNoVuelveALlamar` |
-| RNF-3 | Carga básica | Con la demo levantada en una notebook, 20 usuarios simultáneos consultando durante 30 s (catálogos, tablero público, listado, detalle y avisos): ningún error y percentil 95 de 1000 ms o menos | CP68, `scripts/prueba-carga.mjs`. **Medido: 0 errores, p95 de 62 ms** ([prueba-carga.md](evidencias/prueba-carga.md)) |
+| RNF-3 | Carga básica | Con la demo levantada en una notebook, 20 usuarios simultáneos consultando durante 30 s (catálogos, tablero público, listado, detalle y avisos): ningún error y percentil 95 de 1000 ms o menos | CP68, `scripts/prueba-carga.mjs`. **Medido: 0 errores, p95 de 66 ms** ([prueba-carga.md](evidencias/prueba-carga.md)) |
 | RNF-4 | Seguridad | Sesión del servidor con cookie `HttpOnly` y `SameSite=Lax`, que vence a los 30 minutos sin actividad. Token CSRF en todo `POST`, `PATCH` y `DELETE`. Contraseñas con BCrypt. Permisos por rol en cada endpoint, no solo en la interfaz | CP09, CP41 a CP46 |
 | RNF-5 | Privacidad de los datos personales | El teléfono se muestra enmascarado y no viaja a la IA ni a RabbitMQ. Los mensajes de la cola no llevan DNI, teléfono ni descripción. La foto se guarda re-codificada, sin EXIF. Los posibles duplicados y los tableros no muestran quién reclamó | CP53, CP58, CP63, `OutboxIntegrationTest`, [contratos de mensajes](contratos/README.md) |
 | RNF-6 | Abuso | Hasta 5 reclamos por día y 3 códigos de verificación por hora por ciudadano, con `429`. Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos. En la demo con Docker el límite diario sube a 20 (`RECLAMOS_USO_RECLAMOS_POR_DIA`), para poder repetir el guion y el script de verificación el mismo día | CP50, CP61 |
@@ -111,22 +111,18 @@ de metas que dice si cada una se cumple.
 | RNF-IA-6 | Sugerencia de categoría acotada | Para "Otro problema" (PR 26), la IA solo puede sugerir una de las categorías existentes o ninguna: el esquema JSON se arma con la lista. Una categoría inventada es un error (`502`) y se reintenta. Lo que escribió el vecino se trata como dato, no como instrucción. La sugerencia nunca cambia la categoría sola: decide un administrador | `SugeridorCategoriaTest`, `CategoriaControllerTest`, `SugerenciaCategoriaIntegrationTest.unaCategoriaInventadaSeTrataComoFallaYSeReintenta`, CP73 |
 | RNF-IA-7 | Comparación de duplicados acotada y solo con texto | Para los posibles duplicados del alta (PR 27), la IA solo puede elegir uno de los reclamos cercanos que recibe, identificados con ids propios, o ninguno. Recibe solo categorías y descripciones: ni números de reclamo, ni nombres, ni direcciones, ni fotos. Un id inventado o una falla de la IA no traban el alta: quedan los de la misma categoría. La IA marca, no asocia: decide el vecino | `ComparadorDuplicadosTest`, `DuplicadosControllerTest`, `DuplicadosConIAIntegrationTest`, CP75 |
 
-**Resultado medido** ([ia-evaluacion.md](evidencias/ia-evaluacion.md), Gemini `gemini-3.5-flash-lite`,
-sobre los 25 casos):
+**Resultado medido** ([ia-evaluacion.md](evidencias/ia-evaluacion.md), Gemini `gemini-3.5-flash-lite` con
+nivel de razonamiento `minimal`, sobre los 25 casos):
 
 | Requisito | Meta | Obtenido | Resultado |
 | --- | --- | --- | --- |
-| RNF-IA-1 | ≥ 70 % exactos | 92 % (23 de 25) | Cumple |
-| RNF-IA-1 | ≥ 90 % a un nivel o menos | 96 % (24 de 25) | Cumple |
-| RNF-IA-2 | p95 ≤ 6000 ms | 4504 ms | Cumple |
-| RNF-IA-3 | ≥ 95 % de respuestas válidas | 96 % (24 de 25) | Cumple |
+| RNF-IA-1 | ≥ 70 % exactos | 96 % (24 de 25) | Cumple |
+| RNF-IA-1 | ≥ 90 % a un nivel o menos | 100 % (25 de 25) | Cumple |
+| RNF-IA-2 | p95 ≤ 6000 ms | 2196 ms | Cumple |
+| RNF-IA-3 | ≥ 95 % de respuestas válidas | 100 % (25 de 25) | Cumple |
 
-Los dos casos no acertados muestran por qué la IA está detrás de un respaldo:
+El único caso no acertado muestra por qué la prioridad de la categoría funciona como piso:
 
-- **Caso 7** (bache grande en una avenida): Gemini no respondió en 5 s y REST 2 devolvió `504`. Antes del
-  PR 24, el reclamo quedaba con la prioridad de la categoría; ahora queda `PENDIENTE_IA` y la IA lo revisa
-  por la cola, con REST 2 esperando hasta 9 s y el nivel de razonamiento `minimal`, que la hace más rápida.
-  La medición es anterior a ese cambio: conviene volver a correr la evaluación.
 - **Caso 18** (farol con un foco de dos): la IA dijo BAJA donde el grupo esperaba MEDIA. En el sistema queda
   MEDIA, porque esa es la prioridad de "Luminaria rota" y la IA no puede bajarla (RNF-IA-5).
 

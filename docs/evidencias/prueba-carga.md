@@ -1,16 +1,16 @@
 # Prueba de carga básica
 
-Corrida el 11/11/2026, 10:28:55 contra `http://localhost:8080`: 20 usuarios simultáneos durante 30 s, solo lecturas, con la sesión de ana@example.org.
+Corrida el 17/11/2026, 12:47:08 contra `http://localhost:8080`: 20 usuarios simultáneos durante 30 s, solo lecturas, con la sesión de ana@example.org.
 
 | Endpoint | Pedidos | Errores | p50 (ms) | p95 (ms) | Máximo (ms) |
 | --- | --- | --- | --- | --- | --- |
-| `GET /api/categorias` | 4357 | 0 | 15 | 30 | 149 |
-| `GET /api/dashboard/publico` | 4360 | 0 | 16 | 32 | 149 |
-| `GET /api/reclamos` | 4356 | 0 | 23 | 50 | 171 |
-| `GET /api/notificaciones` | 4358 | 0 | 25 | 58 | 177 |
-| `GET /api/reclamos/{numero}` | 4357 | 0 | 40 | 99 | 243 |
-| **Total** | 21788 | 0 | 22 | 62 | 243 |
+| `GET /api/categorias` | 4594 | 0 | 13 | 30 | 198 |
+| `GET /api/dashboard/publico` | 4595 | 0 | 13 | 32 | 280 |
+| `GET /api/reclamos` | 4599 | 0 | 20 | 56 | 227 |
+| `GET /api/notificaciones` | 4597 | 0 | 26 | 72 | 282 |
+| `GET /api/reclamos/{numero}` | 4593 | 0 | 34 | 104 | 316 |
+| **Total** | 22978 | 0 | 19 | 66 | 316 |
 
-Rendimiento: 726 pedidos por segundo.
+Rendimiento: 765.7 pedidos por segundo.
 
 Meta (RNF-3): ningún error y percentil 95 ≤ 1000 ms. Resultado: **cumple**.

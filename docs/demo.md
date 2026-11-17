@@ -53,7 +53,7 @@ contenedor en el paso «Memoria de cada contenedor».
 | 5 | **Crear reclamo** | Detalle: la foto, prioridad alta o crítica "sugerida por IA" con su motivo, área Alumbrado, dirección normalizada y **Ver en Google Maps** | **IA** (REST 2 con Gemini) y **SOAP** (cobertura). La foto no viaja a la IA |
 | 6 | Pestaña Mailpit | Los correos "lo recibimos" y "ya tiene un área a cargo" para Ana, y el aviso para Carla Gómez | **Mensajería**: outbox, RabbitMQ y consumidor |
 | 7 | Pestaña RabbitMQ: **Exchanges** → `reclamos.eventos`, **Queues** → `notificaciones.email` | El gráfico de mensajes publicados y entregados; `notificaciones.email.dlq` vacía | Publicar y suscribir, cola de errores |
-| 8 | Pestañas del WSDL y de los dos Swagger | `ConsultarCobertura`, `POST /api/prioridades/evaluar` y los endpoints de REST 1 | **Contratos**: WSDL y OpenAPI |
+| 8 | Pestañas del WSDL y de los dos Swagger | `ConsultarCobertura` (v2, municipio y categoría), `POST /api/prioridades/evaluar`, `POST /api/categorias/sugerir`, `POST /api/duplicados/comparar` y los endpoints de REST 1 | **Contratos**: WSDL y OpenAPI |
 | 9 | Como **Bruno Díaz**, crear un reclamo de **Otro problema** ("Cable suelto") en Belgrano 450, eligiendo la sugerencia de Bernal (Quilmes), con la descripción "El poste de luz frente a la escuela tiene un cable colgando que tira chispas" | Antes de crear aparece **¿Es alguno de estos?**: "La IA cree que el reclamo REC-… es el mismo problema", con el reclamo de Ana marcado aunque sea de otra categoría, su foto y sin su nombre. **Es el mismo: asociarme** vuelve a **Mis reclamos** con el aviso; Ana ve "1 vecino apoya este reclamo". Cuando Carla lo toma (paso 10), Bruno recibe "El reclamo … que apoyaste paso de ASIGNADO a EN_PROCESO" | **IA** que compara textos (PR 27), duplicados (Haversine) y avisos a los asociados |
 | 10 | **Salir** y entrar como **Carla Gómez** (`carla@example.org`, agente de Alumbrado): ver la foto, tomar el reclamo y resolverlo | La agente ve la foto; el historial suma dos pasos | Cada rol ve y hace lo suyo: lo decide el dominio con el usuario de la sesión |
 | 11 | Volver a Mailpit | "cambió de estado" y "está resuelto" para Ana | El mismo flujo de mensajería, otro evento |
@@ -64,8 +64,9 @@ contenedor en el paso «Memoria de cada contenedor».
 | 16 | Como Elena, pestaña **Tablero** | Tablero de gestión: pendientes, vencidos con su porcentaje, sin asignar y la tabla por área y municipio. Debajo, el público con filtros. Salir y, en la pantalla de ingreso, **Ver el tablero público**: las mismas cifras sin sesión | Lado de lectura separado (Domain Reporting, Clase 5) |
 
 Para el paso 5: la IA puede subir la prioridad de la categoría pero nunca bajarla. Si sugiere una menor, el
-detalle dice "por categoría" y el motivo lo explica. Si dice "por categoría (la IA no respondió)", el servicio
-de IA no contestó: revisar la clave antes de seguir (ver [Si algo sale mal](#si-algo-sale-mal)).
+detalle dice "por categoría" y el motivo lo explica. Si tarda más de 4 s en el alta, dice "por categoría (la IA
+lo está revisando)" y se actualiza solo en unos segundos; si después de los reintentos dice "por categoría (la
+IA no respondió)", el servicio de IA no contestó: revisar la clave antes de seguir (ver [Si algo sale mal](#si-algo-sale-mal)).
 
 ## Fallas a propósito
 
@@ -73,7 +74,7 @@ Elegir dos o tres. Cada una se hace en una terminal desde la raíz del repositor
 
 | Falla | Cómo provocarla | Qué se ve | Cómo se vuelve |
 | --- | --- | --- | --- |
-| IA caída | `docker compose stop servicio-prioridad` y crear un reclamo | Responde igual; prioridad "por categoría (la IA no respondió)" | `docker compose start servicio-prioridad` |
+| IA caída | `docker compose stop servicio-prioridad` y crear un reclamo | Responde igual; prioridad "por categoría (la IA lo está revisando)" y, tras los reintentos, "por categoría (la IA no respondió)" | `docker compose start servicio-prioridad` (si vuelve dentro del minuto, la cola completa la prioridad sola) |
 | SOAP caído | `docker compose stop servicio-cobertura` y crear un reclamo | Queda `INGRESADO`: "Sin asignar: el servicio de cobertura no respondió". Elena Ruiz lo asigna a mano | `docker compose start servicio-cobertura` |
 | Broker caído | `docker compose stop rabbitmq` y crear un reclamo | El alta anda. El mensaje queda `PENDIENTE` en `mensajes_salientes` (consulta en el instructivo) | `docker compose start rabbitmq`: en segundos pasa a `PUBLICADO` y llega el correo |
 | Consumidor caído | `docker compose stop servicio-notificaciones` y crear un reclamo | En RabbitMQ, `notificaciones.email` acumula mensajes listos | `docker compose start servicio-notificaciones`: los procesa y llegan los correos |
@@ -99,12 +100,14 @@ la base de datos.
 | Mensaje repetido | El consumidor lo descarta por su `eventId` | Un solo correo | — | `ProcesadorAvisosTest.unMensajeRepetidoNoSeVuelveAMandar` |
 | Mensaje inválido | Va directo a la cola de errores, sin reintentos | Nada | Revisarlo a mano | `FlujoCorreoIntegrationTest.unMensajeInvalidoTerminaEnLaColaDeErroresSinReintentos` |
 | Pedido de revisión de prioridad repetido o inválido | Repetido: se confirma sin llamar a la IA, porque el reclamo ya no está pendiente. Inválido: a `reclamos.prioridad.dlq` | Nada | — | `ReevaluacionPrioridadIntegrationTest.unPedidoRepetidoNoVuelveALlamarNiAvisa`, `ListenerReevaluacionPrioridadTest.unPedidoIlegibleOConOtraVersionVaALaColaDeErrores` |
+| Sugerencia de categoría ("Otro problema") sin respuesta o inválida | Se pide por la cola `reclamos.categoria` y reintenta cada 20 s hasta 4 veces; si sigue fallando queda sin sugerencia | El administrador recategoriza igual eligiendo la categoría de la lista | Automática en los reintentos, o elección manual del administrador | `SugerenciaCategoriaIntegrationTest`, `ListenerSugerenciaCategoriaTest` |
+| Comparación de duplicados con IA caída o lenta | Corta y usa el respaldo geométrico: muestra los reclamos abiertos a 50 m de la misma categoría | Aparecen igual los candidatos cercanos de la misma categoría | Automática en la próxima consulta | `DuplicadosConIAIntegrationTest.siLaIaFallaQuedanLosDeLaMismaCategoria` |
 | Telegram caído o sin Internet (modo `telegram`) | El bot registra el error y vuelve a consultar cada 2 s, desde la misma actualización | El código sigue vigente 10 minutos; la pantalla espera la confirmación | Automática al volver. Plan B: `RECLAMOS_TELEGRAM_MODO=simulado` y reiniciar el backend | `BotTelegramTest.siTelegramFallaNoSeCaeYVuelveAPedirDesdeElMismoPunto` |
 | Disco del volumen de fotos lleno o sin permisos | La foto no se puede guardar: el alta responde `500` y no se crea el reclamo. Si falla después del alta (al confirmar), el reclamo queda creado sin foto visible y el error queda en el log | Error al crear, o "Este reclamo no tiene foto" | Liberar espacio en el volumen `reclamos-fotos` | `AlmacenFotosLocalTest`, `GestionReclamosFacadeTest.siElAltaFallaLaFotoPendienteSeDescartaYElErrorSigue` |
 | MySQL caído | Sin respaldo: es la base del sistema. Las operaciones responden error | Mensaje de error en la interfaz | `docker compose start mysql`; los datos están en el volumen | — |
 
-Los tiempos límite suman como máximo unos 8 segundos dentro del alta (6 de la IA y 2 del SOAP). Georef se
-consulta antes, desde la búsqueda, fuera del alta.
+Los tiempos límite suman como máximo unos 6 segundos dentro del alta (4 de la IA y 2 del SOAP). Georef y la
+comparación de duplicados se consultan antes, fuera del alta.
 
 ## Verificación automática
 
