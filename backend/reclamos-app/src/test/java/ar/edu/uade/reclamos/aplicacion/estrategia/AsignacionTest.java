@@ -58,10 +58,9 @@ class AsignacionTest {
     }
 
     private AreaMunicipal area(Long id) {
-        AreaMunicipal area = new AreaMunicipal("Área " + id, "area@example.org", reclamo.getBarrio().getMunicipio());
+        AreaMunicipal area = new AreaMunicipal("Área " + id, "area@example.org", reclamo.getMunicipio());
         area.setId(id);
         area.agregarCategoria(reclamo.getCategoria());
-        area.agregarBarrio(reclamo.getBarrio());
         return area;
     }
 }

@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import {
-  BARRIOS,
+  MUNICIPIOS,
   CATEGORIAS,
   TOKEN_CSRF,
   archivoFoto,
@@ -15,6 +15,7 @@ const BERNAL = {
   direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires',
   latitud: -34.7361,
   longitud: -58.3229,
+  municipio: { id: 1, nombre: 'Quilmes' },
 }
 
 function candidato(cambios = {}) {
@@ -40,16 +41,15 @@ function mostrar(rutas) {
   })
   const onCreado = vi.fn()
   const onApoyado = vi.fn()
-  render(<FormularioReclamo categorias={CATEGORIAS} barrios={BARRIOS} onCreado={onCreado} onApoyado={onApoyado} />)
+  render(<FormularioReclamo categorias={CATEGORIAS} municipios={MUNICIPIOS} onCreado={onCreado} onApoyado={onApoyado} />)
   return { llamadas, onCreado, onApoyado, usuario: userEvent.setup() }
 }
 
 async function completarConElMapa(usuario) {
   await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-  await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
   await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
   await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
-  await usuario.click(await screen.findByRole('radio', { name: BERNAL.direccionNormalizada }))
+  await usuario.click(await screen.findByRole('radio', { name: /Bernal Oeste, Quilmes, Buenos Aires.*Quilmes/ }))
   await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
   await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
 }
@@ -112,7 +112,9 @@ describe('Posibles duplicados en el alta', () => {
 
     await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
     const alta = llamadas.find((llamada) => llamada.ruta === '/api/reclamos' && llamada.metodo === 'POST')
-    expect(alta.cuerpo.ubicacion).toEqual(BERNAL)
+    const { municipio, ...ubicacion } = BERNAL
+    expect(alta.cuerpo.ubicacion).toEqual(ubicacion)
+    expect(alta.cuerpo.municipioId).toBe(municipio.id)
     expect(llamadas.filter((llamada) => llamada.ruta === '/api/reclamos/candidatos-duplicados')).toHaveLength(1)
   })
 

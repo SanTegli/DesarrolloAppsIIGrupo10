@@ -37,7 +37,7 @@ public class ConfiguracionOpenApi {
         ERRORES.put("401", "Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)");
         ERRORES.put("403", "El rol no puede hacer la operación o el reclamo no es suyo (ACCESO_DENEGADO), "
                 + "o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)");
-        ERRORES.put("404", "No existe el usuario, reclamo, barrio, categoría o área (RECURSO_NO_ENCONTRADO)");
+        ERRORES.put("404", "No existe el usuario, reclamo, municipio, categoría o área (RECURSO_NO_ENCONTRADO)");
         ERRORES.put("409", "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)");
         ERRORES.put("500", "Error inesperado (ERROR_INTERNO)");
     }

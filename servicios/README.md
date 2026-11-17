@@ -24,14 +24,14 @@ desde el repositorio completo. La integración continua corre el mismo comando e
 
 ## Servicio de cobertura (SOAP)
 
-Responde qué áreas municipales atienden una categoría en un barrio. Es el dueño de esa información: la
+Responde qué áreas de un municipio atienden una categoría (contrato v2, PR 25). Es el dueño de esa información: la
 guarda en `servicio-cobertura/src/main/resources/cobertura.json`, con los mismos ids que la semilla del
 backend.
 
 ```text
 servicio-cobertura/
   src/main/resources/cobertura.xsd     Contrato. Las clases del pedido y la respuesta se generan de acá
-  src/main/resources/cobertura.json    Catálogo: municipios, barrios, categorías y qué cubre cada área
+  src/main/resources/cobertura.json    Catálogo: municipios, categorías y qué categorías atiende cada área en su municipio
   src/main/java/.../configuracion/     Publicación del WSDL, validación contra el XSD y carga del catálogo
   src/main/java/.../endpoint/          CoberturaEndpoint: la operación ConsultarCobertura
   src/main/java/.../catalogo/          CatalogoCobertura: la consulta, sin nada de SOAP
@@ -55,8 +55,8 @@ Para que el backend lo use, se arranca el backend con `RECLAMOS_COBERTURA_ORIGEN
 | `server.port` | `8081` | Puerto HTTP |
 | `cobertura.catalogo` | `classpath:cobertura.json` | Archivo del catálogo; se puede cambiar sin recompilar, por ejemplo `COBERTURA_CATALOGO=file:/datos/cobertura.json` |
 
-Un catálogo inconsistente (un área que cubre un barrio de otro municipio, ids repetidos, una categoría que
-no existe) impide arrancar, en lugar de dar respuestas equivocadas después.
+Un catálogo inconsistente (un área de un municipio que no existe, ids repetidos, una categoría que no
+existe) impide arrancar, en lugar de dar respuestas equivocadas después.
 
 | Test | Qué comprueba |
 | --- | --- |

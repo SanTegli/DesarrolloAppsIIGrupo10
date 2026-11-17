@@ -47,12 +47,11 @@ class VerificacionYReaperturasIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
 
-    private record Datos(Long ana, Long bruno, Long carla, Long elena, Long categoria, Long barrio) { }
+    private record Datos(Long ana, Long bruno, Long carla, Long elena, Long categoria, Long municipio) { }
 
     private Datos datos;
 
@@ -60,15 +59,12 @@ class VerificacionYReaperturasIntegrationTest {
     void escenario() {
         datos = new TransactionTemplate(transacciones).execute(tx -> {
             for (String tabla : List.of("codigos_verificacion", "notificaciones", "historial_estados", "reclamos",
-                    "area_barrio", "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias",
-                    "municipios")) {
+                    "area_categoria", "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
             Categoria luminaria = categorias.guardar(new Categoria("Luminaria rota", "Farol", 48, Prioridad.MEDIA));
             AreaMunicipal alumbrado = new AreaMunicipal("Alumbrado", "alumbrado@example.org", quilmes);
-            alumbrado.agregarBarrio(bernal);
             alumbrado.agregarCategoria(luminaria);
             alumbrado = areas.guardar(alumbrado);
             // Ana todavía no verificó su teléfono; Bruno sí.
@@ -79,7 +75,7 @@ class VerificacionYReaperturasIntegrationTest {
                     null, alumbrado));
             Usuario elena = usuarios.guardar(new Administrador("20555666", "Elena", "Ruiz", "elena@example.org", null));
             return new Datos(ana.getId(), bruno.getId(), carla.getId(), elena.getId(), luminaria.getId(),
-                    bernal.getId());
+                    quilmes.getId());
         });
     }
 
@@ -188,8 +184,8 @@ class VerificacionYReaperturasIntegrationTest {
 
     private ResultActions crearReclamo(Long usuario) throws Exception {
         return mvc.perform(alta("""
-                        {"categoriaId": %d, "barrioId": %d, "descripcion": "Farol apagado",
-                         "direccion": "Belgrano 450"}""".formatted(datos.categoria(), datos.barrio())).with(como(usuario)));
+                        {"categoriaId": %d, "municipioId": %d, "descripcion": "Farol apagado",
+                         "direccion": "Belgrano 450"}""".formatted(datos.categoria(), datos.municipio())).with(como(usuario)));
     }
 
     private ResultActions pedirCodigo(Long usuario) throws Exception {

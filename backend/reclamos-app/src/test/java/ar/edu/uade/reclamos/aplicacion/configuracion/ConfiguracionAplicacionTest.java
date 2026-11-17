@@ -162,7 +162,7 @@ class ConfiguracionAplicacionTest {
             Municipio municipio = new Municipio("Quilmes", "Buenos Aires");
             Reclamo reclamo = ctx.getBean(ReclamoFactory.class).crear(
                     new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null),
-                    new Categoria("Bache", "Pozo", 48, Prioridad.BAJA), new Barrio("Bernal", municipio),
+                    new Categoria("Bache", "Pozo", 48, Prioridad.BAJA), municipio,
                     "Pozo en la calle", "Belgrano 450");
             assertThat(reclamo.getFechaCreacion()).isEqualTo(LocalDateTime.of(2026, 10, 5, 10, 0));
             assertThat(reclamo.getFechaLimite()).isEqualTo(reclamo.getFechaCreacion().plusHours(48));

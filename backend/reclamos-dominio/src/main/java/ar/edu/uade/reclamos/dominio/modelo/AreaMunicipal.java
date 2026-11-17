@@ -7,7 +7,8 @@ import java.util.Set;
 
 /**
  * Dependencia municipal que resuelve reclamos (Alumbrado, Obras Públicas, Higiene Urbana).
- * Atiende ciertas categorías y tiene jurisdicción sobre ciertos barrios.
+ * Pertenece a un municipio, que es su jurisdicción, y atiende ciertas categorías. Cada municipio tiene sus
+ * propias áreas: el Alumbrado de Quilmes no atiende reclamos de Avellaneda.
  */
 public class AreaMunicipal extends Entidad {
 
@@ -15,7 +16,6 @@ public class AreaMunicipal extends Entidad {
     private String emailContacto;
     private boolean activa = true;
     private Municipio municipio;
-    private Set<Barrio> barrios = new LinkedHashSet<>();
     private Set<Categoria> categorias = new LinkedHashSet<>();
 
     /** Requerido por JPA. */
@@ -28,25 +28,21 @@ public class AreaMunicipal extends Entidad {
         this.municipio = Validador.requerirNoNulo(municipio, "municipio");
     }
 
-    public void agregarBarrio(Barrio barrio) {
-        barrios.add(Validador.requerirNoNulo(barrio, "barrio"));
-    }
-
     public void agregarCategoria(Categoria categoria) {
         categorias.add(Validador.requerirNoNulo(categoria, "categoría"));
     }
 
-    public boolean tieneJurisdiccionSobre(Barrio barrio) {
-        return barrios.contains(barrio);
+    public boolean tieneJurisdiccionSobre(Municipio otro) {
+        return municipio.equals(otro);
     }
 
     public boolean atiende(Categoria categoria) {
         return categorias.contains(categoria);
     }
 
-    /** Regla de asignación automática: área activa, que atiende la categoría y cubre el barrio. */
-    public boolean puedeAtender(Categoria categoria, Barrio barrio) {
-        return activa && atiende(categoria) && tieneJurisdiccionSobre(barrio);
+    /** Regla de asignación automática: área activa, del municipio del reclamo y que atiende la categoría. */
+    public boolean puedeAtender(Categoria categoria, Municipio municipioDelReclamo) {
+        return activa && atiende(categoria) && tieneJurisdiccionSobre(municipioDelReclamo);
     }
 
     public void activar() {
@@ -71,10 +67,6 @@ public class AreaMunicipal extends Entidad {
 
     public Municipio getMunicipio() {
         return municipio;
-    }
-
-    public Set<Barrio> getBarrios() {
-        return Collections.unmodifiableSet(barrios);
     }
 
     public Set<Categoria> getCategorias() {

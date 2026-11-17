@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReclamoService {
     private final UsuarioRepository usuarios;
     private final CategoriaRepository categorias;
-    private final BarrioRepository barrios;
+    private final MunicipioRepository municipios;
     private final ReclamoRepository reclamos;
     private final ReclamoFactory factory;
     private final EstrategiaPrioridad prioridad;
@@ -35,11 +35,11 @@ public class ReclamoService {
     private final ControlesDeUso controles;
     private final PoliticaReapertura reaperturas;
 
-    public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, BarrioRepository barrios,
+    public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, MunicipioRepository municipios,
                           ReclamoRepository reclamos, ReclamoFactory factory,
                           EstrategiaPrioridad prioridad, ServicioAsignacion asignacion,
                           PermisosReclamo permisos, Clock reloj, PublicadorEventos eventos) {
-        this(usuarios, categorias, barrios, reclamos, factory, prioridad, asignacion, permisos, reloj, eventos,
+        this(usuarios, categorias, municipios, reclamos, factory, prioridad, asignacion, permisos, reloj, eventos,
                 ControlesDeUso.NINGUNO, PoliticaReapertura.PREDETERMINADA);
     }
 
@@ -48,7 +48,7 @@ public class ReclamoService {
      * @param reaperturas cuántas veces y hasta cuándo se puede reabrir un reclamo
      */
     @Autowired
-    public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, BarrioRepository barrios,
+    public ReclamoService(UsuarioRepository usuarios, CategoriaRepository categorias, MunicipioRepository municipios,
                           ReclamoRepository reclamos, ReclamoFactory factory,
                           EstrategiaPrioridad prioridad, ServicioAsignacion asignacion,
                           PermisosReclamo permisos, Clock reloj, PublicadorEventos eventos,
@@ -57,7 +57,7 @@ public class ReclamoService {
         this.reaperturas = reaperturas;
         this.usuarios = usuarios;
         this.categorias = categorias;
-        this.barrios = barrios;
+        this.municipios = municipios;
         this.reclamos = reclamos;
         this.factory = factory;
         this.prioridad = prioridad;
@@ -69,8 +69,8 @@ public class ReclamoService {
 
     /** Alta sin ubicación en el mapa: queda pendiente. */
     @Transactional
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion) {
-        return crear(usuarioId, categoriaId, barrioId, descripcion, direccion, Ubicacion.pendiente());
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion) {
+        return crear(usuarioId, categoriaId, municipioId, descripcion, direccion, Ubicacion.pendiente());
     }
 
     /**
@@ -78,9 +78,9 @@ public class ReclamoService {
      * sugerencia del geocodificador, pendiente si no.
      */
     @Transactional
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          Ubicacion ubicacion) {
-        return crear(usuarioId, categoriaId, barrioId, descripcion, direccion, ubicacion, null);
+        return crear(usuarioId, categoriaId, municipioId, descripcion, direccion, ubicacion, null);
     }
 
     /**
@@ -89,24 +89,24 @@ public class ReclamoService {
      * @param referenciaFoto la referencia en el almacén de fotos; {@code null} solo desde los tests de servicio
      */
     @Transactional
-    public Reclamo crear(Long usuarioId, Long categoriaId, Long barrioId, String descripcion, String direccion,
+    public Reclamo crear(Long usuarioId, Long categoriaId, Long municipioId, String descripcion, String direccion,
                          Ubicacion ubicacion, String referenciaFoto) {
         Ciudadano ciudadano = permisos.validarCreacion(usuario(usuarioId));
         controles.antesDeCrear(ciudadano, ahora());
         Categoria categoria = categorias.buscarPorId(categoriaId)
                 .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
-        Barrio barrio = barrios.buscarPorId(barrioId)
-                .orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
-        Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
+        Municipio municipio = municipios.buscarPorId(municipioId)
+                .orElseThrow(() -> new RecursoNoEncontradoException("municipio", municipioId));
+        Reclamo reclamo = factory.crear(ciudadano, categoria, municipio, descripcion, direccion);
         reclamo.registrarUbicacion(ubicacion);
         if (referenciaFoto != null) {
             reclamo.registrarFoto(referenciaFoto);
         }
         PrioridadCalculada calculada = prioridad.calcular(reclamo);
         reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
-        asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
+        asignacion.asignarAutomaticamente(reclamo, ahora());
         Reclamo guardado = reclamos.guardar(reclamo);
-        eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, barrioId,
+        eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, municipioId,
                 guardado.getPrioridad(), guardado.getFechaCreacion()));
         if (guardado.getArea() != null) {
             publicarAsignacion(guardado, null);

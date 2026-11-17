@@ -32,7 +32,7 @@ frontend/                   Interfaz React + Vite
                             duplicados, detalle, avisos, administración y tableros
   mock/                     API simulada para trabajar sin Java ni MySQL
 servicios/                  Servicios de integración de la Segunda Parte, cada uno un proceso aparte
-  servicio-cobertura/       SOAP: qué áreas cubren cada categoría y barrio (WSDL en el puerto 8081)
+  servicio-cobertura/       SOAP: qué áreas de cada municipio atienden cada categoría (WSDL en el puerto 8081)
   servicio-prioridad/       REST 2: prioridad sugerida por IA con Gemini (Swagger en el puerto 8082)
   servicio-notificaciones/  Consumidor de RabbitMQ: manda los avisos por correo (Mailpit)
 docs/                       Requerimientos, arquitectura, patrones, contratos, despliegue, demo y evidencias
@@ -189,8 +189,9 @@ La conexión de `dev` se puede cambiar sin tocar archivos con las variables `DB_
 
 En `dev`, Hibernate actualiza el esquema y luego se ejecuta
 `reclamos-persistencia/src/main/resources/db/datos-dev.sql`. La semilla respeta los IDs de
-`docs/api-contract.md`: un municipio, tres barrios, tres categorías, cuatro áreas y siete usuarios.
-La tabla técnica `inicializaciones` registra el marcador `datos-dev-v1` al terminar la primera
+`docs/api-contract.md`: tres municipios (Quilmes, Avellaneda y Berazategui), tres categorías, nueve áreas y
+ocho usuarios. Desde el PR 25 no hay barrios: una base creada antes se borra una vez con
+`docker compose down -v`. La tabla técnica `inicializaciones` registra el marcador `datos-dev-v2` al terminar la primera
 ejecución. Los siguientes arranques no restauran datos ni relaciones eliminadas o modificadas.
 Esta tabla se usa únicamente para inicializar datos de desarrollo; una base nueva vuelve a cargar
 la semilla. En una base existente sin marcador, la primera ejecución completa los datos faltantes.
@@ -245,7 +246,7 @@ backend y `soap` se las pide a `servicio-cobertura`. Las dos dan el mismo result
 [Acceso local y remoto](docs/arquitectura.md#acceso-local-y-remoto-entre-componentes).
 
 Las estrategias de asignación reciben únicamente las áreas candidatas de `CatalogoCobertura`
-(activas, que atienden la categoría y cubren el barrio). `jurisdiccion` elige el menor ID;
+(activas, del municipio del reclamo y que atienden su categoría). `jurisdiccion` elige el menor ID;
 `carga-trabajo` elige la menor cantidad de reclamos `ASIGNADO` o `EN_PROCESO`, con desempate
 por menor ID. Sin candidatas, ambas devuelven vacío. Una estrategia configurada con un
 nombre desconocido impide el arranque con un mensaje de configuración.
@@ -333,3 +334,4 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 22 | `evidencias/sistema-real` | Capturas y salidas del sistema real (`docs/evidencias/sistema-real/`) |
 | 23 | `mejora/interfaz` | Rediseño de la interfaz |
 | 24 | `feature/24-ia-asincronica` | IA híbrida: el alta espera 4 s y, si la IA no llega, el reclamo queda `PENDIENTE_IA` y se revisa por la cola `reclamos.prioridad` con reintentos sin bloquear (cola de espera con TTL). La IA sube o mantiene, nunca baja; avisa si cambió. Gemini con razonamiento `minimal` y el detalle se actualiza solo |
+| 25 | `feature/25-municipios` | Municipios en vez de barrios: Quilmes, Avellaneda y Berazategui, cada uno con sus áreas. Georef busca la dirección en todos y la sugerencia elegida define el municipio; en el alta, `GET /ubicacion` confirma el partido. Lista de municipios si el mapa no responde. SOAP v2 por municipio y categoría. Semilla `datos-dev-v2` |

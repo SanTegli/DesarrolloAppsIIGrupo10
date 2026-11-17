@@ -30,14 +30,13 @@ class RelacionesFueraDeTransaccionTest extends PersistenciaTestBase {
 
         Reclamo recuperado = reclamos.buscarPorNumero(numero).orElseThrow();
         assertThat(recuperado.getCiudadano().getNombre()).isEqualTo("Ana");
-        assertThat(recuperado.getBarrio().getMunicipio().getNombre()).isEqualTo("Quilmes");
+        assertThat(recuperado.getMunicipio().getNombre()).isEqualTo("Quilmes");
         assertThat(recuperado.getCategoria().getNombre()).isEqualTo("Bache");
-        assertThat(recuperado.getArea().puedeAtender(recuperado.getCategoria(), recuperado.getBarrio())).isTrue();
+        assertThat(recuperado.getArea().puedeAtender(recuperado.getCategoria(), recuperado.getMunicipio())).isTrue();
         assertThat(recuperado.getAgente().perteneceA(recuperado.getArea())).isTrue();
         assertThat(recuperado.getHistorial()).extracting(h -> h.getUsuario() == null ? Rol.SISTEMA : h.getUsuario().getRol())
                 .containsExactly(Rol.CIUDADANO, Rol.SISTEMA, Rol.AGENTE_MUNICIPAL);
-        assertThat(areas.buscarPorId(area.getId()).orElseThrow().getBarrios()).hasSize(1);
-        assertThat(barrios.buscarPorId(barrio.getId()).orElseThrow().getMunicipio().getNombre()).isEqualTo("Quilmes");
+        assertThat(areas.buscarPorId(area.getId()).orElseThrow().getMunicipio().getNombre()).isEqualTo("Quilmes");
         Usuario usuario = usuarios.buscarPorId(agente.getId()).orElseThrow();
         assertThat(usuario).isInstanceOf(AgenteMunicipal.class);
         assertThat(((AgenteMunicipal) usuario).getArea().getCategorias()).hasSize(1);

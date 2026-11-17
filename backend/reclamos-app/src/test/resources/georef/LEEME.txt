@@ -1,2 +1,7 @@
-Respuestas reales de Georef (apis.datos.gob.ar/georef/api/v2.0/direcciones), grabadas el 2/11/2026 para
-los tests de GeorefGeocodificador. Los tests nunca llaman a Georef.
+Respuestas de Georef (apis.datos.gob.ar/georef/api/v2.0) para los tests de GeorefGeocodificador. Los tests
+nunca llaman a Georef.
+
+- belgrano-450.json y sin-resultados.json: /direcciones, grabadas el 2/11/2026.
+- ubicacion-wilde.json y ubicacion-fuera.json: /ubicacion (PR 25), armadas con la forma que documenta
+  Georef para un punto de Wilde (partido de Avellaneda) y para un punto en el río. Conviene reemplazarlas por
+  una respuesta grabada: curl "https://apis.datos.gob.ar/georef/api/v2.0/ubicacion?lat=-34.7&lon=-58.32".

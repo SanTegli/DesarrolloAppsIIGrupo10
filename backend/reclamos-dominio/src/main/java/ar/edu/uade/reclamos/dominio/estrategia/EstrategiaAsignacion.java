@@ -16,7 +16,7 @@ public interface EstrategiaAsignacion {
 
     /**
      * @param candidatas áreas activas que atienden la categoría del reclamo y tienen jurisdicción sobre
-     *                   su barrio (resultado de {@code AreaMunicipalRepository.buscarCandidatas})
+     *                   su municipio (resultado de {@code CatalogoCobertura.buscarCandidatas})
      * @return el área elegida, o vacío si ninguna puede atenderlo; en ese caso el reclamo queda INGRESADO
      */
     Optional<AreaMunicipal> seleccionarArea(Reclamo reclamo, List<AreaMunicipal> candidatas);

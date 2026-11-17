@@ -27,22 +27,22 @@ verde también sirve de evidencia.
 
 ## Casos a demostrar
 
-Los usuarios, barrios, categorías y áreas son los de la semilla (ver
+Los usuarios, municipios, categorías y áreas son los de la semilla (ver
 [contrato REST](../api-contract.md#datos-semilla-acordados)).
 
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo en la interfaz |
 | --- | --- | --- | --- |
-| CP01 | Crear reclamo válido: `201` y `ASIGNADO` | `RestIntegrationTest.postValidoDevuelve201LocationDtoCompletoYNotificaciones` | Como Ana Pérez, crear "Luminaria rota" en Bernal. Queda asignado a Alumbrado |
-| CP02 | Barrio o categoría inexistente: `404` | `RestIntegrationTest.postConCategoriaOBarrioInexistenteEs404YNoCreaNada` | Solo por API: `POST /api/reclamos` con `barrioId: 999` |
+| CP01 | Crear reclamo válido: `201` y `ASIGNADO` | `RestIntegrationTest.postValidoDevuelve201LocationDtoCompletoYNotificaciones` | Como Ana Pérez, crear "Luminaria rota" en Quilmes. Queda asignado a Alumbrado |
+| CP02 | Municipio o categoría inexistente: `404` | `RestIntegrationTest.postConCategoriaOMunicipioInexistenteEs404YNoCreaNada` | Solo por API: `POST /api/reclamos` con `municipioId: 999` |
 | CP03 | Datos inválidos: `400` | `RestIntegrationTest.postConBodyInvalidoEs400`, `beanValidationDevuelveUnDetallePorCampoInvalido` | Solo por API: enviar `descripcion` vacía. El formulario no deja enviar campos vacíos |
 | CP04 | Cambiar la estrategia de prioridad sin tocar `ReclamoService` | `ConfiguracionAplicacionTest.seleccionaLasEstrategiasAlternativasPorPropiedades`, `PrioridadTest` | Poner `reclamos.prioridad.estrategia: palabras-clave`, reiniciar y crear un reclamo con la palabra "peligro". Sale con prioridad Alta |
-| CP05 | Cambiar la estrategia de asignación por configuración | `ConfiguracionAplicacionTest`, `AsignacionTest` | Poner `reclamos.asignacion.estrategia: carga-trabajo`, reiniciar y crear dos reclamos "Bache" en Bernal. Se reparten entre Obras Públicas y Mantenimiento Vial |
-| CP06 | Sin área compatible: `201` e `INGRESADO`; después asigna el administrador | `RestIntegrationTest.postSinAreaCompatibleDevuelveIngresadoYAreaNula`, `patchAsignacionValidaEs200` | Como Ana Pérez, crear "Residuos" en Ezpeleta. Como Elena Ruiz, ir a Administración, abrirlo y asignarle un área |
+| CP05 | Cambiar la estrategia de asignación por configuración | `ConfiguracionAplicacionTest`, `AsignacionTest` | Poner `reclamos.asignacion.estrategia: carga-trabajo`, reiniciar y crear dos reclamos "Bache" en Quilmes. Se reparten entre Obras Públicas y Mantenimiento Vial |
+| CP06 | Sin área compatible: `201` e `INGRESADO`; después asigna el administrador | `RestIntegrationTest.postSinAreaCompatibleDevuelveIngresadoYAreaNula`, `patchAsignacionValidaEs200` | Como Ana Pérez, crear "Luminaria rota" en Avellaneda (no tiene Alumbrado). Como Elena Ruiz, ir a Administración, abrirlo y asignarle un área: solo se ofrecen las de Avellaneda |
 | CP07 | Crear y asignar generan eventos | `FlujoDeAvisosTest`, `ObserverIntegrationTest` | Abrir cualquier reclamo: "Avisos enviados" lista los avisos al ciudadano y a los agentes. En el log del backend, las líneas del logger `auditoria` muestran cada evento |
 | CP08 | Flujo `ASIGNADO`, `EN_PROCESO`, `RESUELTO`, `CERRADO` | `RestIntegrationTest.patchEstadoValidoPersisteYMapeaAgenteHistorialYAcciones`, `ReclamoTest.flujoPrincipal` | Como Carla Gómez, tomar y resolver el reclamo de CP01. Como Ana Pérez, confirmar la solución |
 | CP09 | Rol incorrecto: `403` | `RestIntegrationTest.patchEstadoSinPermisoEs403`, `postAgenteNoPuedeCrearEs403` | Solo por API. La interfaz no muestra las acciones que el usuario no puede hacer |
 | CP10 | Transición inexistente: `409` | `RestIntegrationTest.patchTransicionInvalidaPrevaleceSobrePermisosYEs409`, `PoliticaTransicionesTest` | Solo por API: `PATCH .../estado` con `RESUELTO` sobre un reclamo `INGRESADO` |
-| CP11 | Persistencia de reclamo, barrio, área, categoría e historial | `ReclamoRepositoryJpaTest.guardaYRecuperaPorNumeroConSusRelaciones` | Después de CP08, consultar las tablas `reclamos` e `historial_estados` en MySQL |
+| CP11 | Persistencia de reclamo, municipio, área, categoría e historial | `ReclamoRepositoryJpaTest.guardaYRecuperaPorNumeroConSusRelaciones` | Después de CP08, consultar las tablas `reclamos` e `historial_estados` en MySQL |
 | CP12 | Consultas por número, ciudadano y área | `ReclamoRepositoryJpaTest.filtraPorCiudadanoYAreaYOrdenaDelMasNuevoAlMasViejo`, `RestIntegrationTest.listadosPorRolConservanOrdenYSoloIncluyenCamposDelResumen` | El listado de Ana muestra solo sus reclamos; el de Carla, los de Alumbrado; el de Elena, todos, con filtro por área |
 | CP13 | Vencimiento: se marca, sube la prioridad y publica `ReclamoVencido` | `ServicioVencimientosTest`, `FlujoDeAvisosTest.elVencimientoPublicaReclamoVencidoYAvisaAlCiudadanoYAlArea` | Con un reclamo abierto, adelantar su `fecha_limite` en MySQL y esperar un minuto. Aparece la insignia "Vencido" y un aviso nuevo |
 | CP14 | Cada usuario consulta los avisos que recibió | `ConsultaAvisosTest`, `RestIntegrationTest.bandejaDeAvisosDevuelveSoloLosDelUsuarioYExigeIdentidad` | Crear un reclamo como Ana y abrir la pestaña "Avisos": dos avisos. Cambiar a Carla: un aviso, el de la asignación a su área |
@@ -56,8 +56,8 @@ explica [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md#probar-el-servicio-s
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
 | --- | --- | --- | --- |
 | CP16 | El servicio publica su WSDL, generado del XSD | `ServicioSoapHttpTest.publicaElWsdlConLaOperacionYLaDireccionDelServidor` | Abrir `http://localhost:8081/ws/cobertura.wsdl` |
-| CP17 | Caso válido: el reclamo se asigna con el área que devuelve el SOAP | `AsignacionPorSoapIntegrationTest.casoValidoAsignaElAreaQueDevuelveElServicio`, `CoberturaEndpointTest.casoValidoDevuelveLasAreasQueCubren` | Como Ana Pérez, crear "Bache" en Bernal. Queda en Obras Públicas y el log de `servicio-cobertura` muestra la consulta |
-| CP18 | Lista vacía: sin áreas no es un error | `AsignacionPorSoapIntegrationTest.listaVaciaDejaElReclamoIngresadoSinMarcarlo`, `CoberturaEndpointTest.combinacionSinAreasDevuelveLaRespuestaVacia` | Crear "Luminaria rota" en Ezpeleta: queda `INGRESADO` sin la marca de asignación pendiente |
+| CP17 | Caso válido: el reclamo se asigna con el área que devuelve el SOAP | `AsignacionPorSoapIntegrationTest.casoValidoAsignaElAreaQueDevuelveElServicio`, `CoberturaEndpointTest.casoValidoDevuelveLasAreasQueCubren` | Como Ana Pérez, crear "Bache" en Quilmes. Queda en Obras Públicas y el log de `servicio-cobertura` muestra la consulta |
+| CP18 | Lista vacía: sin áreas no es un error | `AsignacionPorSoapIntegrationTest.listaVaciaDejaElReclamoIngresadoSinMarcarlo`, `CoberturaEndpointTest.combinacionSinAreasDevuelveLaRespuestaVacia` | Crear "Luminaria rota" en Avellaneda: queda `INGRESADO` sin la marca de asignación pendiente |
 | CP19 | Id inválido: SOAP Fault de cliente | `CoberturaEndpointTest.idDesconocidoDevuelveFaultDeCliente`, `ServicioSoapHttpTest.respondeFaultDeClienteConHttp500` | Mandar la petición de ejemplo de [contratos](../contratos/README.md#probarlo-a-mano) con `categoriaId` 99 |
 | CP20 | Servicio caído o lento: el alta sigue y el reclamo queda con la asignación pendiente | `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `CoberturaSoapTest.servicioApagadoEsServicioNoDisponible` | `docker compose stop servicio-cobertura` y crear un reclamo: responde 201, `INGRESADO` y el detalle avisa que la cobertura no respondió. Elena Ruiz lo asigna a mano |
 
@@ -92,11 +92,13 @@ grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Geor
 
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
 | --- | --- | --- | --- |
-| CP27 | Dirección ambigua: varias sugerencias, el ciudadano elige | `UbicacionesIntegrationTest.direccionAmbiguaDevuelveSoloLasOpcionesConCoordenadas`, `GeorefGeocodificadorTest` | Crear reclamo, barrio Bernal, "Belgrano 450", **Buscar en el mapa**: aparecen varias opciones |
-| CP28 | Dirección válida elegida: el reclamo queda con la ubicación confirmada y el enlace a Maps | `UbicacionesIntegrationTest.elAltaConLaSugerenciaElegidaGuardaLaUbicacionConfirmada`, `ServicioUbicacionesTest` | Elegir una opción y crear el reclamo. El detalle muestra **Ver en Google Maps** |
+| CP27 | Dirección ambigua: varias sugerencias, cada una con su municipio, el ciudadano elige | `UbicacionesIntegrationTest.buscaLaDireccionEnCadaMunicipioYDevuelveLasOpcionesConSuMunicipio`, `GeorefGeocodificadorTest`, `ServicioUbicacionesTest` | Crear reclamo, "Belgrano 450", **Buscar en el mapa**: aparecen opciones de varios municipios |
+| CP28 | Dirección válida elegida: el reclamo queda con la ubicación confirmada y el enlace a Maps | `UbicacionesIntegrationTest.elAltaConLaSugerenciaElegidaLaConfirmaConGeorefYLaGuarda`, `ServicioUbicacionesTest` | Elegir una opción y crear el reclamo. El detalle muestra **Ver en Google Maps** |
 | CP29 | Dirección inexistente: lista vacía, el reclamo se crea igual | `UbicacionesIntegrationTest.direccionInexistenteDevuelveListaVacia` | Buscar "Calle Inventada 123": avisa que no la encontró |
-| CP30 | Georef caído: el alta no se traba y la ubicación queda pendiente | `UbicacionesIntegrationTest.georefCaidoDevuelveNoDisponibleSinError`, `GeorefGeocodificadorTest.georefQueNoContestaSeCortaEnElTiempoLimite` | Desconectar Internet y buscar: "El mapa no responde en este momento". El reclamo se crea con la ubicación pendiente |
+| CP30 | Georef caído: el alta no se traba y la ubicación queda pendiente | `UbicacionesIntegrationTest.georefCaidoDevuelveNoDisponibleSinError`, `GeorefGeocodificadorTest.georefQueNoContestaSeCortaEnElTiempoLimite` | Desconectar Internet y buscar: "El mapa no responde en este momento". Elegir el municipio de la lista: el reclamo se crea con la ubicación pendiente |
 | CP31 | Una ubicación fuera del municipio se rechaza | `UbicacionesIntegrationTest.elAltaConUnaUbicacionFueraDelMunicipioOIncompletaSeRechaza` | Solo por API: `POST /api/reclamos` con coordenadas de Córdoba. Responde 400 |
+| CP71 | La dirección elegida define el municipio, y Georef confirma el partido en el alta (PR 25) | `UbicacionesIntegrationTest.siGeorefUbicaElPuntoEnOtroMunicipioElAltaSeRechaza`, `siLaUbicacionInversaNoRespondeAlcanzaConElRecuadro`, `ServicioUbicacionesTest`, `FormularioReclamo.test.jsx` | En la interfaz, elegir la sugerencia de Wilde (Avellaneda): el formulario dice "Municipio: Avellaneda" y el reclamo queda en Avellaneda. Solo por API: `municipioId: 1` con coordenadas de Wilde dentro del recuadro de Quilmes responde 400 "queda en Avellaneda, no en Quilmes" |
+| CP72 | Cada municipio tiene sus áreas: no se asigna un área de otro municipio (PR 25) | `ReclamoTest.noSeAsignaAOtroMunicipio`, `AreaMunicipalTest.puedeAtender`, `DatosSemillaTest`, `DetalleReclamo.test.jsx` | Como Elena, abrir un reclamo de Avellaneda: **Asignar área** ofrece solo las de Avellaneda. Solo por API: `PATCH .../asignacion` con `areaId: 1` (Alumbrado de Quilmes) responde 409 |
 
 ### Segunda Parte: avisos por correo con RabbitMQ
 
@@ -163,7 +165,7 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 
 | Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
 | --- | --- | --- | --- |
-| CP58 | Un reclamo abierto de la misma categoría a menos de 50 m aparece como posible duplicado, sin datos del autor | `DuplicadosYApoyosIntegrationTest.encuentraElReclamoAbiertoDeLaMismaCategoriaAPocosMetrosSinDatosDelAutor`, `DistanciaTest`, `CandidatosDuplicados.test.jsx` | Como Bruno, crear Luminaria rota en Belgrano 450, Bernal, eligiendo esa sugerencia: aparece el reclamo de Ana con su foto y sin su nombre |
+| CP58 | Un reclamo abierto de la misma categoría a menos de 50 m aparece como posible duplicado, sin datos del autor | `DuplicadosYApoyosIntegrationTest.encuentraElReclamoAbiertoDeLaMismaCategoriaAPocosMetrosSinDatosDelAutor`, `DistanciaTest`, `CandidatosDuplicados.test.jsx` | Como Bruno, crear Luminaria rota en Belgrano 450, eligiendo la sugerencia de Bernal (Quilmes): aparece el reclamo de Ana con su foto y sin su nombre |
 | CP59 | Otra categoría, más de 50 m, sin ubicación o un reclamo resuelto no aparecen | `otraCategoriaMasDeCincuentaMetrosOSinUbicacionNoSonCandidatos`, `unReclamoResueltoNoSeApoyaNiApareceYSuFotoVuelveASerPrivada`, `ApoyosYCercaniaRepositoryJpaTest` | Elegir Bache en la misma dirección: se crea directo |
 | CP60 | Apoyar y retirar son idempotentes; apoyar no da acceso al detalle ni cambia la prioridad | `apoyarYRetirarSonIdempotentesYNoDanAccesoAlDetalle` | **Es el mismo: apoyar**: el autor ve "1 vecino apoya este reclamo". Solo por API: el detalle con la sesión de quien apoyó responde `403` |
 | CP61 | Un apoyo por ciudadano y reclamo, aun con dos pedidos simultáneos | `ApoyosYCercaniaRepositoryJpaTest.unCiudadanoNoApoyaDosVecesElMismoReclamo`, `GestionReclamosFacadeTest.unDobleClicQueChocaConLaRestriccionUnicaDevuelveElEstadoActual` | Solo por API: dos `POST /api/reclamos/{numero}/apoyo` seguidos dejan `cantidadApoyos: 1` |
@@ -174,8 +176,8 @@ Los siete usuarios de la semilla entran con su email y la contraseña `demo1234`
 | Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
 | --- | --- | --- | --- |
 | CP63 | El tablero público coincide con los totales contados a mano, sin sesión y sin datos personales | `TableroIntegrationTest.elTableroPublicoNoPideSesionYCoincideConLaCuentaAMano`, `ConsultasTableroJpaTest` | En la pantalla de ingreso, **Ver el tablero público**. Contar a mano los reclamos de la base y comparar |
-| CP64 | Filtros de barrio, categoría y período; "sin casos" cuando no hay denominador | `losFiltrosDeBarrioCategoriaYPeriodo`, `ServicioTableroTest.sinCasosNoHayPorcentaje`, `Tablero.test.jsx` | Elegir un barrio sin reclamos: "Atendidos: sin casos" |
-| CP65 | El tablero de gestión: vencidos por fecha, sin asignar y la tabla por área y barrio | `elAdministradorVeTodasLasAreasConVencidosPorFechaYSinAsignar`, `ConsultasTableroJpaTest.agrupaPendientesYVencidosPorAreaYBarrioSegunLaFecha` | Como Elena, pestaña **Tablero** |
+| CP64 | Filtros de municipio, categoría y período; "sin casos" cuando no hay denominador | `losFiltrosDeMunicipioCategoriaYPeriodo`, `ServicioTableroTest.sinCasosNoHayPorcentaje`, `Tablero.test.jsx` | Elegir un municipio sin reclamos: "Atendidos: sin casos" |
+| CP65 | El tablero de gestión: vencidos por fecha, sin asignar y la tabla por área y municipio | `elAdministradorVeTodasLasAreasConVencidosPorFechaYSinAsignar`, `ConsultasTableroJpaTest.agrupaPendientesYVencidosPorAreaYMunicipioSegunLaFecha` | Como Elena, pestaña **Tablero** |
 | CP66 | Cada agente ve solo su área; un ciudadano no ve la gestión | `cadaAgenteVeSoloSuAreaYLosCiudadanosNoLoVen` | Como Carla, **Tablero** muestra solo Alumbrado. Solo por API: `GET /api/dashboard/gestion` con la sesión de Ana responde `403` |
 | CP67 | Período inválido o filtro inexistente: `400` o `404` | `losParametrosInvalidosResponden400O404`, `ServicioTableroTest.elPeriodoTieneQueSerValido` | Solo por API: `desde` posterior a `hasta` responde `400` |
 
@@ -187,7 +189,7 @@ por SOAP en otro proceso.
 
 | Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
 | --- | --- | --- | --- |
-| CP69 | Cobertura local y remota dan la misma área para el mismo reclamo; solo cambia la propiedad `reclamos.cobertura.origen` | `ConfiguracionAplicacionTest.coberturaPorDefectoEsLocalYApuntaAlServicioSoapDeDesarrollo`, `coberturaSoapUsaElAdapterConLaUrlYElTiempoLimiteConfigurados`, `AsignacionPorSoapIntegrationTest.casoValidoAsignaElAreaQueDevuelveElServicio`, `CatalogoSincronizadoTest` (los dos catálogos tienen los mismos datos) | **Local:** con `docker compose up -d mysql` y el backend a mano (`./mvnw -pl reclamos-app spring-boot:run` en `backend/`, perfil `dev`, origen `local`), crear "Bache" en Bernal como Ana Pérez: queda en Obras Públicas y `servicio-cobertura` no recibe nada. **Remoto:** con `docker compose up` (origen `soap`), crear el mismo reclamo: queda en Obras Públicas y el log de `servicio-cobertura` muestra la consulta. Capturar los dos detalles y el log |
+| CP69 | Cobertura local y remota dan la misma área para el mismo reclamo; solo cambia la propiedad `reclamos.cobertura.origen` | `ConfiguracionAplicacionTest.coberturaPorDefectoEsLocalYApuntaAlServicioSoapDeDesarrollo`, `coberturaSoapUsaElAdapterConLaUrlYElTiempoLimiteConfigurados`, `AsignacionPorSoapIntegrationTest.casoValidoAsignaElAreaQueDevuelveElServicio`, `CatalogoSincronizadoTest` (los dos catálogos tienen los mismos datos) | **Local:** con `docker compose up -d mysql` y el backend a mano (`./mvnw -pl reclamos-app spring-boot:run` en `backend/`, perfil `dev`, origen `local`), crear "Bache" en Quilmes como Ana Pérez: queda en Obras Públicas y `servicio-cobertura` no recibe nada. **Remoto:** con `docker compose up` (origen `soap`), crear el mismo reclamo: queda en Obras Públicas y el log de `servicio-cobertura` muestra la consulta. Capturar los dos detalles y el log |
 
 ### Integrador: prueba de carga básica
 
@@ -210,7 +212,7 @@ categoría" (la API simulada no llama a la IA) y la verificación del teléfono 
 | [01-ingreso](interfaz/01-ingreso.png) | Pantalla de ingreso, con el registro y el tablero público sin sesión | CP41 |
 | [02-formulario-crear](interfaz/02-formulario-crear.png) | Ciudadano: alta con la dirección elegida entre las sugerencias del mapa y la vista previa de la foto | CP27, CP53 |
 | [03-detalle-asignado-ciudadano](interfaz/03-detalle-asignado-ciudadano.png) | Reclamo asignado automáticamente, con la foto, el enlace a Google Maps, el historial y los avisos | CP01, CP28 |
-| [04-detalle-ingresado-sin-area](interfaz/04-detalle-ingresado-sin-area.png) | Reclamo sin área compatible (Residuos en Ezpeleta): queda ingresado | CP06 |
+| [04-detalle-ingresado-sin-area](interfaz/04-detalle-ingresado-sin-area.png) | Reclamo sin área compatible (Residuos en Ezpeleta, captura anterior al PR 25): queda ingresado | CP06 |
 | [05-verificacion-telefono](interfaz/05-verificacion-telefono.png) | Cuenta nueva: la verificación del teléfono antes del primer reclamo, en modo simulado | CP47 |
 | [06-agente-listado](interfaz/06-agente-listado.png) | Agente: los reclamos de su área | CP12 |
 | [07-agente-en-proceso](interfaz/07-agente-en-proceso.png) | Agente: reclamo tomado, con la observación lista para resolver | CP08 |

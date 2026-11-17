@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest'
 import App from './App.jsx'
 import {
   AREAS,
-  BARRIOS,
+  MUNICIPIOS,
   CATEGORIAS,
   SIN_SESION,
   TOKEN_CSRF,
@@ -18,7 +18,7 @@ const [ana, carla, elena] = USUARIOS
 
 const CATALOGOS = {
   'GET /api/categorias': CATEGORIAS,
-  'GET /api/barrios': BARRIOS,
+  'GET /api/municipios': MUNICIPIOS,
   'GET /api/areas': AREAS,
 }
 
@@ -163,7 +163,7 @@ describe('App', () => {
     await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
     await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
     expect(screen.getByText(/Plazo de atención: 48 horas/)).toBeInTheDocument()
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.type(screen.getByLabelText(/Descripción del problema/), '  Farol apagado frente a la plaza ')
     await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
@@ -178,7 +178,7 @@ describe('App', () => {
         multipart: true,
         tipoReclamo: 'application/json',
         categoriaId: 1,
-        barrioId: 2,
+        municipioId: 1,
         direccion: 'Belgrano 450',
         descripcion: 'Farol apagado frente a la plaza',
         foto: { nombre: 'farol.jpg', tipo: 'image/jpeg', tamano: 2048 },
@@ -192,12 +192,21 @@ describe('App', () => {
       latitud: -34.73614578,
       longitud: -58.3228998575,
     }
-    const quilmes = { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.758, longitud: -58.297 }
+    const wilde = {
+      direccionNormalizada: 'BELGRANO 450, Wilde, Avellaneda, Buenos Aires',
+      latitud: -34.701,
+      longitud: -58.318,
+      municipio: { id: 2, nombre: 'Avellaneda' },
+    }
+    const { direccionNormalizada, latitud, longitud } = bernal
     const creado = reclamo({ ubicacion: { estado: 'CONFIRMADA', ...bernal, proveedor: 'georef' } })
     const llamadas = simularApi({
       ...conSesion(ana),
       'GET /api/reclamos': [],
-      'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [bernal, quilmes] },
+      'GET /api/ubicaciones/sugerencias': {
+        disponible: true,
+        sugerencias: [{ ...bernal, municipio: { id: 1, nombre: 'Quilmes' } }, wilde],
+      },
       'POST /api/reclamos': { status: 201, cuerpo: creado },
       'GET /api/reclamos/REC-4F2A91BC': creado,
       'GET /api/reclamos/REC-4F2A91BC/notificaciones': [],
@@ -209,14 +218,17 @@ describe('App', () => {
     const buscar = screen.getByRole('button', { name: 'Buscar en el mapa' })
     expect(buscar).toBeDisabled()
     await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.click(buscar)
 
-    const opcion = await screen.findByRole('radio', { name: bernal.direccionNormalizada })
+    // Se busca en todos los municipios: cada opción dice de cuál es, y elegirla define el del reclamo.
+    const opcion = await screen.findByRole('radio', { name: /Bernal Oeste, Quilmes, Buenos Aires.*·.*Quilmes/ })
+    expect(screen.getByRole('radio', { name: /Wilde, Avellaneda, Buenos Aires.*·.*Avellaneda/ })).toBeInTheDocument()
     expect(screen.getByRole('radio', { name: /Ninguna de estas/ })).toBeChecked()
     expect(screen.getAllByRole('link', { name: 'Ver en el mapa' })).toHaveLength(2)
     await usuario.click(opcion)
+    expect(screen.queryByLabelText('Municipio')).not.toBeInTheDocument()
+    expect(screen.getByText(/según la dirección elegida/)).toHaveTextContent('Municipio: Quilmes')
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado frente a la plaza')
     await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
@@ -224,9 +236,10 @@ describe('App', () => {
     expect(await screen.findByRole('link', { name: 'Ver en Google Maps' })).toBeInTheDocument()
     expect(llamadas.find((llamada) => llamada.ruta === '/api/ubicaciones/sugerencias').consulta).toEqual({
       direccion: 'Belgrano 450',
-      barrioId: '2',
     })
-    expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo.ubicacion).toEqual(bernal)
+    const alta = llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo
+    expect(alta.ubicacion).toEqual({ direccionNormalizada, latitud, longitud })
+    expect(alta.municipioId).toBe(1)
   })
 
   it('si el mapa no responde lo avisa, y cambiar la dirección borra la búsqueda', async () => {
@@ -241,7 +254,7 @@ describe('App', () => {
 
     await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
     await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
 
@@ -270,7 +283,7 @@ describe('App', () => {
 
     await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
     await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'x')
     await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
@@ -283,7 +296,12 @@ describe('App', () => {
   })
 
   it('si el problema ya estaba reclamado cerca, el vecino lo apoya y vuelve a sus reclamos con el aviso', async () => {
-    const bernal = { direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste', latitud: -34.7361, longitud: -58.3229 }
+    const bernal = {
+      direccionNormalizada: 'GRL BELGRANO 450, Bernal Oeste',
+      latitud: -34.7361,
+      longitud: -58.3229,
+      municipio: { id: 1, nombre: 'Quilmes' },
+    }
     simularApi({
       ...conSesion(ana),
       'GET /api/reclamos': [],
@@ -309,10 +327,10 @@ describe('App', () => {
 
     await usuario.click(await screen.findByRole('button', { name: 'Crear reclamo' }))
     await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-    await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+    await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
     await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
     await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
-    await usuario.click(await screen.findByRole('radio', { name: bernal.direccionNormalizada }))
+    await usuario.click(await screen.findByRole('radio', { name: /GRL BELGRANO 450, Bernal Oeste/ }))
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
     await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
@@ -335,7 +353,9 @@ describe('App', () => {
 
     expect(await screen.findByRole('heading', { name: 'Reclamos sin asignar' })).toBeInTheDocument()
     expect(await screen.findByText('Sin asignar')).toBeInTheDocument()
-    expect(screen.getByRole('cell', { name: 'Obras Públicas' })).toBeInTheDocument()
+    // Cada municipio tiene sus áreas: hay dos "Obras Públicas", cada una con su municipio.
+    expect(screen.getAllByRole('cell', { name: 'Obras Públicas' })).toHaveLength(2)
+    expect(screen.getByRole('cell', { name: 'Avellaneda' })).toBeInTheDocument()
     expect(llamadas.some((llamada) => llamada.consulta?.estado === 'INGRESADO')).toBe(true)
   })
 
@@ -388,7 +408,7 @@ describe('App', () => {
     simularApi({
       'GET /api/auth/yo': ana,
       'GET /api/categorias': { status: 502, cuerpo: null },
-      'GET /api/barrios': [],
+      'GET /api/municipios': [],
       'GET /api/areas': [],
     })
     render(<App />)

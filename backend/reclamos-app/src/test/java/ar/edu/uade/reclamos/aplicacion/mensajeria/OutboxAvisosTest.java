@@ -68,7 +68,7 @@ class OutboxAvisosTest {
     void nuncaLlevaDniTelefonoNiLaDescripcionDelReclamo() {
         Ciudadano conTelefono = new Ciudadano("30999888", "Luz", "Diaz", "luz@example.org", "1155550000");
         conTelefono.setId(9L);
-        Reclamo reclamo = e.factory.crear(conTelefono, e.categoria, e.barrio, "Pozo frente a mi casa", "Belgrano 450");
+        Reclamo reclamo = e.factory.crear(conTelefono, e.categoria, e.municipio, "Pozo frente a mi casa", "Belgrano 450");
 
         outbox.enviar(new Notificacion(reclamo, conTelefono, CanalNotificacion.INTERNO, "Aviso", LocalDateTime.now(e.reloj)),
                 TipoAviso.RECLAMO_CREADO);

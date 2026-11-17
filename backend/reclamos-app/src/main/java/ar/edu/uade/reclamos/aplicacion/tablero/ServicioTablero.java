@@ -10,8 +10,8 @@ import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import ar.edu.uade.reclamos.dominio.reporte.ConsultasTablero;
 import ar.edu.uade.reclamos.dominio.reporte.ConteoPorEstado;
 import ar.edu.uade.reclamos.dominio.reporte.FilaPendientes;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
+import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
 import java.time.Clock;
 import java.time.LocalDate;
@@ -37,21 +37,21 @@ public class ServicioTablero {
 
     private final ConsultasTablero consultas;
     private final UsuarioRepository usuarios;
-    private final BarrioRepository barrios;
+    private final MunicipioRepository municipios;
     private final CategoriaRepository categorias;
     private final Clock reloj;
 
-    public ServicioTablero(ConsultasTablero consultas, UsuarioRepository usuarios, BarrioRepository barrios,
+    public ServicioTablero(ConsultasTablero consultas, UsuarioRepository usuarios, MunicipioRepository municipios,
                            CategoriaRepository categorias, Clock reloj) {
         this.consultas = consultas;
         this.usuarios = usuarios;
-        this.barrios = barrios;
+        this.municipios = municipios;
         this.categorias = categorias;
         this.reloj = reloj;
     }
 
     /** Público: no necesita sesión. Los dos extremos del período se incluyen. */
-    public TableroPublico publico(LocalDate desde, LocalDate hasta, Long barrioId, Long categoriaId) {
+    public TableroPublico publico(LocalDate desde, LocalDate hasta, Long municipioId, Long categoriaId) {
         LocalDate fin = hasta == null ? LocalDate.now(reloj) : hasta;
         LocalDate inicio = desde == null ? fin.minusDays(DIAS_POR_DEFECTO - 1) : desde;
         if (inicio.isAfter(fin)) {
@@ -60,24 +60,25 @@ public class ServicioTablero {
         if (ChronoUnit.DAYS.between(inicio, fin) + 1 > DIAS_MAXIMOS) {
             throw new DatosInvalidosException("El período puede tener como máximo " + DIAS_MAXIMOS + " días.");
         }
-        if (barrioId != null) {
-            barrios.buscarPorId(barrioId).orElseThrow(() -> new RecursoNoEncontradoException("barrio", barrioId));
+        if (municipioId != null) {
+            municipios.buscarPorId(municipioId)
+                    .orElseThrow(() -> new RecursoNoEncontradoException("municipio", municipioId));
         }
         if (categoriaId != null) {
             categorias.buscarPorId(categoriaId)
                     .orElseThrow(() -> new RecursoNoEncontradoException("categoría", categoriaId));
         }
-        long creados = consultas.contarCreados(inicio.atStartOfDay(), fin.plusDays(1).atStartOfDay(), barrioId,
+        long creados = consultas.contarCreados(inicio.atStartOfDay(), fin.plusDays(1).atStartOfDay(), municipioId,
                 categoriaId);
         Map<EstadoReclamo, Long> hoy = new EnumMap<>(EstadoReclamo.class);
-        for (ConteoPorEstado conteo : consultas.contarPorEstado(barrioId, categoriaId)) {
+        for (ConteoPorEstado conteo : consultas.contarPorEstado(municipioId, categoriaId)) {
             hoy.put(conteo.estado(), conteo.cantidad());
         }
         long pendientes = cantidad(hoy, EstadoReclamo.INGRESADO) + cantidad(hoy, EstadoReclamo.ASIGNADO)
                 + cantidad(hoy, EstadoReclamo.EN_PROCESO);
         long resueltos = cantidad(hoy, EstadoReclamo.RESUELTO);
         long cerrados = cantidad(hoy, EstadoReclamo.CERRADO);
-        return new TableroPublico(inicio, fin, barrioId, categoriaId, creados, pendientes, resueltos, cerrados,
+        return new TableroPublico(inicio, fin, municipioId, categoriaId, creados, pendientes, resueltos, cerrados,
                 cantidad(hoy, EstadoReclamo.RECHAZADO), cantidad(hoy, EstadoReclamo.CANCELADO),
                 porcentaje(resueltos + cerrados, pendientes + resueltos + cerrados));
     }
@@ -89,9 +90,9 @@ public class ServicioTablero {
         LocalDateTime ahora = LocalDateTime.now(reloj);
         return switch (usuario) {
             case Administrador administrador -> armar(ahora, null, null,
-                    consultas.pendientesPorAreaYBarrio(ahora, null), true);
+                    consultas.pendientesPorAreaYMunicipio(ahora, null), true);
             case AgenteMunicipal agente -> armar(ahora, agente.getArea().getId(), agente.getArea().getNombre(),
-                    consultas.pendientesPorAreaYBarrio(ahora, agente.getArea().getId()), false);
+                    consultas.pendientesPorAreaYMunicipio(ahora, agente.getArea().getId()), false);
             default -> throw new AccesoDenegadoException(
                     "El tablero de gestión es solo para agentes y administradores.");
         };

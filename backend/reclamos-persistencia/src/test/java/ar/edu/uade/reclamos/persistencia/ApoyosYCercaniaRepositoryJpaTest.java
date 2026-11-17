@@ -61,7 +61,7 @@ class ApoyosYCercaniaRepositoryJpaTest extends PersistenciaTestBase {
         resuelto.cambiarEstado(EstadoReclamo.RESUELTO, agente, null, AHORA);
         reclamos.guardar(resuelto);
         Categoria otra = categorias.guardar(new Categoria("Luminaria rota", "Farol", 48, Prioridad.MEDIA));
-        Reclamo otraCategoria = new ReclamoFactory(Clock.systemUTC()).crear(ciudadano, otra, barrio, "Farol",
+        Reclamo otraCategoria = new ReclamoFactory(Clock.systemUTC()).crear(ciudadano, otra, municipio, "Farol",
                 "Belgrano 450");
         otraCategoria.registrarUbicacion(Ubicacion.confirmada(LATITUD, LONGITUD, "BELGRANO 450", "georef"));
         reclamos.guardar(otraCategoria);

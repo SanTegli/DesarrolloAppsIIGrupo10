@@ -650,6 +650,27 @@ td .secundario {
   width: 100%;
 }
 
+/* Municipio del reclamo (PR 25): sale de la dirección elegida o se elige de la lista */
+.campo-municipio {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.campo-municipio .ayuda-campo {
+  margin: 0;
+}
+
+.municipio-elegido {
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.municipio-sugerencia {
+  color: var(--tinta-suave);
+  font-weight: 600;
+}
+
 /* Foto del reclamo */
 .campo-foto {
   display: flex;

@@ -34,8 +34,8 @@ public class AreaMunicipalRepositoryJpa implements AreaMunicipalRepository {
     }
 
     @Override
-    public List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long barrioId) {
-        return jpa.buscarCandidatas(categoriaId, barrioId).stream().map(CargadorRelaciones::cargar).toList();
+    public List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long municipioId) {
+        return jpa.buscarCandidatas(categoriaId, municipioId).stream().map(CargadorRelaciones::cargar).toList();
     }
 }
 

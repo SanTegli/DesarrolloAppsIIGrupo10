@@ -31,7 +31,7 @@ import org.springframework.xml.xsd.XsdSchema;
 @Configuration
 public class ConfiguracionWebService implements WsConfigurer {
 
-    public static final String NAMESPACE = "http://uade.edu.ar/reclamos/cobertura/v1";
+    public static final String NAMESPACE = "http://uade.edu.ar/reclamos/cobertura/v2";
 
     @Bean
     public ServletRegistrationBean<MessageDispatcherServlet> messageDispatcherServlet(ApplicationContext contexto) {

@@ -6,8 +6,6 @@ import ar.edu.uade.reclamos.aplicacion.rest.mapper.RestMapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,12 +25,12 @@ public class UbicacionController {
     }
 
     @Operation(summary = "Buscar la dirección de un reclamo",
-            description = "Consulta la dirección en el geocodificador, dentro del municipio del barrio, y devuelve "
-                    + "las opciones con coordenadas. Si el geocodificador no responde, devuelve disponible: false.")
+            description = "Consulta la dirección en el geocodificador, una vez por municipio, y devuelve las opciones "
+                    + "con coordenadas y su municipio: elegir una define el municipio del reclamo. Si el "
+                    + "geocodificador no responde para ningún municipio, devuelve disponible: false.")
     @GetMapping("/sugerencias")
     public SugerenciasUbicacionResponse sugerencias(
-            @RequestParam @NotBlank @Size(min = 3, max = 200) String direccion,
-            @RequestParam @NotNull @Positive Long barrioId) {
-        return mapper.sugerencias(facade.sugerirUbicaciones(direccion, barrioId));
+            @RequestParam @NotBlank @Size(min = 3, max = 200) String direccion) {
+        return mapper.sugerencias(facade.sugerirUbicaciones(direccion));
     }
 }

@@ -12,13 +12,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Prioridad;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
@@ -55,10 +53,11 @@ import org.springframework.transaction.support.TransactionTemplate;
  * {@code ServicioUbicaciones}, la caché, {@link GeorefGeocodificador} y HTTP reales. Del otro lado hay un
  * servidor mínimo que contesta las respuestas grabadas de Georef, así el test no depende de Internet.
  *
- * <p>Cubre los casos del PR 11: dirección válida, ambigua, inexistente y Georef caído.
+ * <p>Cubre los casos del PR 11 (dirección válida, ambigua, inexistente y Georef caído) y los del PR 25: la
+ * búsqueda en cada municipio y la confirmación del municipio con la ubicación inversa.
  */
 @SpringBootTest(properties = {"spring.datasource.url=jdbc:h2:mem:ubicaciones;MODE=MySQL;DB_CLOSE_DELAY=-1",
-        "reclamos.geocodificacion.tiempo-respuesta=500ms"})
+        "reclamos.geocodificacion.tiempo-respuesta=500ms", "reclamos.geocodificacion.confirmar-municipio=true"})
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class UbicacionesIntegrationTest {
@@ -70,12 +69,11 @@ class UbicacionesIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
 
-    private Long barrio;
+    private Long municipio;
     private Long categoria;
     private Long ciudadano;
 
@@ -93,35 +91,38 @@ class UbicacionesIntegrationTest {
     void escenario() {
         CONSULTAS.clear();
         new TransactionTemplate(transacciones).executeWithoutResult(tx -> {
-            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_barrio",
-                    "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias", "municipios")) {
+            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_categoria",
+                    "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio quilmes = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio bernal = barrios.guardar(new Barrio("Bernal", quilmes));
+            municipios.guardar(new Municipio("Avellaneda", "Buenos Aires"));
             Categoria bache = categorias.guardar(new Categoria("Bache", "Pozo en la calzada", 120, Prioridad.BAJA));
             AreaMunicipal obras = new AreaMunicipal("Obras Públicas", "obras@example.org", quilmes);
-            obras.agregarBarrio(bernal);
             obras.agregarCategoria(bache);
             areas.guardar(obras);
             Ciudadano ana = (Ciudadano) usuarios.guardar(
                     verificado(new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null)));
-            barrio = bernal.getId();
+            municipio = quilmes.getId();
             categoria = bache.getId();
             ciudadano = ana.getId();
         });
     }
 
     @Test
-    void direccionAmbiguaDevuelveSoloLasOpcionesConCoordenadas() throws Exception {
+    void buscaLaDireccionEnCadaMunicipioYDevuelveLasOpcionesConSuMunicipio() throws Exception {
         sugerencias("Belgrano 450").andExpect(status().isOk())
                 .andExpect(jsonPath("$.disponible").value(true))
                 .andExpect(jsonPath("$.sugerencias", hasSize(1)))
                 .andExpect(jsonPath("$.sugerencias[0].direccionNormalizada")
                         .value("GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"))
-                .andExpect(jsonPath("$.sugerencias[0].latitud").value(-34.73614578));
-        assertThat(CONSULTAS).singleElement().asString()
-                .contains("direccion=Belgrano 450", "departamento=Quilmes", "provincia=Buenos Aires");
+                .andExpect(jsonPath("$.sugerencias[0].latitud").value(-34.73614578))
+                .andExpect(jsonPath("$.sugerencias[0].municipio.id").value(municipio))
+                .andExpect(jsonPath("$.sugerencias[0].municipio.nombre").value("Quilmes"));
+        assertThat(CONSULTAS).hasSize(2).allSatisfy(consulta -> assertThat(consulta)
+                .startsWith("/direcciones?").contains("direccion=Belgrano 450", "provincia=Buenos Aires"));
+        assertThat(CONSULTAS).anySatisfy(consulta -> assertThat(consulta).contains("departamento=Quilmes"))
+                .anySatisfy(consulta -> assertThat(consulta).contains("departamento=Avellaneda"));
     }
 
     @Test
@@ -129,7 +130,7 @@ class UbicacionesIntegrationTest {
         sugerencias("Pasaje Repetido 10").andExpect(status().isOk());
         sugerencias("pasaje repetido 10").andExpect(status().isOk());
 
-        assertThat(CONSULTAS).hasSize(1);
+        assertThat(CONSULTAS).hasSize(2);
     }
 
     @Test
@@ -150,53 +151,77 @@ class UbicacionesIntegrationTest {
     void validaLosParametrosDeLaBusqueda() throws Exception {
         sugerencias("ab").andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
-        mvc.perform(get("/api/ubicaciones/sugerencias").with(como(ciudadano)).param("direccion", "Belgrano 450").param("barrioId", "999"))
-                .andExpect(status().isNotFound());
         assertThat(CONSULTAS).isEmpty();
     }
 
     @Test
-    void elAltaConLaSugerenciaElegidaGuardaLaUbicacionConfirmada() throws Exception {
-        crear("""
+    void elAltaConLaSugerenciaElegidaLaConfirmaConGeorefYLaGuarda() throws Exception {
+        crear(municipio, """
                 , "ubicacion": {"latitud": -34.73614578, "longitud": -58.3228998575,
                   "direccionNormalizada": "GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"}""")
                 .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.municipio.nombre").value("Quilmes"))
                 .andExpect(jsonPath("$.ubicacion.estado").value("CONFIRMADA"))
                 .andExpect(jsonPath("$.ubicacion.latitud").value(-34.73614578))
                 .andExpect(jsonPath("$.ubicacion.direccionNormalizada")
                         .value("GRL BELGRANO 450, Bernal Oeste, Quilmes, Buenos Aires"))
                 .andExpect(jsonPath("$.ubicacion.proveedor").value("georef"))
                 .andExpect(jsonPath("$.direccion").value("Belgrano 450"));
+        assertThat(CONSULTAS).singleElement().asString().startsWith("/ubicacion?").contains("lat=-34.73614578");
     }
 
     @Test
-    void elAltaSinUbicacionLaDejaPendiente() throws Exception {
-        crear("").andExpect(status().isCreated())
+    void elAltaSinUbicacionLaDejaPendienteSinConsultarGeoref() throws Exception {
+        crear(municipio, "").andExpect(status().isCreated())
                 .andExpect(jsonPath("$.ubicacion.estado").value("PENDIENTE"))
                 .andExpect(jsonPath("$.ubicacion.latitud").value(nullValue()));
+        assertThat(CONSULTAS).isEmpty();
     }
 
     @Test
     void elAltaConUnaUbicacionFueraDelMunicipioOIncompletaSeRechaza() throws Exception {
-        crear("""
+        crear(municipio, """
                 , "ubicacion": {"latitud": -31.41, "longitud": -64.18, "direccionNormalizada": "BELGRANO 450, Córdoba"}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.mensaje").value("La ubicación elegida queda fuera de Quilmes."));
-        crear("""
+        crear(municipio, """
                 , "ubicacion": {"latitud": -34.7, "direccionNormalizada": "Sin longitud"}""")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("DATOS_INVALIDOS"));
     }
 
-    private ResultActions sugerencias(String direccion) throws Exception {
-        return mvc.perform(get("/api/ubicaciones/sugerencias").with(como(ciudadano)).param("direccion", direccion)
-                .param("barrioId", barrio.toString()));
+    @Test
+    void siGeorefUbicaElPuntoEnOtroMunicipioElAltaSeRechaza() throws Exception {
+        // Dentro del recuadro de Quilmes, pero del lado de Avellaneda: solo Georef lo sabe.
+        crear(municipio, """
+                , "ubicacion": {"latitud": -34.67, "longitud": -58.33, "direccionNormalizada": "AV MITRE 5000, Wilde"}""")
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.mensaje").value("La ubicación elegida queda en Avellaneda, no en Quilmes."));
     }
 
-    private ResultActions crear(String ubicacion) throws Exception {
+    @Test
+    void siLaUbicacionInversaNoRespondeAlcanzaConElRecuadro() throws Exception {
+        crear(municipio, """
+                , "ubicacion": {"latitud": -34.75, "longitud": -58.25, "direccionNormalizada": "CALLE 1, Quilmes"}""")
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ubicacion.estado").value("CONFIRMADA"));
+    }
+
+    @Test
+    void elAltaConUnMunicipioQueNoExisteEs404() throws Exception {
+        crear(Long.MAX_VALUE, "").andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.codigo").value("RECURSO_NO_ENCONTRADO"));
+    }
+
+    private ResultActions sugerencias(String direccion) throws Exception {
+        return mvc.perform(get("/api/ubicaciones/sugerencias").with(como(ciudadano)).param("direccion", direccion));
+    }
+
+    private ResultActions crear(Long municipioId, String ubicacion) throws Exception {
         return mvc.perform(alta("""
-                        {"categoriaId": %d, "barrioId": %d, "descripcion": "Pozo en la calle",
-                         "direccion": "Belgrano 450"%s}""".formatted(categoria, barrio, ubicacion)).with(como(ciudadano)));
+                        {"categoriaId": %d, "municipioId": %d, "descripcion": "Pozo en la calle",
+                         "direccion": "Belgrano 450"%s}""".formatted(categoria, municipioId, ubicacion))
+                .with(como(ciudadano)));
     }
 
     private static HttpServer iniciarServidor() {
@@ -207,7 +232,8 @@ class UbicacionesIntegrationTest {
                 hilo.setDaemon(true);
                 return hilo;
             }));
-            servidor.createContext("/direcciones", UbicacionesIntegrationTest::responder);
+            servidor.createContext("/direcciones", UbicacionesIntegrationTest::responderDirecciones);
+            servidor.createContext("/ubicacion", UbicacionesIntegrationTest::responderUbicacion);
             servidor.start();
             return servidor;
         } catch (IOException error) {
@@ -215,20 +241,45 @@ class UbicacionesIntegrationTest {
         }
     }
 
-    private static void responder(HttpExchange intercambio) throws IOException {
-        String consulta = URLDecoder.decode(intercambio.getRequestURI().getRawQuery(), StandardCharsets.UTF_8);
-        CONSULTAS.add(consulta);
-        int estado = 200;
-        byte[] cuerpo;
+    /** Belgrano 450 solo existe en Quilmes; "Caida" simula Georef caído. */
+    private static void responderDirecciones(HttpExchange intercambio) throws IOException {
+        String consulta = anotar(intercambio);
         if (consulta.contains("Caida")) {
-            estado = 500;
-            cuerpo = "{\"errores\": [{\"mensaje\": \"Error interno\"}]}".getBytes(StandardCharsets.UTF_8);
-        } else {
-            String archivo = consulta.contains("Belgrano") ? "belgrano-450.json" : "sin-resultados.json";
-            try (InputStream grabada = UbicacionesIntegrationTest.class.getResourceAsStream("/georef/" + archivo)) {
-                cuerpo = grabada.readAllBytes();
-            }
+            responder(intercambio, 500, "{\"errores\": [{\"mensaje\": \"Error interno\"}]}");
+            return;
         }
+        String archivo = consulta.contains("Belgrano") && consulta.contains("departamento=Quilmes")
+                ? "belgrano-450.json" : "sin-resultados.json";
+        try (InputStream grabada = UbicacionesIntegrationTest.class.getResourceAsStream("/georef/" + archivo)) {
+            responder(intercambio, 200, new String(grabada.readAllBytes(), StandardCharsets.UTF_8));
+        }
+    }
+
+    /** -34.67 cae en Avellaneda, -34.75 hace fallar a Georef y el resto cae en Quilmes. */
+    private static void responderUbicacion(HttpExchange intercambio) throws IOException {
+        String consulta = anotar(intercambio);
+        if (consulta.contains("lat=-34.67")) {
+            try (InputStream grabada = UbicacionesIntegrationTest.class
+                    .getResourceAsStream("/georef/ubicacion-wilde.json")) {
+                responder(intercambio, 200, new String(grabada.readAllBytes(), StandardCharsets.UTF_8));
+            }
+        } else if (consulta.contains("lat=-34.75")) {
+            responder(intercambio, 500, "{\"errores\": [{\"mensaje\": \"Error interno\"}]}");
+        } else {
+            responder(intercambio, 200, "{\"ubicacion\": {\"departamento\": {\"id\": \"06658\", "
+                    + "\"nombre\": \"Quilmes\"}, \"provincia\": {\"id\": \"06\", \"nombre\": \"Buenos Aires\"}}}");
+        }
+    }
+
+    private static String anotar(HttpExchange intercambio) {
+        String consulta = intercambio.getRequestURI().getPath() + "?"
+                + URLDecoder.decode(intercambio.getRequestURI().getRawQuery(), StandardCharsets.UTF_8);
+        CONSULTAS.add(consulta);
+        return consulta;
+    }
+
+    private static void responder(HttpExchange intercambio, int estado, String json) throws IOException {
+        byte[] cuerpo = json.getBytes(StandardCharsets.UTF_8);
         intercambio.getResponseHeaders().add("Content-Type", "application/json");
         intercambio.sendResponseHeaders(estado, cuerpo.length);
         try (OutputStream salida = intercambio.getResponseBody()) {

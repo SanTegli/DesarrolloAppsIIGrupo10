@@ -23,7 +23,6 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ConsultaReclamosServiceIntegrationTest {
     @Autowired ConsultaReclamosService consultas;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
@@ -36,12 +35,10 @@ class ConsultaReclamosServiceIntegrationTest {
                      Long administrador, Long area1, Long area2, List<String> numeros) { }
         Datos datos = new TransactionTemplate(transacciones).execute(tx -> {
             Municipio municipio = municipios.guardar(new Municipio("Municipio consultas", "Buenos Aires"));
-            Barrio barrio = barrios.guardar(new Barrio("Barrio consultas", municipio));
             Categoria categoria = categorias.guardar(new Categoria("Baches consultas", "Prueba", 24, Prioridad.ALTA));
             AreaMunicipal area1 = new AreaMunicipal("Area uno", "uno@test.org", municipio);
             AreaMunicipal area2 = new AreaMunicipal("Area dos", "dos@test.org", municipio);
             for (AreaMunicipal area : List.of(area1, area2)) {
-                area.agregarBarrio(barrio);
                 area.agregarCategoria(categoria);
                 areas.guardar(area);
             }
@@ -56,12 +53,12 @@ class ConsultaReclamosServiceIntegrationTest {
             Usuario administrador = usuarios.guardar(
                     new Administrador("80555666", "Elena", "Consultas", "elena@test.org", null));
 
-            Reclamo r1 = crear(ciudadano1, categoria, barrio, 3);
-            Reclamo r2 = crear(ciudadano2, categoria, barrio, 1);
-            Reclamo r3 = crear(ciudadano1, categoria, barrio, 2);
-            Reclamo r4 = crear(ciudadano1, categoria, barrio, 3);
-            Reclamo r5 = crear(ciudadano2, categoria, barrio, 2);
-            Reclamo r6 = crear(ciudadano2, categoria, barrio, 4);
+            Reclamo r1 = crear(ciudadano1, categoria, municipio, 3);
+            Reclamo r2 = crear(ciudadano2, categoria, municipio, 1);
+            Reclamo r3 = crear(ciudadano1, categoria, municipio, 2);
+            Reclamo r4 = crear(ciudadano1, categoria, municipio, 3);
+            Reclamo r5 = crear(ciudadano2, categoria, municipio, 2);
+            Reclamo r6 = crear(ciudadano2, categoria, municipio, 4);
             LocalDateTime ahora = LocalDateTime.of(2026, 1, 5, 12, 0);
             for (Reclamo reclamo : List.of(r1, r2, r4)) {
                 reclamo.asignarArea(area1, administrador, "Asignado", ahora);
@@ -115,8 +112,8 @@ class ConsultaReclamosServiceIntegrationTest {
                 datos.area1(), Long.MAX_VALUE)).isEmpty();
     }
 
-    private Reclamo crear(Ciudadano ciudadano, Categoria categoria, Barrio barrio, int dia) {
+    private Reclamo crear(Ciudadano ciudadano, Categoria categoria, Municipio municipio, int dia) {
         Clock reloj = Clock.fixed(Instant.parse("2026-01-0" + dia + "T12:00:00Z"), ZoneOffset.UTC);
-        return new ReclamoFactory(reloj).crear(ciudadano, categoria, barrio, "Pozo", "Calle 450");
+        return new ReclamoFactory(reloj).crear(ciudadano, categoria, municipio, "Pozo", "Calle 450");
     }
 }

@@ -47,20 +47,20 @@ contenedor en el paso «Memoria de cada contenedor».
 | Paso | Qué se hace | Qué se muestra | Qué integración o patrón |
 | --- | --- | --- | --- |
 | 1 | Abrir el diagrama de componentes de [arquitectura.md](arquitectura.md#componentes-e-interfaces) | Cuatro aplicaciones propias y sus contratos | CBD: interfaces provistas y requeridas |
-| 2 | En la interfaz, entrar como **Ana Pérez** (`ana@example.org`, contraseña `demo1234`). **Crear reclamo**: Luminaria rota, barrio Bernal, dirección "Belgrano 450" | La pantalla de ingreso; después, Ana arriba a la derecha con **Salir** | Login con sesión del servidor (Spring Security) |
-| 3 | Tocar **Buscar en el mapa** | Varias sugerencias, porque Belgrano 450 existe en más de una localidad; cada una con "Ver en el mapa" | **API externa** (Georef), Adapter y proxy de caché |
-| 4 | Elegir la sugerencia de Bernal. Descripción: "Hay un cable colgando del poste de luz y chispea cuando llueve, justo frente a la escuela". Elegir una foto (JPEG o PNG) | La vista previa de la foto. Antes, probar con un `.txt` o un GIF: "La foto tiene que ser JPEG o PNG" | Foto obligatoria |
+| 2 | En la interfaz, entrar como **Ana Pérez** (`ana@example.org`, contraseña `demo1234`). **Crear reclamo**: Luminaria rota, dirección "Belgrano 450" | La pantalla de ingreso; después, Ana arriba a la derecha con **Salir** | Login con sesión del servidor (Spring Security) |
+| 3 | Tocar **Buscar en el mapa** | Varias sugerencias, porque Belgrano 450 existe en varios municipios; cada una dice de cuál es y tiene "Ver en el mapa" | **API externa** (Georef), una búsqueda por municipio en paralelo; Adapter y proxy de caché |
+| 4 | Elegir la sugerencia de Bernal (Quilmes): el formulario muestra "Municipio: Quilmes". Descripción: "Hay un cable colgando del poste de luz y chispea cuando llueve, justo frente a la escuela". Elegir una foto (JPEG o PNG) | La vista previa de la foto. Antes, probar con un `.txt` o un GIF: "La foto tiene que ser JPEG o PNG" | Foto obligatoria |
 | 5 | **Crear reclamo** | Detalle: la foto, prioridad alta o crítica "sugerida por IA" con su motivo, área Alumbrado, dirección normalizada y **Ver en Google Maps** | **IA** (REST 2 con Gemini) y **SOAP** (cobertura). La foto no viaja a la IA |
 | 6 | Pestaña Mailpit | Los correos "lo recibimos" y "ya tiene un área a cargo" para Ana, y el aviso para Carla Gómez | **Mensajería**: outbox, RabbitMQ y consumidor |
 | 7 | Pestaña RabbitMQ: **Exchanges** → `reclamos.eventos`, **Queues** → `notificaciones.email` | El gráfico de mensajes publicados y entregados; `notificaciones.email.dlq` vacía | Publicar y suscribir, cola de errores |
 | 8 | Pestañas del WSDL y de los dos Swagger | `ConsultarCobertura`, `POST /api/prioridades/evaluar` y los endpoints de REST 1 | **Contratos**: WSDL y OpenAPI |
-| 9 | Como **Bruno Díaz**, crear un reclamo de Luminaria rota en Belgrano 450, Bernal, eligiendo la sugerencia de Bernal en el mapa | Antes de crear aparece **¿Es alguno de estos?** con el reclamo de Ana a pocos metros, su foto y sin su nombre. **Es el mismo: apoyar** vuelve a **Mis reclamos** con el aviso; Ana ve "1 vecino apoya este reclamo" en el detalle | Duplicados (Haversine) y apoyos |
+| 9 | Como **Bruno Díaz**, crear un reclamo de Luminaria rota en Belgrano 450, eligiendo la sugerencia de Bernal (Quilmes) en el mapa | Antes de crear aparece **¿Es alguno de estos?** con el reclamo de Ana a pocos metros, su foto y sin su nombre. **Es el mismo: apoyar** vuelve a **Mis reclamos** con el aviso; Ana ve "1 vecino apoya este reclamo" en el detalle | Duplicados (Haversine) y apoyos |
 | 10 | **Salir** y entrar como **Carla Gómez** (`carla@example.org`, agente de Alumbrado): ver la foto, tomar el reclamo y resolverlo | La agente ve la foto; el historial suma dos pasos | Cada rol ve y hace lo suyo: lo decide el dominio con el usuario de la sesión |
 | 11 | Volver a Mailpit | "cambió de estado" y "está resuelto" para Ana | El mismo flujo de mensajería, otro evento |
 | 12 | Entrar como Ana, abrir el reclamo resuelto y **Reabrir** con el motivo "Sigue apagado". Que Carla lo resuelva otra vez | La segunda vez, el botón **Reabrir** ya no aparece: solo **Confirmar solución** | Reaperturas con límite (dominio) |
 | 13 | **Crear una cuenta** nueva e ir a **Crear reclamo** | Pide verificar el teléfono. Con el bot: código, enlace a Telegram y "Compartir mi teléfono". Sin bot: el número en un formulario. Repetir con el número de otra cuenta: "Ese número ya está verificado en otra cuenta" | **Segunda API externa** (Telegram), Adapter |
 | 14 | Entrar como **Elena Ruiz** → **Administración** → **Cuentas de ciudadanos** → **Bloquear** la cuenta nueva | Esa cuenta entra y ve sus reclamos, pero **Crear reclamo** muestra el aviso de cuenta bloqueada | Chain of Responsibility de los controles de uso |
-| 15 | Como Elena, pestaña **Tablero** | Tablero de gestión: pendientes, vencidos con su porcentaje, sin asignar y la tabla por área y barrio. Debajo, el público con filtros. Salir y, en la pantalla de ingreso, **Ver el tablero público**: las mismas cifras sin sesión | Lado de lectura separado (Domain Reporting, Clase 5) |
+| 15 | Como Elena, pestaña **Tablero** | Tablero de gestión: pendientes, vencidos con su porcentaje, sin asignar y la tabla por área y municipio. Debajo, el público con filtros. Salir y, en la pantalla de ingreso, **Ver el tablero público**: las mismas cifras sin sesión | Lado de lectura separado (Domain Reporting, Clase 5) |
 
 Para el paso 5: la IA puede subir la prioridad de la categoría pero nunca bajarla. Si sugiere una menor, el
 detalle dice "por categoría" y el motivo lo explica. Si dice "por categoría (la IA no respondió)", el servicio
@@ -120,7 +120,7 @@ correr desde la máquina: `node scripts/verificar-demo.mjs`.
 | --- | --- |
 | Frontend, backend, cobertura, prioridad, RabbitMQ y Mailpit | Que cada contenedor responda: la interfaz y el proxy de `/api`, los contratos OpenAPI, el WSDL, el exchange con su cola y su consumidor, y el buzón |
 | Login | Que Ana Pérez entre con `demo1234`: toma la cookie `XSRF-TOKEN`, la devuelve en `X-XSRF-TOKEN` y guarda la cookie de sesión, como el navegador. Además, que tenga el teléfono verificado y la cuenta sin bloquear, porque si no el alta da 403 |
-| Georef | Que el backend devuelva sugerencias para Belgrano 450, en Bernal. Sin Internet es un **aviso**, no una falla |
+| Georef | Que el backend devuelva sugerencias para Belgrano 450 y que una sea de Quilmes. Sin Internet es un **aviso**, no una falla |
 | Alta del reclamo | `POST /api/reclamos` multipart con la sesión de Ana Pérez, la sugerencia elegida y una foto JPEG chica que viene en el script: responde 201 |
 | Foto | Que `GET /api/reclamos/{numero}/foto` devuelva un JPEG con la sesión de Ana |
 | Tablero público | Que `GET /api/dashboard/publico` cuente al menos el reclamo recién creado |

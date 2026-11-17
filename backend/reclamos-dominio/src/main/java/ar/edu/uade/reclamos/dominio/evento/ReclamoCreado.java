@@ -8,7 +8,7 @@ public record ReclamoCreado(
         String numeroReclamo,
         Long ciudadanoId,
         Long categoriaId,
-        Long barrioId,
+        Long municipioId,
         Prioridad prioridad,
         LocalDateTime ocurridoEn) implements EventoDominio {
 }

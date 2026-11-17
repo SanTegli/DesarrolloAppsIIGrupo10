@@ -161,9 +161,9 @@ class GestionReclamosFacadeTest {
     @Test
     void sugerirUbicacionesDelegaEnElServicio() {
         var resultado = SugerenciasUbicacion.noDisponible();
-        when(ubicaciones.sugerir("Belgrano 450", 3L)).thenReturn(resultado);
+        when(ubicaciones.sugerir("Belgrano 450")).thenReturn(resultado);
 
-        assertThat(facade.sugerirUbicaciones("Belgrano 450", 3L)).isSameAs(resultado);
+        assertThat(facade.sugerirUbicaciones("Belgrano 450")).isSameAs(resultado);
         verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 
@@ -303,11 +303,11 @@ class GestionReclamosFacadeTest {
     }
 
     @Test
-    void barriosDelegaParametrosYResultadoSinOtrasInteracciones() {
-        var resultado = List.of(e.barrio);
-        when(catalogos.barrios()).thenReturn(resultado);
-        assertThat(facade.barrios()).isSameAs(resultado);
-        verify(catalogos).barrios();
+    void municipiosDelegaParametrosYResultadoSinOtrasInteracciones() {
+        var resultado = List.of(e.municipio);
+        when(catalogos.municipios()).thenReturn(resultado);
+        assertThat(facade.municipios()).isSameAs(resultado);
+        verify(catalogos).municipios();
         verifyNoMoreInteractions(escritura, consultas, catalogos);
     }
 

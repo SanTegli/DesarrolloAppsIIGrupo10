@@ -28,21 +28,21 @@ function Cifra({ titulo, valor, detalle }) {
 }
 
 /** Pestaña Tablero: para agentes y administradores, primero la gestión; para todos, el público. */
-export default function Tablero({ usuario, barrios, categorias }) {
+export default function Tablero({ usuario, municipios, categorias }) {
   return (
     <div className="tablero">
       {usuario && usuario.rol !== 'CIUDADANO' && <TableroGestion usuario={usuario} />}
-      <TableroPublico barrios={barrios} categorias={categorias} />
+      <TableroPublico municipios={municipios} categorias={categorias} />
     </div>
   )
 }
 
 /** Cifras públicas, sin datos de personas. No necesita sesión. */
-export function TableroPublico({ barrios, categorias }) {
-  const [filtros, setFiltros] = useState({ desde: '', hasta: '', barrioId: '', categoriaId: '' })
+export function TableroPublico({ municipios, categorias }) {
+  const [filtros, setFiltros] = useState({ desde: '', hasta: '', municipioId: '', categoriaId: '' })
   const { datos, error, cargando } = useCarga(
     () => tableroPublico(filtros),
-    [filtros.desde, filtros.hasta, filtros.barrioId, filtros.categoriaId],
+    [filtros.desde, filtros.hasta, filtros.municipioId, filtros.categoriaId],
   )
   const cambiar = (campo) => (evento) => setFiltros((anteriores) => ({ ...anteriores, [campo]: evento.target.value }))
 
@@ -61,12 +61,12 @@ export function TableroPublico({ barrios, categorias }) {
           <input type="date" value={filtros.hasta} onChange={cambiar('hasta')} />
         </label>
         <label>
-          <span>Barrio</span>
-          <select value={filtros.barrioId} onChange={cambiar('barrioId')}>
+          <span>Municipio</span>
+          <select value={filtros.municipioId} onChange={cambiar('municipioId')}>
             <option value="">Todos</option>
-            {barrios.map((barrio) => (
-              <option key={barrio.id} value={barrio.id}>
-                {barrio.nombre}
+            {municipios.map((municipio) => (
+              <option key={municipio.id} value={municipio.id}>
+                {municipio.nombre}
               </option>
             ))}
           </select>
@@ -111,7 +111,7 @@ export function TableroPublico({ barrios, categorias }) {
   )
 }
 
-/** Para el municipio: pendientes y vencidos por área y barrio. El agente ve solo su área. */
+/** Para los municipios: pendientes y vencidos por área y municipio. El agente ve solo su área. */
 export function TableroGestion({ usuario }) {
   const { datos, error, cargando } = useCarga(tableroGestion, [usuario.id])
 
@@ -141,16 +141,16 @@ export function TableroGestion({ usuario }) {
                 <thead>
                   <tr>
                     <th>Área</th>
-                    <th>Barrio</th>
+                    <th>Municipio</th>
                     <th className="numero">Pendientes</th>
                     <th className="numero">Vencidos</th>
                   </tr>
                 </thead>
                 <tbody>
                   {datos.filas.map((fila) => (
-                    <tr key={`${fila.area?.id ?? 'sin-area'}-${fila.barrio.id}`}>
+                    <tr key={`${fila.area?.id ?? 'sin-area'}-${fila.municipio.id}`}>
                       <td>{fila.area ? fila.area.nombre : 'Sin área'}</td>
-                      <td>{fila.barrio.nombre}</td>
+                      <td>{fila.municipio.nombre}</td>
                       <td className="numero">{fila.pendientes}</td>
                       <td className={fila.vencidos > 0 ? 'numero vencidos' : 'numero'}>{fila.vencidos}</td>
                     </tr>

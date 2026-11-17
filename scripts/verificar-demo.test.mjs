@@ -20,7 +20,19 @@ function escenarioNormal() {
     georef: {
       disponible: true,
       sugerencias: [
-        { direccionNormalizada: 'BELGRANO 450, Bernal, Quilmes', latitud: -34.7086, longitud: -58.2797 },
+        // Primero una de otro municipio: el script elige la de Quilmes, que cubre Alumbrado.
+        {
+          direccionNormalizada: 'BELGRANO 450, Wilde, Avellaneda',
+          latitud: -34.7012,
+          longitud: -58.3181,
+          municipio: { id: 2, nombre: 'Avellaneda' },
+        },
+        {
+          direccionNormalizada: 'BELGRANO 450, Bernal, Quilmes',
+          latitud: -34.7086,
+          longitud: -58.2797,
+          municipio: { id: 1, nombre: 'Quilmes' },
+        },
       ],
     },
     origenPrioridad: 'IA',
@@ -223,6 +235,8 @@ describe('verificarDemo', () => {
     assert.equal(alta.usuarioId, undefined, 'la identidad va en la sesión, no en un encabezado')
     assert.match(resultados.find((r) => r.paso === 'Login').detalle, /Ana Pérez/)
     assert.equal(alta.cuerpo.ubicacion.direccionNormalizada, 'BELGRANO 450, Bernal, Quilmes')
+    assert.equal(alta.cuerpo.municipioId, 1)
+    assert.equal(alta.cuerpo.barrioId, undefined)
     assert.equal(alta.tipoReclamo, 'application/json')
     assert.deepEqual([alta.foto[0], alta.foto[1]], [0xff, 0xd8], 'el alta lleva la foto JPEG')
     assert.match(resultados.find((r) => r.paso === 'Foto').detalle, /JPEG de \d+ bytes/)
@@ -238,6 +252,16 @@ describe('verificarDemo', () => {
     assert.equal(estadoDe(resultados, 'Ubicación'), AVISO)
     assert.equal(escenario.altas[0].cuerpo.ubicacion, undefined)
     assert.equal(resumen(resultados).fallas, 0)
+  })
+
+  test('si Georef solo encuentra la dirección en otro municipio, el alta sigue sin ubicación', async () => {
+    escenario = escenarioNormal()
+    escenario.georef = { disponible: true, sugerencias: [escenario.georef.sugerencias[0]] }
+    const resultados = await verificarDemo(configuracion())
+
+    assert.equal(estadoDe(resultados, 'Georef (API externa)'), AVISO)
+    assert.equal(escenario.altas[0].cuerpo.ubicacion, undefined)
+    assert.equal(escenario.altas[0].cuerpo.municipioId, 1)
   })
 
   test('si la prioridad salió del respaldo, el paso de la IA falla y explica qué revisar', async () => {

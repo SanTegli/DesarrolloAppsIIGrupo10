@@ -60,7 +60,6 @@ class RestIntegrationTest {
     @Autowired JdbcTemplate jdbc;
     @Autowired Environment entorno;
     @Autowired MunicipioRepository municipios;
-    @Autowired BarrioRepository barrios;
     @Autowired CategoriaRepository categorias;
     @Autowired AreaMunicipalRepository areas;
     @Autowired UsuarioRepository usuarios;
@@ -71,26 +70,24 @@ class RestIntegrationTest {
     @MockitoSpyBean GestionReclamosFacade facade;
 
     private record Datos(Long ciudadano, Long otroCiudadano, Long agente, Long otroAgente, Long administrador,
-                         Long categoria, Long sinArea, Long barrio, Long area, Long otraArea,
+                         Long categoria, Long sinArea, Long municipio, Long area, Long otraArea,
                          String asignado, String ajeno, String ingresado, String resuelto) { }
     private Datos datos;
 
     @BeforeEach
     void escenarioReal() {
         datos = new TransactionTemplate(transacciones).execute(tx -> {
-            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_barrio",
-                    "area_categoria", "usuarios", "areas_municipales", "barrios", "categorias", "municipios")) {
+            for (String tabla : List.of("notificaciones", "historial_estados", "reclamos", "area_categoria",
+                    "usuarios", "areas_municipales", "categorias", "municipios")) {
                 jdbc.update("delete from " + tabla);
             }
             Municipio municipio = municipios.guardar(new Municipio("Quilmes", "Buenos Aires"));
-            Barrio barrio = barrios.guardar(new Barrio("Bernal", municipio));
             Categoria categoria = categorias.guardar(new Categoria("Bache", "Pozo urbano", 48, Prioridad.ALTA));
             Categoria sinArea = categorias.guardar(new Categoria("Sin cobertura", "Prueba", 24, Prioridad.BAJA));
             AreaMunicipal area = new AreaMunicipal("Obras", "obras@test.org", municipio);
             AreaMunicipal otraArea = new AreaMunicipal("Vial", "vial@test.org", municipio);
             for (AreaMunicipal candidata : List.of(area, otraArea)) {
                 candidata.agregarCategoria(categoria);
-                candidata.agregarBarrio(barrio);
                 areas.guardar(candidata);
             }
             Ciudadano ciudadano = (Ciudadano) usuarios.guardar(verificado(new Ciudadano("30111222", "Ana", "Perez", "ana@test.org", null)));
@@ -98,10 +95,10 @@ class RestIntegrationTest {
             AgenteMunicipal agente = (AgenteMunicipal) usuarios.guardar(new AgenteMunicipal("30333444", "Carla", "Gomez", "carla@test.org", null, area));
             AgenteMunicipal otroAgente = (AgenteMunicipal) usuarios.guardar(new AgenteMunicipal("30444555", "Diego", "Sosa", "diego@test.org", null, otraArea));
             Usuario administrador = usuarios.guardar(new Administrador("30555666", "Elena", "Ruiz", "elena@test.org", null));
-            Reclamo asignado = crearFixture(ciudadano, categoria, barrio, 1);
-            Reclamo ajeno = crearFixture(otro, categoria, barrio, 2);
-            Reclamo ingresado = crearFixture(ciudadano, sinArea, barrio, 3);
-            Reclamo resuelto = crearFixture(otro, categoria, barrio, 4);
+            Reclamo asignado = crearFixture(ciudadano, categoria, municipio, 1);
+            Reclamo ajeno = crearFixture(otro, categoria, municipio, 2);
+            Reclamo ingresado = crearFixture(ciudadano, sinArea, municipio, 3);
+            Reclamo resuelto = crearFixture(otro, categoria, municipio, 4);
             LocalDateTime fecha = LocalDateTime.of(2026, 1, 5, 12, 0);
             asignado.asignarArea(area, administrador, "Manual", fecha);
             ajeno.asignarArea(otraArea, administrador, "Manual", fecha);
@@ -110,7 +107,7 @@ class RestIntegrationTest {
             resuelto.cambiarEstado(EstadoReclamo.RESUELTO, agente, "Resuelto", fecha);
             List.of(asignado, ajeno, ingresado, resuelto).forEach(reclamos::guardar);
             return new Datos(ciudadano.getId(), otro.getId(), agente.getId(), otroAgente.getId(), administrador.getId(),
-                    categoria.getId(), sinArea.getId(), barrio.getId(), area.getId(), otraArea.getId(),
+                    categoria.getId(), sinArea.getId(), municipio.getId(), area.getId(), otraArea.getId(),
                     asignado.getNumero(), ajeno.getNumero(), ingresado.getNumero(), resuelto.getNumero());
         });
         assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
@@ -137,7 +134,7 @@ class RestIntegrationTest {
         assertThat(dto.get("numero").asText()).matches("REC-[0-9A-F]{8}");
         campos(dto, "numero", "descripcion", "direccion", "ubicacion", "foto", "cantidadApoyos", "estado", "prioridad", "origenPrioridad",
                 "motivoPrioridad", "vencido", "asignacionPendiente", "fechaCreacion", "fechaLimite", "categoria",
-                "barrio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
+                "municipio", "ciudadano", "area", "agente", "historial", "accionesDisponibles");
         campos(dto.get("ubicacion"), "estado", "latitud", "longitud", "direccionNormalizada", "proveedor");
         assertThat(dto.get("foto").asText()).isEqualTo("/api/reclamos/" + dto.get("numero").asText() + "/foto");
         assertThat(dto.get("ubicacion").get("estado").asText()).isEqualTo("PENDIENTE");
@@ -167,11 +164,11 @@ class RestIntegrationTest {
     }
 
     static Stream<String> cuerposInvalidos() {
-        return Stream.of("{}", "null", "{", "{\"categoriaId\":1,\"barrioId\":1,\"descripcion\":\"  \",\"direccion\":\"Calle\"}",
-                "{\"categoriaId\":0,\"barrioId\":-1,\"descripcion\":\"Pozo\",\"direccion\":\"Calle\"}",
-                "{\"categoriaId\":1.5,\"barrioId\":1,\"descripcion\":\"Pozo\",\"direccion\":\"Calle\"}",
-                "{\"categoriaId\":1,\"barrioId\":1,\"descripcion\":\"" + "x".repeat(1001) + "\",\"direccion\":\"Calle\"}",
-                "{\"categoriaId\":1,\"barrioId\":1,\"descripcion\":\"Pozo\",\"direccion\":\"" + "x".repeat(201) + "\"}");
+        return Stream.of("{}", "null", "{", "{\"categoriaId\":1,\"municipioId\":1,\"descripcion\":\"  \",\"direccion\":\"Calle\"}",
+                "{\"categoriaId\":0,\"municipioId\":-1,\"descripcion\":\"Pozo\",\"direccion\":\"Calle\"}",
+                "{\"categoriaId\":1.5,\"municipioId\":1,\"descripcion\":\"Pozo\",\"direccion\":\"Calle\"}",
+                "{\"categoriaId\":1,\"municipioId\":1,\"descripcion\":\"" + "x".repeat(1001) + "\",\"direccion\":\"Calle\"}",
+                "{\"categoriaId\":1,\"municipioId\":1,\"descripcion\":\"Pozo\",\"direccion\":\"" + "x".repeat(201) + "\"}");
     }
 
     @Test
@@ -181,12 +178,12 @@ class RestIntegrationTest {
     }
 
     @Test
-    void postConCategoriaOBarrioInexistenteEs404YNoCreaNada() throws Exception {
+    void postConCategoriaOMunicipioInexistenteEs404YNoCreaNada() throws Exception {
         error(mvc.perform(alta(creacion(Long.MAX_VALUE)).with(como(datos.ciudadano()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
-        ObjectNode sinBarrio = (ObjectNode) json.readTree(creacion(datos.categoria()));
-        sinBarrio.put("barrioId", Long.MAX_VALUE);
-        error(mvc.perform(alta(json.writeValueAsString(sinBarrio)).with(como(datos.ciudadano()))),
+        ObjectNode sinMunicipio = (ObjectNode) json.readTree(creacion(datos.categoria()));
+        sinMunicipio.put("municipioId", Long.MAX_VALUE);
+        error(mvc.perform(alta(json.writeValueAsString(sinMunicipio)).with(como(datos.ciudadano()))),
                 404, "RECURSO_NO_ENCONTRADO", "/api/reclamos");
         assertThat(reclamos.buscarTodos()).hasSize(4);
     }
@@ -221,7 +218,7 @@ class RestIntegrationTest {
         String base = "/api/reclamos/" + datos.asignado();
         for (MockHttpServletRequestBuilder request : List.of(get("/api/reclamos"), get(base), get(base + "/notificaciones"),
                 get("/api/notificaciones"), get("/api/usuarios"), get("/api/auth/yo"),
-                get("/api/ubicaciones/sugerencias").param("direccion", "Belgrano 450").param("barrioId", "1"),
+                get("/api/ubicaciones/sugerencias").param("direccion", "Belgrano 450").param("municipioId", "1"),
                 // El 401 sale antes de leer el formulario: alcanza con el tipo multipart, sin partes.
                 post("/api/reclamos").contentType(MediaType.MULTIPART_FORM_DATA),
                 patch(base + "/estado").contentType(MediaType.APPLICATION_JSON).content("{\"estado\":\"EN_PROCESO\"}"),
@@ -261,7 +258,7 @@ class RestIntegrationTest {
         JsonNode resumen = leer(mvc.perform(get("/api/reclamos").with(como(datos.ciudadano())))
                 .andExpect(status().isOk()).andReturn()).get(0);
         campos(resumen, "numero", "direccion", "estado", "prioridad", "vencido", "asignacionPendiente",
-                "fechaCreacion", "fechaLimite", "categoria", "barrio", "ciudadano", "area");
+                "fechaCreacion", "fechaLimite", "categoria", "municipio", "ciudadano", "area");
     }
 
     @Test
@@ -438,14 +435,14 @@ class RestIntegrationTest {
         JsonNode categoria = leer(mvc.perform(get("/api/categorias")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2))).andReturn()).get(0);
         campos(categoria, "id", "nombre", "descripcion", "slaHoras", "prioridadBase");
-        JsonNode barrio = leer(mvc.perform(get("/api/barrios")).andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].municipio").value("Quilmes")).andReturn()).get(0);
-        campos(barrio, "id", "nombre", "municipio");
+        JsonNode municipio = leer(mvc.perform(get("/api/municipios")).andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].nombre").value("Quilmes")).andReturn()).get(0);
+        campos(municipio, "id", "nombre", "provincia");
         JsonNode area = leer(mvc.perform(get("/api/areas")).andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(2))).andReturn()).get(0);
-        campos(area, "id", "nombre", "activa", "categorias", "barrios");
+        campos(area, "id", "nombre", "activa", "municipio", "categorias");
         campos(area.get("categorias").get(0), "id", "nombre");
-        campos(area.get("barrios").get(0), "id", "nombre");
+        campos(area.get("municipio"), "id", "nombre");
     }
 
     @Test
@@ -499,7 +496,7 @@ class RestIntegrationTest {
 
     private String creacion(Long categoria) throws Exception {
         ObjectNode body = json.createObjectNode();
-        body.put("categoriaId", categoria).put("barrioId", datos.barrio())
+        body.put("categoriaId", categoria).put("municipioId", datos.municipio())
                 .put("descripcion", "Pozo en la calle").put("direccion", "Belgrano 450");
         return json.writeValueAsString(body);
     }
@@ -534,8 +531,8 @@ class RestIntegrationTest {
         assertThat(nombres).containsExactlyInAnyOrder(esperados);
     }
 
-    private Reclamo crearFixture(Ciudadano ciudadano, Categoria categoria, Barrio barrio, int dia) {
+    private Reclamo crearFixture(Ciudadano ciudadano, Categoria categoria, Municipio municipio, int dia) {
         Clock reloj = Clock.fixed(Instant.parse("2026-01-0" + dia + "T12:00:00Z"), ZoneOffset.UTC);
-        return new ReclamoFactory(reloj).crear(ciudadano, categoria, barrio, "Pozo", "Calle 450");
+        return new ReclamoFactory(reloj).crear(ciudadano, categoria, municipio, "Pozo", "Calle 450");
     }
 }

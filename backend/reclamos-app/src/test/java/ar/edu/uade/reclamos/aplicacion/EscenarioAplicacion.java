@@ -10,7 +10,6 @@ public class EscenarioAplicacion {
     public final Clock reloj = Clock.fixed(Instant.parse("2026-10-05T10:00:00Z"), ZoneOffset.UTC);
     public final ReclamoFactory factory = new ReclamoFactory(reloj);
     public final Municipio municipio = id(new Municipio("Quilmes", "Buenos Aires"), 1L);
-    public final Barrio barrio = id(new Barrio("Bernal", municipio), 1L);
     public final Categoria categoria = id(new Categoria("Bache", "Pozo", 48, Prioridad.BAJA), 1L);
     public final AreaMunicipal area = id(new AreaMunicipal("Obras", "obras@example.org", municipio), 1L);
     public final AreaMunicipal otraArea = id(new AreaMunicipal("Vial", "vial@example.org", municipio), 2L);
@@ -24,7 +23,7 @@ public class EscenarioAplicacion {
             "elena@example.org", null), 5L);
 
     public Reclamo ingresado() {
-        return factory.crear(ciudadano, categoria, barrio, "Pozo en la calle", "Belgrano 450");
+        return factory.crear(ciudadano, categoria, municipio, "Pozo en la calle", "Belgrano 450");
     }
 
     public Reclamo asignado() {

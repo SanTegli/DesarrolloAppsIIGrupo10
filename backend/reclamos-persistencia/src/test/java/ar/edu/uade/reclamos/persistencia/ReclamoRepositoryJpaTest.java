@@ -20,7 +20,7 @@ class ReclamoRepositoryJpaTest extends PersistenciaTestBase {
         assertThat(recuperado).isNotSameAs(nuevo);
         assertThat(recuperado.getId()).isEqualTo(id);
         assertThat(recuperado.getCiudadano().getDni()).isEqualTo("30111222");
-        assertThat(recuperado.getBarrio().getMunicipio().getNombre()).isEqualTo("Quilmes");
+        assertThat(recuperado.getMunicipio().getNombre()).isEqualTo("Quilmes");
         assertThat(recuperado.getCategoria().getSlaHoras()).isEqualTo(120);
         assertThat(recuperado.getArea().getId()).isEqualTo(area.getId());
         assertThat(recuperado.getAgente().getId()).isEqualTo(agente.getId());
@@ -64,12 +64,12 @@ class ReclamoRepositoryJpaTest extends PersistenciaTestBase {
     @Test void filtraPorCiudadanoYAreaYOrdenaDelMasNuevoAlMasViejo() {
         Reclamo primero = reclamos.guardar(nuevoReclamo());
         primero.asignarArea(area, null, null, AHORA);
-        Reclamo segundo = new Reclamo("REC-00000002", ciudadano, categoria, barrio, "Otro pozo",
+        Reclamo segundo = new Reclamo("REC-00000002", ciudadano, categoria, municipio, "Otro pozo",
                 "Calle 2", Prioridad.BAJA, AHORA.plusHours(1), AHORA.plusHours(121));
         segundo = reclamos.guardar(segundo);
         Ciudadano otro = (Ciudadano) usuarios.guardar(
                 new Ciudadano("31222333", "Bruno", "Díaz", "bruno@example.org", null));
-        reclamos.guardar(new Reclamo("REC-00000003", otro, categoria, barrio, "Otro",
+        reclamos.guardar(new Reclamo("REC-00000003", otro, categoria, municipio, "Otro",
                 "Calle 3", Prioridad.MEDIA, AHORA.plusHours(2), AHORA.plusHours(3)));
         flushYLimpiar();
 
@@ -116,7 +116,7 @@ class ReclamoRepositoryJpaTest extends PersistenciaTestBase {
     @Test void elNumeroEsUnicoEnLaBase() {
         Reclamo primero = reclamos.guardar(nuevoReclamo());
         em.flush();
-        Reclamo duplicado = new Reclamo(primero.getNumero(), ciudadano, categoria, barrio, "Duplicado",
+        Reclamo duplicado = new Reclamo(primero.getNumero(), ciudadano, categoria, municipio, "Duplicado",
                 "Calle", Prioridad.BAJA, AHORA, AHORA.plusHours(1));
         assertThatThrownBy(() -> { reclamos.guardar(duplicado); em.flush(); })
                 .isInstanceOf(DataIntegrityViolationException.class);

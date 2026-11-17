@@ -41,11 +41,11 @@ class CoberturaEndpointTest {
 
     @Test
     void casoValidoDevuelveLasAreasQueCubren() throws IOException {
-        cliente.sendRequest(withPayload(pedido("1", "2", "2")))
+        cliente.sendRequest(withPayload(pedido("1", "2")))
                 .andExpect(noFault())
                 .andExpect(validPayload(new ClassPathResource("cobertura.xsd")))
                 .andExpect(payload(new StringSource(
-                        "<ConsultarCoberturaResponse xmlns=\"http://uade.edu.ar/reclamos/cobertura/v1\">"
+                        "<ConsultarCoberturaResponse xmlns=\"http://uade.edu.ar/reclamos/cobertura/v2\">"
                         + "<area><id>2</id><nombre>Obras Públicas</nombre></area>"
                         + "<area><id>4</id><nombre>Mantenimiento Vial</nombre></area>"
                         + "</ConsultarCoberturaResponse>")));
@@ -53,41 +53,39 @@ class CoberturaEndpointTest {
 
     @Test
     void combinacionSinAreasDevuelveLaRespuestaVacia() {
-        cliente.sendRequest(withPayload(pedido("1", "3", "1")))
+        cliente.sendRequest(withPayload(pedido("2", "1")))
                 .andExpect(noFault())
                 .andExpect(xpath("count(/c:ConsultarCoberturaResponse/c:area)", NS).evaluatesTo(0));
     }
 
     @Test
     void idDesconocidoDevuelveFaultDeCliente() {
-        cliente.sendRequest(withPayload(pedido("1", "99", "2")))
-                .andExpect(clientOrSenderFault("No existe el barrio 99"));
+        cliente.sendRequest(withPayload(pedido("99", "2")))
+                .andExpect(clientOrSenderFault("No existe el municipio 99"));
     }
 
     @Test
     void idQueNoCumpleElXsdSeRechazaAntesDeConsultar() {
-        cliente.sendRequest(withPayload(pedido("0", "2", "2")))
+        cliente.sendRequest(withPayload(pedido("0", "2")))
                 .andExpect(clientOrSenderFault("El pedido no cumple el contrato cobertura.xsd"));
-        cliente.sendRequest(withPayload(pedido("uno", "2", "2")))
+        cliente.sendRequest(withPayload(pedido("uno", "2")))
                 .andExpect(clientOrSenderFault());
     }
 
     @Test
     void pedidoIncompletoSeRechaza() {
         cliente.sendRequest(withPayload(new StringSource("""
-                        <ConsultarCoberturaRequest xmlns="http://uade.edu.ar/reclamos/cobertura/v1">
+                        <ConsultarCoberturaRequest xmlns="http://uade.edu.ar/reclamos/cobertura/v2">
                           <municipioId>1</municipioId>
-                          <barrioId>2</barrioId>
                         </ConsultarCoberturaRequest>""")))
                 .andExpect(clientOrSenderFault());
     }
 
-    private static Source pedido(String municipio, String barrio, String categoria) {
+    private static Source pedido(String municipio, String categoria) {
         return new StringSource("""
-                <ConsultarCoberturaRequest xmlns="http://uade.edu.ar/reclamos/cobertura/v1">
+                <ConsultarCoberturaRequest xmlns="http://uade.edu.ar/reclamos/cobertura/v2">
                   <municipioId>%s</municipioId>
-                  <barrioId>%s</barrioId>
                   <categoriaId>%s</categoriaId>
-                </ConsultarCoberturaRequest>""".formatted(municipio, barrio, categoria));
+                </ConsultarCoberturaRequest>""".formatted(municipio, categoria));
     }
 }

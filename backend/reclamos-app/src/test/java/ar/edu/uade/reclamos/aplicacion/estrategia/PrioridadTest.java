@@ -57,9 +57,8 @@ class PrioridadTest {
 
     public static Reclamo reclamo(Prioridad base, String descripcion) {
         Municipio municipio = new Municipio("Quilmes", "Buenos Aires");
-        Barrio barrio = new Barrio("Bernal", municipio);
         Categoria categoria = new Categoria("Bache", "Pozo", 48, base);
         Ciudadano ciudadano = new Ciudadano("30111222", "Ana", "Pérez", "ana@example.org", null);
-        return new ReclamoFactory().crear(ciudadano, categoria, barrio, descripcion, "Belgrano 450");
+        return new ReclamoFactory().crear(ciudadano, categoria, municipio, descripcion, "Belgrano 450");
     }
 }

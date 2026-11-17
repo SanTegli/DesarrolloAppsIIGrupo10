@@ -21,17 +21,17 @@ documento donde está la decisión.
 | RF-01 | Un visitante crea una cuenta de ciudadano con nombre, apellido, email, contraseña de al menos 8 caracteres y, si quiere, DNI. Email y DNI no se repiten | CP45 |
 | RF-02 | Los usuarios entran con email y contraseña, y salen. Un error de login no revela si la cuenta existe | CP41, CP42, CP46 |
 | RF-03 | Un ciudadano verifica su teléfono por Telegram (o con la verificación simulada, cuando no hay bot configurado) antes de crear reclamos. Un número vale para una sola cuenta | CP47, CP48, CP49 |
-| RF-04 | Un ciudadano crea un reclamo con categoría, barrio, descripción, foto obligatoria y, si quiere, la dirección ubicada en el mapa | CP01 a CP03, CP27 a CP31, CP53, CP54 |
+| RF-04 | Un ciudadano crea un reclamo con categoría, municipio, descripción, foto obligatoria y, si quiere, la dirección ubicada en el mapa. La dirección se busca en todos los municipios y la elegida define el municipio; si el mapa no responde, el municipio se elige de una lista | CP01 a CP03, CP27 a CP31, CP53, CP54, CP71 |
 | RF-05 | Antes de crear el reclamo, el sistema muestra los reclamos abiertos de la misma categoría a menos de 50 m, sin datos del autor, y el ciudadano puede apoyar uno en vez de crear otro | CP58 a CP62 |
-| RF-06 | El sistema asigna el reclamo al área que cubre ese barrio y esa categoría. Si no hay ninguna, o el servicio de cobertura no responde, queda sin asignar para la administración | CP05, CP06, CP17 a CP20 |
+| RF-06 | El sistema asigna el reclamo a un área del municipio que atiende esa categoría; cada municipio tiene sus propias áreas. Si no hay ninguna, o el servicio de cobertura no responde, queda sin asignar para la administración | CP05, CP06, CP17 a CP20, CP72 |
 | RF-07 | El sistema calcula la prioridad con la IA a partir de la descripción, sin bajar nunca la prioridad de la categoría. Si la IA no responde, usa la de la categoría | CP04, CP21 a CP26 |
 | RF-08 | Los agentes toman y resuelven los reclamos de su área. El ciudadano confirma la solución o reabre el reclamo con un motivo, una sola vez y dentro de 7 días. Cada transición la puede pedir un solo rol (`PoliticaTransiciones`): otro rol recibe `403`, y una transición que no existe, `409` | CP08 a CP10, CP52 |
 | RF-09 | Cada cambio queda en el historial, y el ciudadano y el área reciben un aviso en la aplicación y por correo | CP07, CP11, CP14, CP32, CP33 |
 | RF-10 | El sistema marca como vencidos los reclamos que pasaron su fecha límite, les sube la prioridad y avisa | CP13 |
 | RF-11 | Cada rol ve solo los reclamos que le tocan: el ciudadano los suyos, el agente los de su área, el administrador todos | CP12, CP43, CP55 |
 | RF-12 | El administrador asigna el área de un reclamo ingresado o lo rechaza si no corresponde al municipio, reasigna uno asignado y bloquea o desbloquea cuentas de ciudadanos | CP06, CP51, `ObserverIntegrationTest.sinAsignacionAutomaticaAsignacionManualReasignacionCancelacionYRechazoAvisanAlCiudadano` |
-| RF-13 | Cualquiera, sin sesión, ve un tablero público con cifras agregadas por período, barrio y categoría | CP63, CP64, CP67 |
-| RF-14 | Agentes y administradores ven un tablero de gestión con pendientes, vencidos y sin asignar, por área y barrio | CP65, CP66 |
+| RF-13 | Cualquiera, sin sesión, ve un tablero público con cifras agregadas por período, municipio y categoría | CP63, CP64, CP67 |
+| RF-14 | Agentes y administradores ven un tablero de gestión con pendientes, vencidos y sin asignar, por área y municipio | CP65, CP66 |
 | RF-15 | El ciudadano cancela su reclamo mientras está ingresado o asignado, es decir, antes de que un agente lo tome | `ReclamoServiceTest.ciudadanoCancelaIngresadoOAsignado`, `ReclamoTest.cancelacion` |
 
 ## Requerimientos no funcionales

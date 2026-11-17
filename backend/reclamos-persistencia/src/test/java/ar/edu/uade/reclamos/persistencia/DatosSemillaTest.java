@@ -19,7 +19,6 @@ class DatosSemillaTest extends PersistenciaTestBase {
     @Autowired JdbcTemplate jdbc;
 
     @Test void noRestauraDatosNiRelacionesEliminadosDespuesDeInicializar() {
-        assertThat(jdbc.update("delete from area_barrio where area_id = 1 and barrio_id = 1")).isEqualTo(1);
         assertThat(jdbc.update("delete from area_categoria where area_id = 1 and categoria_id = 1")).isEqualTo(1);
         assertThat(jdbc.update("delete from usuarios where id = 7")).isEqualTo(1);
 
@@ -28,33 +27,30 @@ class DatosSemillaTest extends PersistenciaTestBase {
         semilla.execute(jdbc.getDataSource());
         flushYLimpiar();
 
-        assertThat(jdbc.queryForObject("select count(*) from area_barrio where area_id = 1 and barrio_id = 1",
-                Integer.class)).isZero();
         assertThat(jdbc.queryForObject("select count(*) from area_categoria where area_id = 1 and categoria_id = 1",
                 Integer.class)).isZero();
         assertThat(usuarios.buscarPorId(7L)).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from inicializaciones where identificador = 'datos-dev-v1'",
+        assertThat(jdbc.queryForObject("select count(*) from inicializaciones where identificador = 'datos-dev-v2'",
                 Integer.class)).isEqualTo(1);
     }
 
     @Test void cargaDosVecesSinDuplicarYRespetaLosIdsDelContrato() {
         flushYLimpiar();
-        assertThat(municipios.buscarTodos()).hasSize(1);
-        assertThat(municipios.buscarPorId(1L).orElseThrow().getProvincia()).isEqualTo("Buenos Aires");
-        assertThat(barrios.buscarPorId(1L).orElseThrow().getNombre()).isEqualTo("Quilmes Centro");
-        assertThat(barrios.buscarPorId(2L).orElseThrow().getNombre()).isEqualTo("Bernal");
-        assertThat(barrios.buscarPorId(3L).orElseThrow().getNombre()).isEqualTo("Ezpeleta");
+        assertThat(municipios.buscarTodos()).extracting(Municipio::getNombre)
+                .containsExactly("Quilmes", "Avellaneda", "Berazategui");
+        assertThat(municipios.buscarTodos()).extracting(Municipio::getProvincia).containsOnly("Buenos Aires");
         assertThat(categorias.buscarPorId(1L).orElseThrow().getSlaHoras()).isEqualTo(48);
         assertThat(categorias.buscarPorId(2L).orElseThrow().getSlaHoras()).isEqualTo(120);
         assertThat(categorias.buscarPorId(3L).orElseThrow().getSlaHoras()).isEqualTo(72);
         assertThat(categorias.buscarPorId(1L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.MEDIA);
         assertThat(categorias.buscarPorId(2L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.BAJA);
         assertThat(categorias.buscarPorId(3L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.MEDIA);
-        assertThat(areas.buscarTodas()).hasSize(4);
-        assertThat(usuarios.buscarTodos()).extracting(Usuario::getId).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L);
+        assertThat(areas.buscarTodas()).hasSize(9);
+        assertThat(areas.buscarPorId(5L).orElseThrow().getMunicipio().getNombre()).isEqualTo("Avellaneda");
+        assertThat(usuarios.buscarTodos()).extracting(Usuario::getId).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
         assertThat(usuarios.buscarTodos()).extracting(Usuario::getNombreCompleto)
                 .containsExactly("Ana Pérez", "Bruno Díaz", "Carla Gómez", "Diego Sosa",
-                        "Fabián Luna", "Gabriela Paz", "Elena Ruiz");
+                        "Fabián Luna", "Gabriela Paz", "Elena Ruiz", "Hugo Medina");
         assertThat(usuarios.buscarPorId(1L).orElseThrow()).isInstanceOf(Ciudadano.class);
         assertThat(usuarios.buscarPorId(2L).orElseThrow()).isInstanceOf(Ciudadano.class);
         assertThat(usuarios.buscarPorId(7L).orElseThrow()).isInstanceOf(Administrador.class);
@@ -62,13 +58,15 @@ class DatosSemillaTest extends PersistenciaTestBase {
             assertThat(usuarios.buscarAgentesPorArea(areaId)).extracting(AgenteMunicipal::getId)
                     .containsExactly(areaId + 2);
         }
-        assertThat(areas.buscarCandidatas(1L, 2L)).extracting(AreaMunicipal::getId).containsExactly(1L);
-        assertThat(areas.buscarCandidatas(2L, 2L)).extracting(AreaMunicipal::getId).containsExactly(2L, 4L);
-        assertThat(areas.buscarCandidatas(2L, 3L)).extracting(AreaMunicipal::getId).containsExactly(2L);
-        assertThat(areas.buscarCandidatas(1L, 3L)).isEmpty();
-        assertThat(areas.buscarCandidatas(3L, 3L)).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from area_barrio", Integer.class)).isEqualTo(8);
-        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(4);
+        assertThat(usuarios.buscarAgentesPorArea(5L)).extracting(AgenteMunicipal::getId).containsExactly(8L);
+        // (categoría, municipio): Quilmes tiene dos áreas para baches y Avellaneda no tiene Alumbrado.
+        assertThat(areas.buscarCandidatas(1L, 1L)).extracting(AreaMunicipal::getId).containsExactly(1L);
+        assertThat(areas.buscarCandidatas(2L, 1L)).extracting(AreaMunicipal::getId).containsExactly(2L, 4L);
+        assertThat(areas.buscarCandidatas(2L, 2L)).extracting(AreaMunicipal::getId).containsExactly(5L);
+        assertThat(areas.buscarCandidatas(1L, 2L)).isEmpty();
+        assertThat(areas.buscarCandidatas(1L, 3L)).extracting(AreaMunicipal::getId).containsExactly(7L);
+        assertThat(areas.buscarCandidatas(3L, 3L)).extracting(AreaMunicipal::getId).containsExactly(9L);
+        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(9);
         assertThat(reclamos.buscarTodos()).isEmpty();
         assertThat(usuarios.buscarTodos()).allMatch(Usuario::tieneContrasena);
         assertThat(usuarios.buscarPorEmail("ana@example.org")).isPresent();

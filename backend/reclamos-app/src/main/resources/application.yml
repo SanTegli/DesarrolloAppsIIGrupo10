@@ -127,6 +127,9 @@ reclamos:
     cache:
       duracion: 10m              # la misma dirección en el mismo municipio no se vuelve a consultar
       maximo: 500
+    # En el alta, Georef confirma en qué municipio cae la ubicación elegida (GET /ubicacion). Si no responde,
+    # alcanza el recuadro.
+    confirmar-municipio: true
     # Recuadro aproximado de cada municipio (filtro grueso, no el límite exacto). Un nombre con espacios va
     # entre corchetes: "[Lomas de Zamora]".
     recuadros:
@@ -135,3 +138,13 @@ reclamos:
         latitud-maxima: -34.66
         longitud-minima: -58.38
         longitud-maxima: -58.17
+      Avellaneda:
+        latitud-minima: -34.73
+        latitud-maxima: -34.62
+        longitud-minima: -58.41
+        longitud-maxima: -58.24
+      Berazategui:
+        latitud-minima: -34.92
+        latitud-maxima: -34.72
+        longitud-minima: -58.28
+        longitud-maxima: -58.02

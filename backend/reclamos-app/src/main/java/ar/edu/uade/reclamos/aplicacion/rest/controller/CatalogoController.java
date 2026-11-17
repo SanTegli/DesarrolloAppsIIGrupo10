@@ -9,7 +9,7 @@ import java.util.List;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@Tag(name = "Catálogos", description = "Categorías, barrios y áreas")
+@Tag(name = "Catálogos", description = "Categorías, municipios y áreas")
 @RequestMapping("/api")
 public class CatalogoController {
     private final GestionReclamosFacade facade;
@@ -26,13 +26,15 @@ public class CatalogoController {
         return facade.categorias().stream().map(mapper::categoria).toList();
     }
 
-    @Operation(summary = "Listar barrios")
-    @GetMapping("/barrios")
-    public List<BarrioResponse> barrios() {
-        return facade.barrios().stream().map(mapper::barrio).toList();
+    @Operation(summary = "Listar municipios",
+            description = "Los municipios donde se pueden hacer reclamos. La interfaz los ofrece para elegir a mano "
+                    + "cuando el mapa no responde.")
+    @GetMapping("/municipios")
+    public List<MunicipioResponse> municipios() {
+        return facade.municipios().stream().map(mapper::municipio).toList();
     }
 
-    @Operation(summary = "Listar áreas con su cobertura")
+    @Operation(summary = "Listar áreas con su municipio y sus categorías")
     @GetMapping("/areas")
     public List<AreaResponse> areas() {
         return facade.areas().stream().map(mapper::area).toList();

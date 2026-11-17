@@ -46,12 +46,11 @@ class FlujoDeAvisosTest {
     @BeforeEach
     void conectarServiciosYListener() {
         e.area.agregarCategoria(e.categoria);
-        e.area.agregarBarrio(e.barrio);
         var sinArea = new ar.edu.uade.reclamos.dominio.modelo.Categoria("Sin cobertura", "Prueba", 24, Prioridad.BAJA);
         sinArea.setId(CATEGORIA_SIN_AREA);
         categorias.guardar(sinArea);
         var areas = new DoblesEnMemoria.Areas(e.area, e.otraArea);
-        servicio = new ReclamoService(usuarios, categorias, new DoblesEnMemoria.Barrios(e.barrio), reclamos,
+        servicio = new ReclamoService(usuarios, categorias, new DoblesEnMemoria.Municipios(e.municipio), reclamos,
                 e.factory, new PrioridadPorCategoria(), new ServicioAsignacion(areas, new CoberturaLocal(areas),
                 new AsignacionPorJurisdiccion()),
                 new PermisosReclamo(), e.reloj, eventos);

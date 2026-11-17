@@ -32,10 +32,9 @@ public class CoberturaEndpoint {
     @PayloadRoot(namespace = ConfiguracionWebService.NAMESPACE, localPart = "ConsultarCoberturaRequest")
     @ResponsePayload
     public ConsultarCoberturaResponse consultarCobertura(@RequestPayload ConsultarCoberturaRequest pedido) {
-        List<DatosCatalogo.Area> areas = catalogo.consultar(pedido.getMunicipioId(), pedido.getBarrioId(),
-                pedido.getCategoriaId());
-        LOGGER.info("ConsultarCobertura municipio={} barrio={} categoria={}: {} áreas", pedido.getMunicipioId(),
-                pedido.getBarrioId(), pedido.getCategoriaId(), areas.size());
+        List<DatosCatalogo.Area> areas = catalogo.consultar(pedido.getMunicipioId(), pedido.getCategoriaId());
+        LOGGER.info("ConsultarCobertura municipio={} categoria={}: {} áreas", pedido.getMunicipioId(),
+                pedido.getCategoriaId(), areas.size());
 
         ConsultarCoberturaResponse respuesta = new ConsultarCoberturaResponse();
         for (DatosCatalogo.Area area : areas) {

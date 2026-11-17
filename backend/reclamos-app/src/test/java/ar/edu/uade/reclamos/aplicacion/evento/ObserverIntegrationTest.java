@@ -42,7 +42,6 @@ class ObserverIntegrationTest {
     @Autowired UsuarioRepository usuarios;
     @Autowired MunicipioRepository municipios;
     @Autowired CategoriaRepository categorias;
-    @Autowired BarrioRepository barrios;
     @Autowired AreaMunicipalRepository areas;
     @Autowired PlatformTransactionManager transacciones;
     @Autowired ApplicationEvents eventos;
@@ -50,21 +49,19 @@ class ObserverIntegrationTest {
 
     private record Datos(Long ciudadano, Long otroCiudadano, Long agente, Long otroAgente,
                          Long administrador, Long categoria, Long categoriaSinArea,
-                         Long barrio, Long area, Long otraArea) { }
+                         Long municipio, Long area, Long otraArea) { }
     private Datos datos;
 
     @BeforeEach
     void prepararEscenario() {
         datos = new TransactionTemplate(transacciones).execute(tx -> {
             Municipio municipio = municipios.guardar(new Municipio("Municipio Observer", "Buenos Aires"));
-            Barrio barrio = barrios.guardar(new Barrio("Barrio Observer", municipio));
             Categoria categoria = categorias.guardar(new Categoria("Bache", "Prueba", 24, Prioridad.ALTA));
             Categoria sinArea = categorias.guardar(new Categoria("Sin cobertura", "Prueba", 24, Prioridad.BAJA));
             AreaMunicipal area = new AreaMunicipal("Obras", "obras@test.org", municipio);
             AreaMunicipal otraArea = new AreaMunicipal("Vial", "vial@test.org", municipio);
             for (AreaMunicipal candidata : List.of(area, otraArea)) {
                 candidata.agregarCategoria(categoria);
-                candidata.agregarBarrio(barrio);
                 areas.guardar(candidata);
             }
             Usuario ciudadano = usuarios.guardar(verificado(new Ciudadano(dni(), "Ana", "Observer", "ana@test.org", null)));
@@ -73,7 +70,7 @@ class ObserverIntegrationTest {
             Usuario otroAgente = usuarios.guardar(new AgenteMunicipal(dni(), "Diego", "Observer", "diego@test.org", null, otraArea));
             Usuario administrador = usuarios.guardar(new Administrador(dni(), "Elena", "Observer", "elena@test.org", null));
             return new Datos(ciudadano.getId(), otroCiudadano.getId(), agente.getId(), otroAgente.getId(),
-                    administrador.getId(), categoria.getId(), sinArea.getId(), barrio.getId(),
+                    administrador.getId(), categoria.getId(), sinArea.getId(), municipio.getId(),
                     area.getId(), otraArea.getId());
         });
         eventos.clear();
@@ -201,7 +198,7 @@ class ObserverIntegrationTest {
 
     private Reclamo crear(boolean asignacionAutomatica) {
         return servicio.crear(datos.ciudadano(), asignacionAutomatica ? datos.categoria() : datos.categoriaSinArea(),
-                datos.barrio(), "Pozo", "Calle 450");
+                datos.municipio(), "Pozo", "Calle 450");
     }
 
     private List<Notificacion> avisos(String numero) {

@@ -13,14 +13,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConsultaCatalogosService {
     private final UsuarioRepository usuarios;
     private final CategoriaRepository categorias;
-    private final BarrioRepository barrios;
+    private final MunicipioRepository municipios;
     private final AreaMunicipalRepository areas;
 
     public ConsultaCatalogosService(UsuarioRepository usuarios, CategoriaRepository categorias,
-                                     BarrioRepository barrios, AreaMunicipalRepository areas) {
+                                     MunicipioRepository municipios, AreaMunicipalRepository areas) {
         this.usuarios = usuarios;
         this.categorias = categorias;
-        this.barrios = barrios;
+        this.municipios = municipios;
         this.areas = areas;
     }
 
@@ -48,8 +48,8 @@ public class ConsultaCatalogosService {
         return categorias.buscarTodas();
     }
 
-    public List<Barrio> barrios() {
-        return barrios.buscarTodos();
+    public List<Municipio> municipios() {
+        return municipios.buscarTodos();
     }
 
     public List<AreaMunicipal> areas() {

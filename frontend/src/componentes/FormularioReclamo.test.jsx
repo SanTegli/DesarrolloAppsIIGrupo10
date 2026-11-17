@@ -1,19 +1,19 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
-import { BARRIOS, CATEGORIAS, TOKEN_CSRF, archivoFoto, reclamo, simularApi } from '../pruebas/apiFalsa.js'
+import { MUNICIPIOS, CATEGORIAS, TOKEN_CSRF, archivoFoto, reclamo, simularApi } from '../pruebas/apiFalsa.js'
 import FormularioReclamo from './FormularioReclamo.jsx'
 
 function mostrar(rutas = {}) {
   const llamadas = simularApi(rutas)
   const onCreado = vi.fn()
-  render(<FormularioReclamo categorias={CATEGORIAS} barrios={BARRIOS} onCreado={onCreado} />)
+  render(<FormularioReclamo categorias={CATEGORIAS} municipios={MUNICIPIOS} onCreado={onCreado} />)
   return { llamadas, onCreado, usuario: userEvent.setup({ applyAccept: false }) }
 }
 
 async function completar(usuario) {
   await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
-  await usuario.selectOptions(screen.getByLabelText('Barrio'), 'Bernal')
+  await usuario.selectOptions(screen.getByLabelText('Municipio'), 'Quilmes')
   await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
   await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
 }
@@ -86,5 +86,44 @@ describe('FormularioReclamo: foto', () => {
 
     expect(await screen.findByRole('alert')).toHaveTextContent('El archivo no es una imagen JPEG o PNG válida.')
     expect(screen.getByRole('button', { name: 'Crear reclamo' })).toBeEnabled()
+  })
+})
+
+describe('FormularioReclamo: municipio', () => {
+  it('la dirección elegida en el mapa define el municipio, aunque sea otro', async () => {
+    const wilde = {
+      direccionNormalizada: 'BELGRANO 450, Wilde, Avellaneda, Buenos Aires',
+      latitud: -34.701,
+      longitud: -58.318,
+      municipio: { id: 2, nombre: 'Avellaneda' },
+    }
+    const { llamadas, onCreado, usuario } = mostrar({
+      'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [wilde] },
+      'GET /api/reclamos/candidatos-duplicados': [],
+      'POST /api/reclamos': { status: 201, cuerpo: reclamo() },
+    })
+
+    await usuario.selectOptions(screen.getByLabelText(/Categoría/), 'Luminaria rota')
+    await usuario.type(screen.getByLabelText('Dirección'), 'Belgrano 450')
+    await usuario.click(screen.getByRole('button', { name: 'Buscar en el mapa' }))
+    await usuario.click(await screen.findByRole('radio', { name: /Wilde/ }))
+    await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
+    await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
+    await usuario.click(screen.getByRole('button', { name: 'Crear reclamo' }))
+
+    await vi.waitFor(() => expect(onCreado).toHaveBeenCalled())
+    expect(llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo.municipioId).toBe(2)
+  })
+
+  it('si no se elige una dirección del mapa, el municipio se elige de la lista y es obligatorio', async () => {
+    const { usuario } = mostrar()
+
+    const municipio = screen.getByLabelText('Municipio')
+    expect(municipio).toBeRequired()
+    expect(screen.getAllByRole('option').map((opcion) => opcion.textContent)).toEqual(
+      expect.arrayContaining(['Quilmes', 'Avellaneda']),
+    )
+    await usuario.selectOptions(municipio, 'Avellaneda')
+    expect(municipio).toHaveValue('2')
   })
 })

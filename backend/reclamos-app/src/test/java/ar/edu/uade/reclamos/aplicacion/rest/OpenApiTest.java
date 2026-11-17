@@ -41,7 +41,7 @@ class OpenApiTest {
         assertThat(rutas).containsExactlyInAnyOrder("/api/reclamos", "/api/reclamos/{numero}",
                 "/api/reclamos/{numero}/estado", "/api/reclamos/{numero}/asignacion",
                 "/api/reclamos/{numero}/notificaciones", "/api/notificaciones", "/api/usuarios",
-                "/api/usuarios/{id}", "/api/categorias", "/api/barrios", "/api/areas",
+                "/api/usuarios/{id}", "/api/categorias", "/api/municipios", "/api/areas",
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
                 "/api/auth/logout", "/api/verificacion-telefono", "/api/verificacion-telefono/simulada",
                 "/api/usuarios/{id}/bloqueo", "/api/reclamos/{numero}/foto",

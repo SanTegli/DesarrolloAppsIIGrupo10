@@ -23,7 +23,7 @@ public class RestMapper {
                 rutaFoto(reclamo), cantidadApoyos, reclamo.getEstado(), reclamo.getPrioridad(),
                 reclamo.getOrigenPrioridad(), reclamo.getMotivoPrioridad(), reclamo.isVencido(),
                 reclamo.isAsignacionPendiente(), reclamo.getFechaCreacion(), reclamo.getFechaLimite(),
-                categoriaReferencia(reclamo.getCategoria()), barrioReferencia(reclamo.getBarrio()),
+                categoriaReferencia(reclamo.getCategoria()), municipioReferencia(reclamo.getMunicipio()),
                 usuarioReferencia(reclamo.getCiudadano()), areaReferencia(reclamo.getArea()),
                 usuarioReferencia(reclamo.getAgente()), reclamo.getHistorial().stream().map(this::historial).toList(),
                 acciones);
@@ -38,7 +38,7 @@ public class RestMapper {
     }
 
     public TableroPublicoResponse tableroPublico(TableroPublico tablero) {
-        return new TableroPublicoResponse(tablero.desde(), tablero.hasta(), tablero.barrioId(),
+        return new TableroPublicoResponse(tablero.desde(), tablero.hasta(), tablero.municipioId(),
                 tablero.categoriaId(), tablero.creadosEnPeriodo(), tablero.pendientes(), tablero.resueltos(),
                 tablero.cerrados(), tablero.rechazados(), tablero.cancelados(), tablero.porcentajeAtendidos());
     }
@@ -50,7 +50,7 @@ public class RestMapper {
                 tablero.filas().stream()
                         .map(fila -> new FilaTableroResponse(
                                 fila.areaId() == null ? null : new ReferenciaResponse(fila.areaId(), fila.area()),
-                                new ReferenciaResponse(fila.barrioId(), fila.barrio()), fila.pendientes(),
+                                new ReferenciaResponse(fila.municipioId(), fila.municipio()), fila.pendientes(),
                                 fila.vencidos()))
                         .toList());
     }
@@ -67,14 +67,14 @@ public class RestMapper {
         return new ResumenReclamoResponse(reclamo.getNumero(), reclamo.getDireccion(), reclamo.getEstado(),
                 reclamo.getPrioridad(), reclamo.isVencido(), reclamo.isAsignacionPendiente(),
                 reclamo.getFechaCreacion(), reclamo.getFechaLimite(), categoriaReferencia(reclamo.getCategoria()),
-                barrioReferencia(reclamo.getBarrio()), usuarioReferencia(reclamo.getCiudadano()),
+                municipioReferencia(reclamo.getMunicipio()), usuarioReferencia(reclamo.getCiudadano()),
                 areaReferencia(reclamo.getArea()));
     }
 
     public SugerenciasUbicacionResponse sugerencias(SugerenciasUbicacion resultado) {
         return new SugerenciasUbicacionResponse(resultado.disponible(), resultado.sugerencias().stream()
-                .map(sugerencia -> new SugerenciaUbicacionResponse(sugerencia.nomenclatura(), sugerencia.latitud(),
-                        sugerencia.longitud()))
+                .map(opcion -> new SugerenciaUbicacionResponse(opcion.nomenclatura(), opcion.latitud(),
+                        opcion.longitud(), municipioReferencia(opcion.municipio())))
                 .toList());
     }
 
@@ -119,22 +119,22 @@ public class RestMapper {
                 categoria.getSlaHoras(), categoria.getPrioridadBase());
     }
 
-    public BarrioResponse barrio(Barrio barrio) {
-        return new BarrioResponse(barrio.getId(), barrio.getNombre(), barrio.getMunicipio().getNombre());
+    public MunicipioResponse municipio(Municipio municipio) {
+        return new MunicipioResponse(municipio.getId(), municipio.getNombre(), municipio.getProvincia());
     }
 
     public AreaResponse area(AreaMunicipal area) {
         return new AreaResponse(area.getId(), area.getNombre(), area.isActiva(),
-                area.getCategorias().stream().map(this::categoriaReferencia).toList(),
-                area.getBarrios().stream().map(this::barrioReferencia).toList());
+                municipioReferencia(area.getMunicipio()),
+                area.getCategorias().stream().map(this::categoriaReferencia).toList());
     }
 
     private ReferenciaResponse categoriaReferencia(Categoria categoria) {
         return new ReferenciaResponse(categoria.getId(), categoria.getNombre());
     }
 
-    private ReferenciaResponse barrioReferencia(Barrio barrio) {
-        return new ReferenciaResponse(barrio.getId(), barrio.getNombre());
+    private ReferenciaResponse municipioReferencia(Municipio municipio) {
+        return new ReferenciaResponse(municipio.getId(), municipio.getNombre());
     }
 
     private ReferenciaResponse areaReferencia(AreaMunicipal area) {

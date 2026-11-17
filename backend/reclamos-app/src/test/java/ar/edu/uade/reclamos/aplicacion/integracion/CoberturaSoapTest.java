@@ -32,7 +32,7 @@ import org.springframework.xml.transform.StringSource;
  */
 class CoberturaSoapTest {
 
-    private static final String NS = "http://uade.edu.ar/reclamos/cobertura/v1";
+    private static final String NS = "http://uade.edu.ar/reclamos/cobertura/v2";
 
     private final Municipio quilmes = conId(new Municipio("Quilmes", "Buenos Aires"), 1L);
     private final Municipio otroMunicipio = conId(new Municipio("Berazategui", "Buenos Aires"), 2L);
@@ -60,23 +60,23 @@ class CoberturaSoapTest {
     }
 
     @Test
-    void mandaLosTresIdsYDevuelveLasAreasDelBackendOrdenadasPorId() {
+    void mandaMunicipioYCategoriaYDevuelveLasAreasDelBackendOrdenadasPorId() {
         servidor.expect(payload(new StringSource("<ConsultarCoberturaRequest xmlns=\"" + NS + "\">"
-                        + "<municipioId>1</municipioId><barrioId>2</barrioId><categoriaId>3</categoriaId>"
+                        + "<municipioId>1</municipioId><categoriaId>3</categoriaId>"
                         + "</ConsultarCoberturaRequest>")))
                 .andRespond(withPayload(respuesta(4, 2)));
 
-        assertThat(cobertura.buscarCandidatas(1L, 2L, 3L)).containsExactly(obras, vial);
+        assertThat(cobertura.buscarCandidatas(1L, 3L)).containsExactly(obras, vial);
     }
 
     @Test
     void listaVaciaNoEsUnaFalla() {
         servidor.expect(payload(new StringSource("<ConsultarCoberturaRequest xmlns=\"" + NS + "\">"
-                        + "<municipioId>1</municipioId><barrioId>3</barrioId><categoriaId>1</categoriaId>"
+                        + "<municipioId>2</municipioId><categoriaId>1</categoriaId>"
                         + "</ConsultarCoberturaRequest>")))
                 .andRespond(withPayload(respuesta()));
 
-        assertThat(cobertura.buscarCandidatas(1L, 3L, 1L)).isEmpty();
+        assertThat(cobertura.buscarCandidatas(2L, 1L)).isEmpty();
     }
 
     @Test
@@ -84,17 +84,17 @@ class CoberturaSoapTest {
         servidor.expect(anything())
                 .andRespond(withPayload(respuesta(99, 5, 6, 2, 2)));
 
-        assertThat(cobertura.buscarCandidatas(1L, 2L, 2L)).containsExactly(obras);
+        assertThat(cobertura.buscarCandidatas(1L, 2L)).containsExactly(obras);
     }
 
     @Test
     void faultDelServicioDejaLaAsignacionPendienteConElMotivo() {
         servidor.expect(anything())
-                .andRespond(withClientOrSenderFault("No existe el barrio 9", Locale.of("es")));
+                .andRespond(withClientOrSenderFault("No existe el municipio 9", Locale.of("es")));
 
-        assertThatThrownBy(() -> cobertura.buscarCandidatas(1L, 9L, 2L))
+        assertThatThrownBy(() -> cobertura.buscarCandidatas(9L, 2L))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class)
-                .hasMessageContaining("rechazó la consulta").hasMessageContaining("No existe el barrio 9");
+                .hasMessageContaining("rechazó la consulta").hasMessageContaining("No existe el municipio 9");
     }
 
     @Test
@@ -102,7 +102,7 @@ class CoberturaSoapTest {
         servidor.expect(anything())
                 .andRespond(withException(new SocketTimeoutException("Read timed out")));
 
-        assertThatThrownBy(() -> cobertura.buscarCandidatas(1L, 2L, 2L))
+        assertThatThrownBy(() -> cobertura.buscarCandidatas(1L, 2L))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class).hasMessageContaining("no respondió");
     }
 
@@ -111,7 +111,7 @@ class CoberturaSoapTest {
         servidor.expect(anything())
                 .andRespond(withPayload(new StringSource("<Otra xmlns=\"urn:otra\"/>")));
 
-        assertThatThrownBy(() -> cobertura.buscarCandidatas(1L, 2L, 2L))
+        assertThatThrownBy(() -> cobertura.buscarCandidatas(1L, 2L))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class);
     }
 
@@ -123,7 +123,7 @@ class CoberturaSoapTest {
                     "http://localhost:" + mudo.getLocalPort() + "/ws", Duration.ofMillis(300)), areas);
             long inicio = System.nanoTime();
 
-            assertThatThrownBy(() -> conTiempoCorto.buscarCandidatas(1L, 2L, 2L))
+            assertThatThrownBy(() -> conTiempoCorto.buscarCandidatas(1L, 2L))
                     .isInstanceOf(ServicioExternoNoDisponibleException.class).hasMessageContaining("no respondió");
             assertThat(Duration.ofNanos(System.nanoTime() - inicio)).isLessThan(Duration.ofSeconds(2));
         }
@@ -138,7 +138,7 @@ class CoberturaSoapTest {
         CoberturaSoap apagado = new CoberturaSoap(CoberturaSoap.crearCliente(
                 "http://localhost:" + puertoLibre + "/ws", Duration.ofMillis(500)), areas);
 
-        assertThatThrownBy(() -> apagado.buscarCandidatas(1L, 2L, 2L))
+        assertThatThrownBy(() -> apagado.buscarCandidatas(1L, 2L))
                 .isInstanceOf(ServicioExternoNoDisponibleException.class).hasMessageContaining("no respondió");
     }
 

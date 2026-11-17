@@ -46,15 +46,15 @@ class ReclamoTest {
     @DisplayName("Datos obligatorios faltantes o inválidos se rechazan al construir")
     void validaDatosAlConstruir() {
         assertThrows(DatosInvalidosException.class, () -> new Reclamo("REC-1", datos.ana, datos.luminaria,
-                datos.bernal, "   ", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
+                datos.quilmes, "   ", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
         assertThrows(DatosInvalidosException.class, () -> new Reclamo("REC-1", datos.ana, datos.luminaria,
-                datos.bernal, "Farol apagado", null, Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
+                datos.quilmes, "Farol apagado", null, Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
         assertThrows(DatosInvalidosException.class, () -> new Reclamo("REC-1", null, datos.luminaria,
-                datos.bernal, "Farol apagado", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
+                datos.quilmes, "Farol apagado", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
         assertThrows(DatosInvalidosException.class, () -> new Reclamo("REC-1", datos.ana, datos.luminaria,
-                datos.bernal, "Farol apagado", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.minusHours(1)));
+                datos.quilmes, "Farol apagado", "Belgrano 450", Prioridad.MEDIA, AHORA, AHORA.minusHours(1)));
         assertThrows(DatosInvalidosException.class, () -> new Reclamo("REC-1", datos.ana, datos.luminaria,
-                datos.bernal, "x".repeat(Reclamo.LONGITUD_MAXIMA_DESCRIPCION + 1), "Belgrano 450",
+                datos.quilmes, "x".repeat(Reclamo.LONGITUD_MAXIMA_DESCRIPCION + 1), "Belgrano 450",
                 Prioridad.MEDIA, AHORA, AHORA.plusHours(1)));
     }
 
@@ -214,6 +214,18 @@ class ReclamoTest {
 
         assertSame(datos.alumbrado, reclamo.getArea());
         assertEquals(2, reclamo.getHistorial().size());
+    }
+
+    @Test
+    @DisplayName("No se asigna a un área de otro municipio, aunque atienda la categoría")
+    void noSeAsignaAOtroMunicipio() {
+        Reclamo reclamo = datos.reclamoIngresado();
+
+        ReglaNegocioException error = assertThrows(ReglaNegocioException.class,
+                () -> reclamo.asignarArea(datos.obrasAvellaneda, datos.admin, null, AHORA));
+
+        assertEquals("El área Obras Públicas es de Avellaneda y el reclamo es de Quilmes.", error.getMessage());
+        assertEquals(EstadoReclamo.INGRESADO, reclamo.getEstado());
     }
 
     @Test

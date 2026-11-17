@@ -53,13 +53,6 @@
       <basic name="provincia"><column name="provincia" nullable="false" length="80"/></basic>
     </attributes>
   </entity>
-  <entity class="Barrio" access="FIELD" metadata-complete="true">
-    <table name="barrios"/>
-    <attributes>
-      <basic name="nombre"><column name="nombre" nullable="false" length="80"/></basic>
-      <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
-    </attributes>
-  </entity>
   <entity class="Categoria" access="FIELD" metadata-complete="true">
     <table name="categorias"/>
     <attributes>
@@ -76,13 +69,6 @@
       <basic name="emailContacto"><column name="email_contacto" nullable="false" length="254"/></basic>
       <basic name="activa"><column name="activa" nullable="false"/></basic>
       <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
-      <many-to-many name="barrios" target-entity="Barrio" fetch="LAZY">
-        <join-table name="area_barrio">
-          <join-column name="area_id" nullable="false"/>
-          <inverse-join-column name="barrio_id" nullable="false"/>
-          <unique-constraint><column-name>area_id</column-name><column-name>barrio_id</column-name></unique-constraint>
-        </join-table>
-      </many-to-many>
       <many-to-many name="categorias" target-entity="Categoria" fetch="LAZY">
         <join-table name="area_categoria">
           <join-column name="area_id" nullable="false"/>
@@ -114,7 +100,8 @@
       <many-to-one name="ciudadano" target-entity="Ciudadano" fetch="LAZY" optional="false"><join-column name="ciudadano_id" nullable="false"/></many-to-one>
       <many-to-one name="agente" target-entity="AgenteMunicipal" fetch="LAZY" optional="true"><join-column name="agente_id" nullable="true"/></many-to-one>
       <many-to-one name="categoria" target-entity="Categoria" fetch="LAZY" optional="false"><join-column name="categoria_id" nullable="false"/></many-to-one>
-      <many-to-one name="barrio" target-entity="Barrio" fetch="LAZY" optional="false"><join-column name="barrio_id" nullable="false"/></many-to-one>
+      <!-- PR 25: el reclamo es de un municipio; los barrios ya no existen. -->
+      <many-to-one name="municipio" target-entity="Municipio" fetch="LAZY" optional="false"><join-column name="municipio_id" nullable="false"/></many-to-one>
       <many-to-one name="area" target-entity="AreaMunicipal" fetch="LAZY" optional="true"><join-column name="area_id" nullable="true"/></many-to-one>
       <one-to-many name="historial" target-entity="HistorialEstado" mapped-by="reclamo" fetch="LAZY">
         <order-by>fecha ASC, id ASC</order-by>

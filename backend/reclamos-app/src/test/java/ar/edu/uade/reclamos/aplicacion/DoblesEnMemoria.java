@@ -10,18 +10,18 @@ import ar.edu.uade.reclamos.dominio.evento.ReclamoResuelto;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoVencido;
 import ar.edu.uade.reclamos.dominio.modelo.AgenteMunicipal;
 import ar.edu.uade.reclamos.dominio.modelo.AreaMunicipal;
-import ar.edu.uade.reclamos.dominio.modelo.Barrio;
 import ar.edu.uade.reclamos.dominio.modelo.Categoria;
 import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
 import ar.edu.uade.reclamos.dominio.modelo.CodigoVerificacion;
 import ar.edu.uade.reclamos.dominio.modelo.Entidad;
+import ar.edu.uade.reclamos.dominio.modelo.Municipio;
 import ar.edu.uade.reclamos.dominio.modelo.Notificacion;
 import ar.edu.uade.reclamos.dominio.modelo.Reclamo;
 import ar.edu.uade.reclamos.dominio.modelo.Usuario;
 import ar.edu.uade.reclamos.dominio.repositorio.AreaMunicipalRepository;
-import ar.edu.uade.reclamos.dominio.repositorio.BarrioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CategoriaRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.CodigoVerificacionRepository;
+import ar.edu.uade.reclamos.dominio.repositorio.MunicipioRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.NotificacionRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.ReclamoRepository;
 import ar.edu.uade.reclamos.dominio.repositorio.UsuarioRepository;
@@ -224,11 +224,11 @@ public final class DoblesEnMemoria {
         }
 
         @Override
-        public List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long barrioId) {
+        public List<AreaMunicipal> buscarCandidatas(Long categoriaId, Long municipioId) {
             return guardadas.stream()
                     .filter(AreaMunicipal::isActiva)
                     .filter(area -> area.getCategorias().stream().anyMatch(c -> c.getId().equals(categoriaId)))
-                    .filter(area -> area.getBarrios().stream().anyMatch(b -> b.getId().equals(barrioId)))
+                    .filter(area -> area.getMunicipio().getId().equals(municipioId))
                     .sorted(Comparator.comparing(AreaMunicipal::getId))
                     .toList();
         }
@@ -257,31 +257,26 @@ public final class DoblesEnMemoria {
         }
     }
 
-    public static class Barrios implements BarrioRepository {
-        public final List<Barrio> guardados = new ArrayList<>();
+    public static class Municipios implements MunicipioRepository {
+        public final List<Municipio> guardados = new ArrayList<>();
 
-        public Barrios(Barrio... iniciales) {
+        public Municipios(Municipio... iniciales) {
             guardados.addAll(List.of(iniciales));
         }
 
         @Override
-        public Barrio guardar(Barrio barrio) {
-            return conId(barrio, guardados);
+        public Municipio guardar(Municipio municipio) {
+            return conId(municipio, guardados);
         }
 
         @Override
-        public Optional<Barrio> buscarPorId(Long id) {
+        public Optional<Municipio> buscarPorId(Long id) {
             return porId(guardados, id);
         }
 
         @Override
-        public List<Barrio> buscarTodos() {
+        public List<Municipio> buscarTodos() {
             return List.copyOf(guardados);
-        }
-
-        @Override
-        public List<Barrio> buscarPorMunicipio(Long municipioId) {
-            return guardados.stream().filter(b -> b.getMunicipio().getId().equals(municipioId)).toList();
         }
     }
 

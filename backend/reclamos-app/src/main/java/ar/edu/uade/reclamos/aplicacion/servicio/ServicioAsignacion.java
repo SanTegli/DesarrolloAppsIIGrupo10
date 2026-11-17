@@ -39,17 +39,16 @@ public class ServicioAsignacion {
     }
 
     /**
-     * Asigna el área que elige la estrategia entre las candidatas (activas, que atienden la categoría y
-     * cubren el barrio). Si ninguna puede atenderlo, el reclamo queda INGRESADO. Si el catálogo de
+     * Asigna el área que elige la estrategia entre las candidatas (activas, del municipio del reclamo y que
+     * atienden su categoría). Si ninguna puede atenderlo, el reclamo queda INGRESADO. Si el catálogo de
      * cobertura no responde, también queda INGRESADO, pero marcado con la asignación pendiente.
      *
      * @return {@code true} si el reclamo quedó asignado
      */
-    public boolean asignarAutomaticamente(Reclamo reclamo, Long categoriaId, Long barrioId, LocalDateTime ahora) {
+    public boolean asignarAutomaticamente(Reclamo reclamo, LocalDateTime ahora) {
         List<AreaMunicipal> candidatas;
         try {
-            candidatas = cobertura.buscarCandidatas(reclamo.getBarrio().getMunicipio().getId(), barrioId,
-                    categoriaId);
+            candidatas = cobertura.buscarCandidatas(reclamo.getMunicipio().getId(), reclamo.getCategoria().getId());
         } catch (ServicioExternoNoDisponibleException error) {
             LOGGER.warn("Cobertura no disponible para el reclamo {}: queda con la asignación pendiente",
                     reclamo.getNumero(), error);

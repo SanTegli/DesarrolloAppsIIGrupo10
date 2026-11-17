@@ -33,8 +33,8 @@ public class ConsultasTableroJpa implements ConsultasTablero {
     }
 
     @Override
-    public long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long barrioId, Long categoriaId) {
-        Filtros filtros = new Filtros(barrioId, categoriaId);
+    public long contarCreados(LocalDateTime desde, LocalDateTime hasta, Long municipioId, Long categoriaId) {
+        Filtros filtros = new Filtros(municipioId, categoriaId);
         TypedQuery<Long> consulta = em.createQuery("select count(r) from Reclamo r"
                 + " where r.fechaCreacion >= :desde and r.fechaCreacion < :hasta" + filtros.condiciones(), Long.class)
                 .setParameter("desde", desde)
@@ -44,8 +44,8 @@ public class ConsultasTableroJpa implements ConsultasTablero {
     }
 
     @Override
-    public List<ConteoPorEstado> contarPorEstado(Long barrioId, Long categoriaId) {
-        Filtros filtros = new Filtros(barrioId, categoriaId);
+    public List<ConteoPorEstado> contarPorEstado(Long municipioId, Long categoriaId) {
+        Filtros filtros = new Filtros(municipioId, categoriaId);
         TypedQuery<ConteoPorEstado> consulta = em.createQuery("select new " + PROYECCION
                 + "ConteoPorEstado(r.estado, count(r)) from Reclamo r where 1 = 1" + filtros.condiciones()
                 + " group by r.estado", ConteoPorEstado.class);
@@ -56,13 +56,13 @@ public class ConsultasTableroJpa implements ConsultasTablero {
     }
 
     @Override
-    public List<FilaPendientes> pendientesPorAreaYBarrio(LocalDateTime ahora, Long areaId) {
+    public List<FilaPendientes> pendientesPorAreaYMunicipio(LocalDateTime ahora, Long areaId) {
         TypedQuery<FilaPendientes> consulta = em.createQuery("select new " + PROYECCION
-                        + "FilaPendientes(a.id, a.nombre, b.id, b.nombre, count(r),"
+                        + "FilaPendientes(a.id, a.nombre, m.id, m.nombre, count(r),"
                         + " sum(case when r.fechaLimite < :ahora then 1 else 0 end))"
-                        + " from Reclamo r join r.barrio b left join r.area a"
+                        + " from Reclamo r join r.municipio m left join r.area a"
                         + " where r.estado in :pendientes" + (areaId == null ? "" : " and a.id = :areaId")
-                        + " group by a.id, a.nombre, b.id, b.nombre", FilaPendientes.class)
+                        + " group by a.id, a.nombre, m.id, m.nombre", FilaPendientes.class)
                 .setParameter("ahora", ahora)
                 .setParameter("pendientes", PENDIENTES);
         if (areaId != null) {
@@ -73,7 +73,7 @@ public class ConsultasTableroJpa implements ConsultasTablero {
                 .sorted(Comparator.comparing(FilaPendientes::vencidos, Comparator.reverseOrder())
                         .thenComparing(FilaPendientes::pendientes, Comparator.reverseOrder())
                         .thenComparing(fila -> fila.area() == null ? "" : fila.area())
-                        .thenComparing(FilaPendientes::barrio))
+                        .thenComparing(FilaPendientes::municipio))
                 .toList();
     }
 
@@ -81,9 +81,9 @@ public class ConsultasTableroJpa implements ConsultasTablero {
     private static final class Filtros {
         private final Map<String, Long> valores = new TreeMap<>();
 
-        Filtros(Long barrioId, Long categoriaId) {
-            if (barrioId != null) {
-                valores.put("barrioId", barrioId);
+        Filtros(Long municipioId, Long categoriaId) {
+            if (municipioId != null) {
+                valores.put("municipioId", municipioId);
             }
             if (categoriaId != null) {
                 valores.put("categoriaId", categoriaId);
@@ -92,8 +92,8 @@ public class ConsultasTableroJpa implements ConsultasTablero {
 
         String condiciones() {
             StringBuilder condiciones = new StringBuilder();
-            if (valores.containsKey("barrioId")) {
-                condiciones.append(" and r.barrio.id = :barrioId");
+            if (valores.containsKey("municipioId")) {
+                condiciones.append(" and r.municipio.id = :municipioId");
             }
             if (valores.containsKey("categoriaId")) {
                 condiciones.append(" and r.categoria.id = :categoriaId");

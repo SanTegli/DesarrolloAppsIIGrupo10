@@ -98,7 +98,10 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
   const { reclamo, notificaciones } = datos
   const cambios = reclamo.accionesDisponibles.filter((destino) => destino !== 'ASIGNADO')
   const puedeAsignar = reclamo.accionesDisponibles.includes('ASIGNADO')
-  const areasElegibles = areas.filter((area) => area.activa && area.id !== reclamo.area?.id)
+  // Solo las áreas del municipio del reclamo: el backend rechaza las de otro.
+  const areasElegibles = areas.filter(
+    (area) => area.activa && area.id !== reclamo.area?.id && area.municipio?.id === reclamo.municipio.id,
+  )
   const verboAsignar = reclamo.area ? 'Reasignar' : 'Asignar'
   // Reabrir exige explicar por qué: el backend responde 400 sin motivo, y la interfaz lo pide antes.
   const puedeReabrir = reclamo.estado === 'RESUELTO' && cambios.includes('EN_PROCESO')
@@ -139,7 +142,7 @@ export default function DetalleReclamo({ usuario, numero, areas, avisoInicial, o
             <dt>Ubicación</dt>
             <dd>
               <span>
-                {reclamo.direccion}, {reclamo.barrio.nombre}
+                {reclamo.direccion}, {reclamo.municipio.nombre}
               </span>
               <UbicacionEnMapa ubicacion={reclamo.ubicacion} />
             </dd>

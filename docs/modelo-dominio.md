@@ -72,9 +72,6 @@ classDiagram
     -String nombre
     -String provincia
   }
-  class Barrio {
-    -String nombre
-  }
   class Categoria {
     -String nombre
     -int slaHoras
@@ -84,8 +81,8 @@ classDiagram
     -String nombre
     -boolean activa
     +atiende(Categoria) boolean
-    +tieneJurisdiccionSobre(Barrio) boolean
-    +puedeAtender(Categoria, Barrio) boolean
+    +tieneJurisdiccionSobre(Municipio) boolean
+    +puedeAtender(Categoria, Municipio) boolean
   }
   class Reclamo {
     -String numero
@@ -150,7 +147,7 @@ classDiagram
     +destinosPosibles(EstadoReclamo, Rol)$ Set
   }
   class ReclamoFactory {
-    +crear(Ciudadano, Categoria, Barrio, String, String) Reclamo
+    +crear(Ciudadano, Categoria, Municipio, String, String) Reclamo
   }
 
   Entidad <|-- Usuario
@@ -163,14 +160,12 @@ classDiagram
   Reclamo ..> PoliticaReapertura
   Usuario <|-- AgenteMunicipal
   Usuario <|-- Administrador
-  Municipio "1" <-- "*" Barrio
-  Municipio "1" <-- "*" AreaMunicipal
-  AreaMunicipal "*" --> "*" Barrio : jurisdicción
+  Municipio "1" <-- "*" AreaMunicipal : jurisdicción
   AreaMunicipal "*" --> "*" Categoria : atiende
   AgenteMunicipal "*" --> "1" AreaMunicipal
   Reclamo "*" --> "1" Ciudadano
   Reclamo "*" --> "1" Categoria
-  Reclamo "*" --> "1" Barrio
+  Reclamo "*" --> "1" Municipio
   Reclamo "*" --> "0..1" AreaMunicipal
   Reclamo "*" --> "0..1" AgenteMunicipal
   Reclamo "1" *-- "1..*" HistorialEstado
@@ -182,7 +177,7 @@ classDiagram
   ReclamoFactory ..> Reclamo : crea
 ```
 
-`Municipio`, `Barrio`, `Categoria`, `HistorialEstado`, `Notificacion` y `MensajeSaliente` también heredan
+`Municipio`, `Categoria`, `HistorialEstado`, `Notificacion` y `MensajeSaliente` también heredan
 de `Entidad`; no se dibuja para no cargar el diagrama. `Ubicacion` no es una entidad: es un valor que se
 guarda en columnas de la tabla `reclamos`. `MensajeSaliente` no tiene reglas de negocio: es la fila de la
 outbox (tabla `mensajes_salientes`) con un aviso que tiene que salir por RabbitMQ.
@@ -208,7 +203,8 @@ habilitada, además salen por correo a través de la outbox.
 | Qué transiciones de estado existen y qué rol puede ejecutar cada una | `PoliticaTransiciones` |
 | Un ciudadano solo opera sobre sus reclamos; un agente, sobre los de su área | `Reclamo.cambiarEstado` |
 | Solo se asigna a un área activa y distinta de la actual | `Reclamo.asignarArea` |
-| Un área puede atender si está activa, atiende la categoría y cubre el barrio | `AreaMunicipal.puedeAtender` |
+| Un área puede atender si está activa, es del municipio del reclamo y atiende la categoría | `AreaMunicipal.puedeAtender` |
+| Solo se asigna (a mano o automáticamente) un área del municipio del reclamo | `Reclamo.asignarArea` |
 | Un reclamo vence una sola vez y sube un nivel de prioridad | `Reclamo.marcarVencido` |
 | Solo un reclamo `INGRESADO` queda con la asignación pendiente; asignarle un área la borra | `Reclamo.marcarAsignacionPendiente` y `asignarArea` |
 | Una ubicación confirmada tiene coordenadas válidas, dirección y proveedor; nunca se inventan | `Ubicacion.confirmada` |
@@ -232,20 +228,18 @@ El ciclo de vida completo está en [secuencias.md](secuencias.md#ciclo-de-vida-d
 ## Tablas
 
 Tablas y columnas tal como las define `orm.xml`. Los tres tipos de usuario comparten la tabla
-`usuarios` y se distinguen por la columna `tipo`. Las relaciones muchos a muchos usan las tablas
-`area_barrio` y `area_categoria`.
+`usuarios` y se distinguen por la columna `tipo`. La relación muchos a muchos entre áreas y categorías usa
+la tabla `area_categoria`. Desde el PR 25 no hay barrios: el reclamo y el área son de un municipio.
 
 ```mermaid
 erDiagram
-  municipios ||--o{ barrios : contiene
-  municipios ||--o{ areas_municipales : organiza
-  areas_municipales }o--o{ barrios : "area_barrio"
+  municipios ||--o{ areas_municipales : "jurisdicción"
   areas_municipales }o--o{ categorias : "area_categoria"
   areas_municipales |o--o{ usuarios : "agentes del área"
   usuarios ||--o{ reclamos : "ciudadano_id"
   usuarios |o--o{ reclamos : "agente_id"
   categorias ||--o{ reclamos : "categoria_id"
-  barrios ||--o{ reclamos : "barrio_id"
+  municipios ||--o{ reclamos : "municipio_id"
   areas_municipales |o--o{ reclamos : "area_id"
   reclamos ||--|{ historial_estados : registra
   usuarios |o--o{ historial_estados : "usuario_id"
@@ -274,11 +268,6 @@ erDiagram
     bigint id PK
     string nombre
     string provincia
-  }
-  barrios {
-    bigint id PK
-    string nombre
-    bigint municipio_id FK
   }
   categorias {
     bigint id PK
@@ -317,7 +306,7 @@ erDiagram
     bigint ciudadano_id FK
     bigint agente_id FK
     bigint categoria_id FK
-    bigint barrio_id FK
+    bigint municipio_id FK
     bigint area_id FK
   }
   historial_estados {

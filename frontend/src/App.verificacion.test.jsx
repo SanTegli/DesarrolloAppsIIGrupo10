@@ -2,14 +2,14 @@ import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it } from 'vitest'
 import App from './App.jsx'
-import { AREAS, BARRIOS, CATEGORIAS, TOKEN_CSRF, USUARIOS, simularApi } from './pruebas/apiFalsa.js'
+import { AREAS, MUNICIPIOS, CATEGORIAS, TOKEN_CSRF, USUARIOS, simularApi } from './pruebas/apiFalsa.js'
 
 const [ana, , elena] = USUARIOS
 const sinTelefono = { ...ana, telefonoVerificado: null }
 
 const CATALOGOS = {
   'GET /api/categorias': CATEGORIAS,
-  'GET /api/barrios': BARRIOS,
+  'GET /api/municipios': MUNICIPIOS,
   'GET /api/areas': AREAS,
 }
 

@@ -124,6 +124,9 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
      * @param url            URL base de la API, sin barra final
      * @param maxSugerencias cuántas sugerencias con coordenadas se le muestran al ciudadano como máximo
      * @param cache          cuánto se recuerda una consulta repetida y cuántas se guardan
+     * @param confirmarMunicipio en el alta, pregunta al geocodificador en qué municipio cae la ubicación elegida
+     *                       y la rechaza si no es el del reclamo. Si el geocodificador no responde, alcanza el
+     *                       recuadro. Los tests lo apagan para no salir a Internet
      * @param recuadros      recuadro de coordenadas de cada municipio, por nombre; una ubicación elegida
      *                       fuera del recuadro se rechaza. Sin recuadro, solo se validan los rangos
      */
@@ -133,6 +136,7 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
                                   @DefaultValue("3s") Duration tiempoRespuesta,
                                   @DefaultValue("5") int maxSugerencias,
                                   @DefaultValue Cache cache,
+                                  @DefaultValue("true") boolean confirmarMunicipio,
                                   Map<String, Recuadro> recuadros) {
         public Geocodificacion {
             if (url == null || url.isBlank()) {

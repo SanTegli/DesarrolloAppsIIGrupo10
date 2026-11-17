@@ -23,7 +23,6 @@ public class CatalogoCobertura {
 
     private final int version;
     private final Map<Long, DatosCatalogo.Municipio> municipios = new HashMap<>();
-    private final Map<Long, Long> municipioDeCadaBarrio = new HashMap<>();
     private final Set<Long> categorias = new HashSet<>();
     private final List<DatosCatalogo.Area> areas;
 
@@ -36,12 +35,6 @@ public class CatalogoCobertura {
             requerirId(municipio.id(), "municipio");
             if (municipios.put(municipio.id(), municipio) != null) {
                 throw new IllegalStateException("Municipio repetido en el catálogo: " + municipio.id());
-            }
-            for (DatosCatalogo.Barrio barrio : municipio.barrios()) {
-                requerirId(barrio.id(), "barrio");
-                if (municipioDeCadaBarrio.put(barrio.id(), municipio.id()) != null) {
-                    throw new IllegalStateException("Barrio repetido en el catálogo: " + barrio.id());
-                }
             }
         }
         for (DatosCatalogo.Categoria categoria : datos.categorias()) {
@@ -70,29 +63,20 @@ public class CatalogoCobertura {
     }
 
     /**
-     * Áreas que atienden la categoría y cubren el barrio, ordenadas por id. Una lista vacía significa que
-     * ninguna área lo cubre; no es un error.
+     * Áreas del municipio que atienden la categoría, ordenadas por id. Una lista vacía significa que ninguna
+     * área lo cubre; no es un error.
      *
-     * @throws IdentificadorDesconocidoException si algún id no existe o el barrio es de otro municipio
+     * @throws IdentificadorDesconocidoException si el municipio o la categoría no existen
      */
-    public List<DatosCatalogo.Area> consultar(long municipioId, long barrioId, long categoriaId) {
+    public List<DatosCatalogo.Area> consultar(long municipioId, long categoriaId) {
         if (!municipios.containsKey(municipioId)) {
             throw new IdentificadorDesconocidoException("No existe el municipio " + municipioId);
-        }
-        Long municipioDelBarrio = municipioDeCadaBarrio.get(barrioId);
-        if (municipioDelBarrio == null) {
-            throw new IdentificadorDesconocidoException("No existe el barrio " + barrioId);
-        }
-        if (municipioDelBarrio != municipioId) {
-            throw new IdentificadorDesconocidoException(
-                    "El barrio " + barrioId + " no pertenece al municipio " + municipioId);
         }
         if (!categorias.contains(categoriaId)) {
             throw new IdentificadorDesconocidoException("No existe la categoría " + categoriaId);
         }
         return areas.stream()
                 .filter(area -> area.municipioId() == municipioId)
-                .filter(area -> area.barrios().contains(barrioId))
                 .filter(area -> area.categorias().contains(categoriaId))
                 .toList();
     }
@@ -113,12 +97,6 @@ public class CatalogoCobertura {
         if (!municipios.containsKey(area.municipioId())) {
             throw new IllegalStateException("El área " + area.id() + " es de un municipio que no existe: "
                     + area.municipioId());
-        }
-        for (Long barrio : area.barrios()) {
-            if (barrio == null || !Long.valueOf(area.municipioId()).equals(municipioDeCadaBarrio.get(barrio))) {
-                throw new IllegalStateException("El área " + area.id() + " cubre un barrio que no es de su municipio: "
-                        + barrio);
-            }
         }
         for (Long categoria : area.categorias()) {
             if (categoria == null || !categorias.contains(categoria)) {

@@ -31,11 +31,11 @@ class EntidadTest {
     @DisplayName("Entidades de tipos distintos no son iguales aunque compartan id")
     void tiposDistintos() {
         Municipio municipio = new Municipio("Quilmes", "Buenos Aires");
-        Barrio barrio = new Barrio("Bernal", municipio);
+        Categoria categoria = new Categoria("Bache", "Pozo en la calzada", 120, Prioridad.BAJA);
         municipio.setId(1L);
-        barrio.setId(1L);
+        categoria.setId(1L);
 
-        assertNotEquals(municipio, barrio);
+        assertNotEquals(municipio, categoria);
     }
 
     @Test

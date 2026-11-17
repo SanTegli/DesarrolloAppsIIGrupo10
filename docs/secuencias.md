@@ -46,7 +46,7 @@ flowchart TB
   DU -- "No, o es otro problema" --> CU{"Sistema: ¿cuenta habilitada<br/>y dentro del límite diario?"}
   CU -- No --> NO(["Sistema: rechaza el alta (403 o 429)"])
   CU -- Sí --> C["Sistema: calcula la prioridad con la IA<br/>(nunca por debajo de la categoría)"]
-  C --> D{"¿Hay un área que atienda<br/>la categoría en el barrio?"}
+  C --> D{"¿Hay un área del municipio<br/>que atienda la categoría?"}
   D -- Sí --> E["Sistema: asigna el área"]
   D -- No --> F["Sistema: lo deja ingresado, sin área"]
   F --> G{"Administrador:<br/>¿corresponde al municipio?"}
@@ -102,7 +102,7 @@ sequenceDiagram
     Note over UI: no se crea un reclamo nuevo (ver Duplicados y apoyos en arquitectura)
   else es otro problema, o no hay candidatos
     UI->>C: POST /api/reclamos (multipart: reclamo y foto) con la cookie de sesión y X-XSRF-TOKEN
-    C->>F: crear(usuarioId, categoriaId, barrioId, descripcion, direccion, ubicación, foto)
+    C->>F: crear(usuarioId, categoriaId, municipioId, descripcion, direccion, ubicación, foto)
     Note over F: valida y re-codifica la foto y la guarda como pendiente (ver arquitectura, Foto del reclamo)
     F->>S: crear(..., referencia de la foto)
     Note over S: comienza la transacción
@@ -110,14 +110,14 @@ sequenceDiagram
     R-->>S: usuario
     S->>CU: validarCreacion(usuario) y antesDeCrear(ciudadano)
     Note over CU: es ciudadano, teléfono verificado, cuenta no bloqueada y menos del límite diario.<br/>Si no: 403 o 429, y la foto pendiente se descarta
-    S->>R: buscar categoría y barrio
-    R-->>S: categoría, barrio
-    S->>FB: crear(ciudadano, categoria, barrio, descripcion, direccion)
+    S->>R: buscar categoría y municipio
+    R-->>S: categoría, municipio
+    S->>FB: crear(ciudadano, categoria, municipio, descripcion, direccion)
     FB-->>S: reclamo INGRESADO con número, fecha límite e historial
     S->>EP: calcular(reclamo)
     EP-->>S: prioridad
-    S->>SA: asignarAutomaticamente(reclamo, categoriaId, barrioId)
-    SA->>R: buscarCandidatas(categoriaId, barrioId)
+    S->>SA: asignarAutomaticamente(reclamo)
+    SA->>R: buscarCandidatas(categoriaId, municipioId)
     R-->>SA: áreas candidatas
     SA->>EA: seleccionarArea(reclamo, candidatas)
     alt hay un área candidata
@@ -174,10 +174,10 @@ sequenceDiagram
 
   U->>UI: escribe la dirección y toca "Buscar en el mapa"
   UI->>B: GET /api/ubicaciones/sugerencias
-  B->>GEO: GET /direcciones (tiempo límite 3 s)
+  B->>GEO: GET /direcciones, una por municipio y en paralelo (tiempo límite 3 s)
   GEO-->>B: direcciones con coordenadas
-  B-->>UI: sugerencias dentro del municipio
-  U->>UI: elige una sugerencia
+  B-->>UI: sugerencias con su municipio
+  U->>UI: elige una sugerencia: queda elegido el municipio
   UI->>B: GET /api/reclamos/candidatos-duplicados
   B->>DB: reclamos abiertos de la misma categoría cerca del punto
   B-->>UI: posibles duplicados, sin datos del autor
@@ -186,14 +186,16 @@ sequenceDiagram
   UI->>B: POST /api/reclamos (multipart) con la ubicación elegida y la foto
   B->>B: valida la foto (JPEG o PNG), la re-codifica sin EXIF y la guarda como pendiente
   B->>B: controles de uso: teléfono verificado, cuenta no bloqueada, límite diario
-  B->>B: valida que la ubicación caiga en el municipio
+  B->>B: valida que la ubicación caiga en el recuadro del municipio
+  B->>GEO: GET /ubicacion (¿en qué partido cae el punto?)
+  GEO-->>B: departamento (si no responde, alcanza el recuadro)
   Note over B,DB: comienza la transacción
   B->>PRI: POST /api/prioridades/evaluar (categoría y descripción)
   PRI->>LLM: generateContent con las instrucciones
   LLM-->>PRI: JSON con prioridad y motivo
   PRI-->>B: prioridad sugerida
   Note right of B: si falla o pasan 4 s: prioridad de la categoría (PENDIENTE_IA)<br/>y pedido de revisión por la cola (PR 24)
-  B->>COB: ConsultarCobertura (municipio, barrio, categoría)
+  B->>COB: ConsultarCobertura (municipio, categoría)
   COB-->>B: áreas que lo cubren
   Note right of B: si falla o pasan 2 s: asignación pendiente
   B->>DB: guarda el reclamo, sus avisos y una fila PENDIENTE por aviso (y por la revisión de la IA) en mensajes_salientes
@@ -213,9 +215,10 @@ sequenceDiagram
   NOT-->>MQ: ack
 ```
 
-Georef se consulta antes del alta, cuando el ciudadano busca; el alta solo valida la sugerencia que eligió. La
-IA y el SOAP corren dentro de la transacción: en el peor caso el alta espera unos 8 segundos (6 de la IA y 2 del
-SOAP). La publicación en RabbitMQ y el correo pasan después de responder: el ciudadano no los espera.
+Georef se consulta antes del alta, cuando el ciudadano busca; el alta solo confirma el partido de la sugerencia
+que eligió, antes de la transacción. La IA y el SOAP corren dentro de la transacción: en el peor caso el alta
+espera unos 9 segundos (3 de Georef, 4 de la IA y 2 del SOAP); lo que la IA no alcanza lo revisa después por
+la cola (PR 24). La publicación en RabbitMQ y el correo pasan después de responder: el ciudadano no los espera.
 
 ## Secuencia: cambio de estado
 

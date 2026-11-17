@@ -24,7 +24,7 @@ describe('DetalleReclamo', () => {
 
     expect(await screen.findByRole('heading', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
     expect(screen.getByText('Farol apagado frente a la plaza')).toBeInTheDocument()
-    expect(screen.getByText('Belgrano 450, Bernal')).toBeInTheDocument()
+    expect(screen.getByText('Belgrano 450, Quilmes')).toBeInTheDocument()
     const historial = screen.getAllByRole('listitem').filter((item) => item.closest('.historial'))
     expect(historial).toHaveLength(2)
     expect(within(historial[1]).getByText('Sistema: Asignación automática')).toBeInTheDocument()
@@ -48,7 +48,7 @@ describe('DetalleReclamo', () => {
     expect(enlace).toHaveAttribute('href', 'https://www.google.com/maps/search/?api=1&query=-34.73614578%2C-58.3228998575')
     expect(enlace).toHaveAttribute('target', '_blank')
     expect(screen.getByText(/GRL BELGRANO 450, Bernal Oeste/)).toBeInTheDocument()
-    expect(screen.getByText('Belgrano 450, Bernal')).toBeInTheDocument()
+    expect(screen.getByText('Belgrano 450, Quilmes')).toBeInTheDocument()
   })
 
   it('muestra la foto del reclamo con enlace para verla completa', async () => {
@@ -228,6 +228,8 @@ describe('DetalleReclamo', () => {
     const selector = await screen.findByLabelText('Asignar área')
     expect(screen.getByRole('button', { name: 'Rechazar' })).toBeInTheDocument()
     expect(within(selector).queryByRole('option', { name: 'Higiene Urbana' })).not.toBeInTheDocument() // inactiva
+    // Solo las áreas del municipio del reclamo: la Obras Públicas de Avellaneda no aparece.
+    expect(within(selector).getAllByRole('option', { name: 'Obras Públicas' })).toHaveLength(1)
     await usuario.selectOptions(selector, 'Obras Públicas')
     await usuario.click(screen.getByRole('button', { name: 'Asignar' }))
 

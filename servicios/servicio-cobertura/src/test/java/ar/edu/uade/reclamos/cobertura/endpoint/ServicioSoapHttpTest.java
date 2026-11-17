@@ -36,7 +36,7 @@ class ServicioSoapHttpTest {
 
         assertThat(respuesta.statusCode()).isEqualTo(200);
         String wsdl = respuesta.body();
-        assertThat(wsdl).contains("targetNamespace=\"http://uade.edu.ar/reclamos/cobertura/v1\"")
+        assertThat(wsdl).contains("targetNamespace=\"http://uade.edu.ar/reclamos/cobertura/v2\"")
                 .contains("name=\"CoberturaPort\"")
                 .contains("name=\"ConsultarCobertura\"")
                 .contains("name=\"CoberturaService\"")
@@ -47,7 +47,7 @@ class ServicioSoapHttpTest {
 
     @Test
     void respondeUnaConsultaValida() throws Exception {
-        HttpResponse<String> respuesta = enviar("1", "2", "2");
+        HttpResponse<String> respuesta = enviar("1", "2");
 
         assertThat(respuesta.statusCode()).isEqualTo(200);
         assertThat(respuesta.body()).contains("Obras Públicas").contains("Mantenimiento Vial")
@@ -56,25 +56,24 @@ class ServicioSoapHttpTest {
 
     @Test
     void respondeFaultDeClienteConHttp500() throws Exception {
-        HttpResponse<String> respuesta = enviar("1", "2", "99");
+        HttpResponse<String> respuesta = enviar("1", "99");
 
         assertThat(respuesta.statusCode()).isEqualTo(500);
         assertThat(respuesta.body()).contains("Client").contains("No existe la categoría 99");
     }
 
-    private HttpResponse<String> enviar(String municipio, String barrio, String categoria)
+    private HttpResponse<String> enviar(String municipio, String categoria)
             throws IOException, InterruptedException {
         String sobre = """
                 <soapenv:Envelope xmlns:soapenv="http://schemas.xmlsoap.org/soap/envelope/"
-                                  xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v1">
+                                  xmlns:cob="http://uade.edu.ar/reclamos/cobertura/v2">
                   <soapenv:Body>
                     <cob:ConsultarCoberturaRequest>
                       <cob:municipioId>%s</cob:municipioId>
-                      <cob:barrioId>%s</cob:barrioId>
                       <cob:categoriaId>%s</cob:categoriaId>
                     </cob:ConsultarCoberturaRequest>
                   </soapenv:Body>
-                </soapenv:Envelope>""".formatted(municipio, barrio, categoria);
+                </soapenv:Envelope>""".formatted(municipio, categoria);
         return http.send(HttpRequest.newBuilder(URI.create(base() + "/ws"))
                         .header("Content-Type", "text/xml; charset=utf-8")
                         .header("SOAPAction", "\"\"")

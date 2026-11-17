@@ -13,6 +13,10 @@ spring:
 reclamos:
   vencimientos:
     habilitado: false
+  # Los tests no salen a Internet: la ubicación elegida se valida solo con el recuadro. UbicacionesIntegrationTest
+  # lo prende contra un Georef falso.
+  geocodificacion:
+    confirmar-municipio: false
   # Las fotos de los tests van a un directorio temporal, no al del proyecto.
   fotos:
     directorio: ${java.io.tmpdir}/reclamos-fotos-test

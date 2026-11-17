@@ -31,7 +31,9 @@ class ConsultasTableroJpaTest extends PersistenciaTestBase {
 
     @Autowired ConsultasTablero tablero;
 
-    private Barrio ezpeleta;
+    private Municipio avellaneda;
+    private AreaMunicipal obrasAvellaneda;
+    private AgenteMunicipal agenteAvellaneda;
     private Categoria luminaria;
 
     @Test
@@ -40,9 +42,9 @@ class ConsultasTableroJpaTest extends PersistenciaTestBase {
 
         assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), null, null)).isEqualTo(5);
         assertThat(tablero.contarCreados(DIA_1.plusDays(2), DIA_1.plusDays(4), null, null)).isEqualTo(3);
-        assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), barrio.getId(), null)).isEqualTo(4);
+        assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), municipio.getId(), null)).isEqualTo(4);
         assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), null, luminaria.getId())).isEqualTo(1);
-        assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), ezpeleta.getId(), luminaria.getId())).isZero();
+        assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), avellaneda.getId(), luminaria.getId())).isZero();
         // El extremo de arriba no entra: [desde, hasta)
         assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(2), null, null)).isEqualTo(1);
     }
@@ -55,26 +57,26 @@ class ConsultasTableroJpaTest extends PersistenciaTestBase {
                 new ConteoPorEstado(EstadoReclamo.INGRESADO, 1L), new ConteoPorEstado(EstadoReclamo.ASIGNADO, 1L),
                 new ConteoPorEstado(EstadoReclamo.EN_PROCESO, 1L), new ConteoPorEstado(EstadoReclamo.RESUELTO, 1L),
                 new ConteoPorEstado(EstadoReclamo.CERRADO, 1L));
-        assertThat(tablero.contarPorEstado(ezpeleta.getId(), null))
+        assertThat(tablero.contarPorEstado(avellaneda.getId(), null))
                 .containsExactly(new ConteoPorEstado(EstadoReclamo.CERRADO, 1L));
-        assertThat(tablero.contarPorEstado(barrio.getId(), luminaria.getId()))
+        assertThat(tablero.contarPorEstado(municipio.getId(), luminaria.getId()))
                 .containsExactly(new ConteoPorEstado(EstadoReclamo.INGRESADO, 1L));
     }
 
     @Test
-    void agrupaPendientesYVencidosPorAreaYBarrioSegunLaFecha() {
+    void agrupaPendientesYVencidosPorAreaYMunicipioSegunLaFecha() {
         escenario();
 
         // Día 7: vencieron el ASIGNADO de Obras (día 6) y el INGRESADO sin área (día 6), no el EN_PROCESO.
-        List<FilaPendientes> filas = tablero.pendientesPorAreaYBarrio(DIA_1.plusDays(7), null);
+        List<FilaPendientes> filas = tablero.pendientesPorAreaYMunicipio(DIA_1.plusDays(7), null);
 
         assertThat(filas).containsExactly(
-                new FilaPendientes(area.getId(), "Obras Públicas", barrio.getId(), "Bernal", 2L, 1L),
-                new FilaPendientes(null, null, barrio.getId(), "Bernal", 1L, 1L));
-        assertThat(tablero.pendientesPorAreaYBarrio(DIA_1, null))
+                new FilaPendientes(area.getId(), "Obras Públicas", municipio.getId(), "Quilmes", 2L, 1L),
+                new FilaPendientes(null, null, municipio.getId(), "Quilmes", 1L, 1L));
+        assertThat(tablero.pendientesPorAreaYMunicipio(DIA_1, null))
                 .extracting(FilaPendientes::vencidos).containsOnly(0L);
-        assertThat(tablero.pendientesPorAreaYBarrio(DIA_1.plusDays(7), area.getId())).containsExactly(
-                new FilaPendientes(area.getId(), "Obras Públicas", barrio.getId(), "Bernal", 2L, 1L));
+        assertThat(tablero.pendientesPorAreaYMunicipio(DIA_1.plusDays(7), area.getId())).containsExactly(
+                new FilaPendientes(area.getId(), "Obras Públicas", municipio.getId(), "Quilmes", 2L, 1L));
     }
 
     @Test
@@ -83,39 +85,44 @@ class ConsultasTableroJpaTest extends PersistenciaTestBase {
 
         assertThat(tablero.contarCreados(DIA_1, DIA_1.plusDays(10), null, null)).isZero();
         assertThat(tablero.contarPorEstado(null, null)).isEmpty();
-        assertThat(tablero.pendientesPorAreaYBarrio(DIA_1, null)).isEmpty();
+        assertThat(tablero.pendientesPorAreaYMunicipio(DIA_1, null)).isEmpty();
     }
 
     private void escenario() {
         prepararDatos();
-        ezpeleta = barrios.guardar(new Barrio("Ezpeleta", municipio));
-        area.agregarBarrio(ezpeleta);
-        area = areas.guardar(area);
+        avellaneda = municipios.guardar(new Municipio("Avellaneda", "Buenos Aires"));
+        obrasAvellaneda = new AreaMunicipal("Obras Públicas", "obras.av@example.org", avellaneda);
+        obrasAvellaneda.agregarCategoria(categoria);
+        obrasAvellaneda = areas.guardar(obrasAvellaneda);
+        agenteAvellaneda = (AgenteMunicipal) usuarios.guardar(new AgenteMunicipal(
+                "29777888", "Hugo", "Medina", "hugo@example.org", null, obrasAvellaneda));
         luminaria = categorias.guardar(new Categoria("Luminaria rota", "Farol", 48, Prioridad.MEDIA));
 
         // Bache: 120 horas de plazo (5 días).
-        Reclamo asignado = asignado(crear(categoria, barrio, 0));
+        Reclamo asignado = asignado(crear(categoria, municipio, 0));
         reclamos.guardar(asignado);
-        Reclamo enProceso = asignado(crear(categoria, barrio, 2));
+        Reclamo enProceso = asignado(crear(categoria, municipio, 2));
         enProceso.cambiarEstado(EstadoReclamo.EN_PROCESO, agente, null, DIA_1.plusDays(2));
         reclamos.guardar(enProceso);
-        Reclamo resuelto = asignado(crear(categoria, barrio, 2));
+        Reclamo resuelto = asignado(crear(categoria, municipio, 2));
         resuelto.cambiarEstado(EstadoReclamo.EN_PROCESO, agente, null, DIA_1.plusDays(2));
         resuelto.cambiarEstado(EstadoReclamo.RESUELTO, agente, null, DIA_1.plusDays(3));
         reclamos.guardar(resuelto);
         // Luminaria: 48 horas. Nadie la cubre: queda INGRESADO.
-        reclamos.guardar(crear(luminaria, barrio, 3));
-        Reclamo cerrado = asignado(crear(categoria, ezpeleta, 4));
-        cerrado.cambiarEstado(EstadoReclamo.EN_PROCESO, agente, null, DIA_1.plusDays(4));
-        cerrado.cambiarEstado(EstadoReclamo.RESUELTO, agente, null, DIA_1.plusDays(4));
+        reclamos.guardar(crear(luminaria, municipio, 3));
+        Reclamo cerrado = crear(categoria, avellaneda, 4);
+        cerrado.asignarArea(obrasAvellaneda, null, "Asignación automática", cerrado.getFechaCreacion());
+        cerrado.cambiarEstado(EstadoReclamo.EN_PROCESO, agenteAvellaneda, null, DIA_1.plusDays(4));
+        cerrado.cambiarEstado(EstadoReclamo.RESUELTO, agenteAvellaneda, null, DIA_1.plusDays(4));
         cerrado.cambiarEstado(EstadoReclamo.CERRADO, ciudadano, null, DIA_1.plusDays(5));
         reclamos.guardar(cerrado);
         flushYLimpiar();
     }
 
-    private Reclamo crear(Categoria categoria, Barrio barrio, int dia) {
+    private Reclamo crear(Categoria categoria, Municipio municipioDelReclamo, int dia) {
         Clock reloj = Clock.fixed(DIA_1.plusDays(dia).toInstant(ZoneOffset.UTC), ZoneOffset.UTC);
-        return new ReclamoFactory(reloj).crear(ciudadano, categoria, barrio, "Reclamo de prueba", "Belgrano 450");
+        return new ReclamoFactory(reloj).crear(ciudadano, categoria, municipioDelReclamo, "Reclamo de prueba",
+                "Belgrano 450");
     }
 
     private Reclamo asignado(Reclamo reclamo) {

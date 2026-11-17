@@ -32,12 +32,12 @@ alguno quedaría incompleto.
 | Validaciones | Rechaza datos faltantes y ciudadanos inactivos |
 
 ```java
-public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Barrio barrio,
+public Reclamo crear(Ciudadano ciudadano, Categoria categoria, Municipio municipio,
                      String descripcion, String direccion) {
     // ...validaciones...
     LocalDateTime ahora = LocalDateTime.now(reloj).truncatedTo(ChronoUnit.SECONDS);
     LocalDateTime fechaLimite = ahora.plusHours(categoria.getSlaHoras());
-    return new Reclamo(generarNumero(), ciudadano, categoria, barrio, descripcion, direccion,
+    return new Reclamo(generarNumero(), ciudadano, categoria, municipio, descripcion, direccion,
             categoria.getPrioridadBase(), ahora, fechaLimite);
 }
 ```
@@ -78,7 +78,7 @@ public interface ReclamoRepository {
 Las diez interfaces son:
 
 - Las de la Primera Parte: `ReclamoRepository`, `UsuarioRepository`, `MunicipioRepository`,
-  `BarrioRepository`, `AreaMunicipalRepository`, `CategoriaRepository` y `NotificacionRepository`.
+  `MunicipioRepository`, `AreaMunicipalRepository`, `CategoriaRepository` y `NotificacionRepository`.
 - `MensajeSalienteRepository`, para la outbox.
 - `CodigoVerificacionRepository`, para la verificación del teléfono.
 - `ApoyoRepository`, para los apoyos.
@@ -110,7 +110,7 @@ modificarlo.
 | `EstrategiaAsignacion` | `AsignacionPorJurisdiccion` | Entre las áreas candidatas, la de menor id | `jurisdiccion` |
 | `EstrategiaAsignacion` | `AsignacionPorCargaDeTrabajo` | Entre las áreas candidatas, la que tiene menos reclamos pendientes | `carga-trabajo` |
 
-Las áreas candidatas son las activas que atienden la categoría y tienen jurisdicción sobre el barrio.
+Las áreas candidatas son las activas del municipio del reclamo que atienden su categoría.
 Las entrega `CatalogoCobertura`: `CoberturaLocal`, que consulta la base del backend, o `CoberturaSoap`,
 que se las pide a `servicio-cobertura` por SOAP (`reclamos.cobertura.origen: local | soap`). La estrategia
 no cambia: recibe la misma lista en los dos casos.
@@ -136,13 +136,13 @@ Los servicios solo conocen las interfaces:
 
 ```java
 // ReclamoService.crear
-Reclamo reclamo = factory.crear(ciudadano, categoria, barrio, descripcion, direccion);
+Reclamo reclamo = factory.crear(ciudadano, categoria, municipio, descripcion, direccion);
 PrioridadCalculada calculada = prioridad.calcular(reclamo);
 reclamo.definirPrioridad(calculada.prioridad(), calculada.origen(), calculada.motivo());
-asignacion.asignarAutomaticamente(reclamo, categoriaId, barrioId, ahora());
+asignacion.asignarAutomaticamente(reclamo, ahora());
 
 // ServicioAsignacion.asignarAutomaticamente
-candidatas = cobertura.buscarCandidatas(municipioId, barrioId, categoriaId);
+candidatas = cobertura.buscarCandidatas(reclamo.getMunicipio().getId(), reclamo.getCategoria().getId());
 Optional<AreaMunicipal> elegida = estrategia.seleccionarArea(reclamo, candidatas);
 elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA, ahora));
 ```
@@ -183,7 +183,7 @@ sin tocar ni a los servicios ni a los otros dos.
 
 ```java
 // ReclamoService: publica y sigue
-eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, barrioId,
+eventos.publicar(new ReclamoCreado(guardado.getNumero(), ciudadano.getId(), categoriaId, municipioId,
         guardado.getPrioridad(), guardado.getFechaCreacion()));
 
 // Observador 1: delega en ServicioNotificaciones, que decide a quién avisar
@@ -236,7 +236,7 @@ flowchart TB
   F --> S1["ReclamoService<br/>crear, asignar, cambiar estado"]
   S1 --> S4["ServicioAsignacion<br/>área automática o manual"]
   F --> S2["ConsultaReclamosService<br/>listar, buscar, acciones, avisos"]
-  F --> S3["ConsultaCatalogosService<br/>usuarios, categorías, barrios, áreas"]
+  F --> S3["ConsultaCatalogosService<br/>usuarios, categorías, municipios, áreas"]
   F --> S5["ServicioCuentas<br/>registro de ciudadanos"]
 ```
 
@@ -245,7 +245,7 @@ flowchart TB
 public ResponseEntity<ReclamoResponse> crear(
         @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
         @Valid @RequestBody CrearReclamoRequest request) {
-    Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.barrioId(),
+    Reclamo reclamo = facade.crear(usuario.id(), request.categoriaId(), request.municipioId(),
             request.descripcion(), request.direccion(), mapper.ubicacionElegida(request.ubicacion()));
     return ResponseEntity.created(URI.create("/api/reclamos/" + reclamo.getNumero()))
             .body(respuesta(usuario.id(), reclamo));
@@ -312,9 +312,8 @@ ServicioAsignacion ──usa──▶ CatalogoCobertura (interfaz del dominio)
 ```
 
 ```java
-public List<AreaMunicipal> buscarCandidatas(Long municipioId, Long barrioId, Long categoriaId) {
-    ConsultarCoberturaResponse respuesta = consultar(new ConsultarCoberturaRequest(municipioId, barrioId,
-            categoriaId));
+public List<AreaMunicipal> buscarCandidatas(Long municipioId, Long categoriaId) {
+    ConsultarCoberturaResponse respuesta = consultar(new ConsultarCoberturaRequest(municipioId, categoriaId));
     // ids del servicio → áreas del backend: descarta las que no existen, las inactivas y las de otro municipio
 }
 ```
@@ -549,7 +548,7 @@ interfaz porque el archivo y la base no comparten transacción.
 
 ## Lado de lectura para los tableros (Domain Reporting, CQRS)
 
-**Problema.** Los tableros necesitan cuántos reclamos hay por estado, por área y barrio, y cuántos vencieron.
+**Problema.** Los tableros necesitan cuántos reclamos hay por estado, por área y municipio, y cuántos vencieron.
 Pedirle a `ReclamoRepository` todos los reclamos y contarlos en Java funciona con pocos datos, pero carga
 cada agregado con su historial y sus relaciones solo para sumar. La Clase 5 lo marca como antipatrón: los
 reportes son el lado de lectura y no deben pasar por las entidades ni por los repositorios del dominio.

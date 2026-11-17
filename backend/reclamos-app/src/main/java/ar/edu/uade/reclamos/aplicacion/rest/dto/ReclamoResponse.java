@@ -16,6 +16,6 @@ public record ReclamoResponse(String numero, String descripcion, String direccio
                               EstadoReclamo estado, Prioridad prioridad, OrigenPrioridad origenPrioridad,
                               String motivoPrioridad, boolean vencido, boolean asignacionPendiente,
                               LocalDateTime fechaCreacion, LocalDateTime fechaLimite, ReferenciaResponse categoria,
-                              ReferenciaResponse barrio, UsuarioReferenciaResponse ciudadano, ReferenciaResponse area,
+                              ReferenciaResponse municipio, UsuarioReferenciaResponse ciudadano, ReferenciaResponse area,
                               UsuarioReferenciaResponse agente, List<HistorialEstadoResponse> historial,
                               Set<EstadoReclamo> accionesDisponibles) { }
