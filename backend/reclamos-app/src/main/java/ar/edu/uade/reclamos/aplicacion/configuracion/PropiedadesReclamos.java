@@ -25,6 +25,11 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
      * {@code ia}, la mensajería encendida y {@code prioridad.ia.reevaluacion.habilitada}. Si no, la prioridad de
      * la categoría queda como definitiva, con origen {@code RESPALDO}.
      */
+    /** PR 27: la IA compara los posibles duplicados del alta. */
+    public boolean comparaDuplicadosConIA() {
+        return "ia".equals(prioridad.estrategia()) && duplicados.compararConIa();
+    }
+
     public boolean reevaluaPrioridadConIA() {
         return "ia".equals(prioridad.estrategia()) && mensajeria.habilitada() && prioridad.ia().reevaluacion().habilitada();
     }
@@ -324,10 +329,15 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
      * @param radioMetros       radio por defecto alrededor del punto elegido
      * @param radioMaximoMetros radio más grande que se acepta en la consulta
      * @param maximoCandidatos  cuántos candidatos se devuelven como máximo
+     * @param compararConIa     PR 27: con la estrategia {@code ia}, la IA compara el texto del reclamo nuevo con
+     *                          los cercanos de cualquier categoría
+     * @param maximoComparados  PR 27: cuántos reclamos cercanos, los más próximos, se le mandan a la IA (hasta 10)
      */
     public record Duplicados(@DefaultValue("50") int radioMetros,
                              @DefaultValue("200") int radioMaximoMetros,
-                             @DefaultValue("5") int maximoCandidatos) {
+                             @DefaultValue("5") int maximoCandidatos,
+                             @DefaultValue("true") boolean compararConIa,
+                             @DefaultValue("10") int maximoComparados) {
         public Duplicados {
             if (radioMetros < 1 || radioMaximoMetros < radioMetros) {
                 throw new IllegalArgumentException("reclamos.duplicados: el radio debe ser mayor que cero y no "
@@ -335,6 +345,10 @@ public record PropiedadesReclamos(@DefaultValue Prioridad prioridad, @DefaultVal
             }
             if (maximoCandidatos < 1) {
                 throw new IllegalArgumentException("reclamos.duplicados.maximo-candidatos debe ser mayor que cero");
+            }
+            if (maximoComparados < 1 || maximoComparados > 10) {
+                throw new IllegalArgumentException(
+                        "reclamos.duplicados.maximo-comparados va de 1 a 10, lo que acepta REST 2");
             }
         }
     }

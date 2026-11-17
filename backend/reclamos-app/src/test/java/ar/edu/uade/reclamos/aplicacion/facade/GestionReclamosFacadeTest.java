@@ -119,7 +119,7 @@ class GestionReclamosFacadeTest {
 
     @Test
     void candidatosYApoyosDeleganEnSusServicios() {
-        var candidatos = List.of(new CandidatoDuplicado(reclamo, 12.5, 2, false, false));
+        var candidatos = List.of(new CandidatoDuplicado(reclamo, 12.5, 2, false, false, false));
         var estado = new EstadoApoyo("REC-12345678", 3, true);
         when(duplicados.candidatos(1L, 2L, -34.7, -58.3, null, null)).thenReturn(candidatos);
         when(apoyos.apoyar(1L, "REC-12345678")).thenReturn(estado);

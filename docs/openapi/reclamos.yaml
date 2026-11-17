@@ -403,6 +403,156 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/reclamos/candidatos-duplicados:
+    get:
+      tags:
+      - Reclamos
+      summary: Reclamos abiertos parecidos cerca del punto elegido (posibles duplicados)
+      operationId: candidatosDuplicados
+      parameters:
+      - name: categoriaId
+        in: query
+        required: true
+        schema:
+          type: integer
+          format: int64
+          exclusiveMinimum: 0
+      - name: latitud
+        in: query
+        required: true
+        schema:
+          type: number
+          format: double
+          maximum: 90.0
+          minimum: -90.0
+      - name: longitud
+        in: query
+        required: true
+        schema:
+          type: number
+          format: double
+          maximum: 180.0
+          minimum: -180.0
+      - name: radio
+        in: query
+        description: "Radio en metros; por defecto 50, máximo 200"
+        required: false
+        schema:
+          type: integer
+          format: int32
+          exclusiveMinimum: 0
+      - name: limite
+        in: query
+        description: Cantidad máxima; por defecto y como máximo 5
+        required: false
+        schema:
+          type: integer
+          format: int32
+          exclusiveMinimum: 0
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CandidatoDuplicadoResponse"
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      tags:
+      - Reclamos
+      summary: "Posibles duplicados del alta, comparados por la IA con el texto del\
+        \ reclamo nuevo"
+      operationId: duplicadosDelAlta
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuscarDuplicadosRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DuplicadosDelAltaResponse"
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/auth/registro:
     post:
       tags:
@@ -1170,99 +1320,6 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
-  /api/reclamos/candidatos-duplicados:
-    get:
-      tags:
-      - Reclamos
-      summary: Reclamos abiertos parecidos cerca del punto elegido (posibles duplicados)
-      operationId: candidatosDuplicados
-      parameters:
-      - name: categoriaId
-        in: query
-        required: true
-        schema:
-          type: integer
-          format: int64
-          exclusiveMinimum: 0
-      - name: latitud
-        in: query
-        required: true
-        schema:
-          type: number
-          format: double
-          maximum: 90.0
-          minimum: -90.0
-      - name: longitud
-        in: query
-        required: true
-        schema:
-          type: number
-          format: double
-          maximum: 180.0
-          minimum: -180.0
-      - name: radio
-        in: query
-        description: "Radio en metros; por defecto 50, máximo 200"
-        required: false
-        schema:
-          type: integer
-          format: int32
-          exclusiveMinimum: 0
-      - name: limite
-        in: query
-        description: Cantidad máxima; por defecto y como máximo 5
-        required: false
-        schema:
-          type: integer
-          format: int32
-          exclusiveMinimum: 0
-      responses:
-        "200":
-          description: OK
-          content:
-            '*/*':
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CandidatoDuplicadoResponse"
-        "400":
-          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "401":
-          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "403":
-          description: "El rol no puede hacer la operación o el reclamo no es suyo\
-            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "404":
-          description: "No existe el usuario, reclamo, municipio, categoría o área\
-            \ (RECURSO_NO_ENCONTRADO)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "409":
-          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
-        "500":
-          description: Error inesperado (ERROR_INTERNO)
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ErrorResponse"
   /api/notificaciones:
     get:
       tags:
@@ -1929,6 +1986,90 @@ components:
           format: int64
         apoyado:
           type: boolean
+    BuscarDuplicadosRequest:
+      type: object
+      properties:
+        categoriaId:
+          type: integer
+          format: int64
+        descripcion:
+          type: string
+          maxLength: 1000
+          minLength: 0
+        latitud:
+          type: number
+          format: double
+          maximum: 90
+          minimum: -90
+        longitud:
+          type: number
+          format: double
+          maximum: 180
+          minimum: -180
+      required:
+      - categoriaId
+      - latitud
+      - longitud
+    CandidatoDuplicadoResponse:
+      type: object
+      properties:
+        numero:
+          type: string
+        estado:
+          type: string
+          enum:
+          - INGRESADO
+          - ASIGNADO
+          - EN_PROCESO
+          - RESUELTO
+          - CERRADO
+          - RECHAZADO
+          - CANCELADO
+        fechaCreacion:
+          type: string
+          format: date-time
+        descripcion:
+          type: string
+        direccion:
+          type: string
+          description: Dirección normalizada por el geocodificador
+        foto:
+          type: string
+          description: Ruta de la foto; null si el reclamo no tiene
+        distanciaMetros:
+          type: integer
+          format: int64
+          description: "Distancia al punto elegido, en metros, redondeada"
+        cantidadApoyos:
+          type: integer
+          format: int64
+          description: Cuántos vecinos lo apoyan
+        apoyadoPorMi:
+          type: boolean
+          description: Si quien consulta ya lo apoya
+        propio:
+          type: boolean
+          description: "Si lo creó quien consulta: no se puede apoyar"
+        categoria:
+          $ref: "#/components/schemas/ReferenciaResponse"
+          description: "Categoría del reclamo (PR 27: puede ser otra que la del reclamo\
+            \ nuevo)"
+        masParecido:
+          type: boolean
+          description: "PR 27: la IA dijo que es el mismo problema que el reclamo\
+            \ nuevo"
+    DuplicadosDelAltaResponse:
+      type: object
+      properties:
+        comparadoPorIA:
+          type: boolean
+        motivo:
+          type: string
+          description: Explicación de la IA; null si no comparó
+        candidatos:
+          type: array
+          items:
+            $ref: "#/components/schemas/CandidatoDuplicadoResponse"
     RegistroRequest:
       type: object
       properties:
@@ -2116,46 +2257,6 @@ components:
         fechaEnvio:
           type: string
           format: date-time
-    CandidatoDuplicadoResponse:
-      type: object
-      properties:
-        numero:
-          type: string
-        estado:
-          type: string
-          enum:
-          - INGRESADO
-          - ASIGNADO
-          - EN_PROCESO
-          - RESUELTO
-          - CERRADO
-          - RECHAZADO
-          - CANCELADO
-        fechaCreacion:
-          type: string
-          format: date-time
-        descripcion:
-          type: string
-        direccion:
-          type: string
-          description: Dirección normalizada por el geocodificador
-        foto:
-          type: string
-          description: Ruta de la foto; null si el reclamo no tiene
-        distanciaMetros:
-          type: integer
-          format: int64
-          description: "Distancia al punto elegido, en metros, redondeada"
-        cantidadApoyos:
-          type: integer
-          format: int64
-          description: Cuántos vecinos lo apoyan
-        apoyadoPorMi:
-          type: boolean
-          description: Si quien consulta ya lo apoya
-        propio:
-          type: boolean
-          description: "Si lo creó quien consulta: no se puede apoyar"
     AvisoResponse:
       type: object
       properties:
@@ -2172,6 +2273,8 @@ components:
         fechaEnvio:
           type: string
           format: date-time
+        abrible:
+          type: boolean
     MunicipioResponse:
       type: object
       properties:

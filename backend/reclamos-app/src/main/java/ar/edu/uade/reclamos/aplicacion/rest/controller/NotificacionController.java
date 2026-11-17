@@ -30,6 +30,6 @@ public class NotificacionController {
     @GetMapping
     public List<AvisoResponse> delUsuario(
             @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario) {
-        return facade.consultarAvisosDelUsuario(usuario.id()).stream().map(mapper::aviso).toList();
+        return facade.bandeja(usuario.id()).stream().map(mapper::aviso).toList();
     }
 }

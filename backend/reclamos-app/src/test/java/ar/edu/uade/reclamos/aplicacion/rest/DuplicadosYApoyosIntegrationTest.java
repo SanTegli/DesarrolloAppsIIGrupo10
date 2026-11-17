@@ -104,7 +104,8 @@ class DuplicadosYApoyosIntegrationTest {
         List<String> campos = new java.util.ArrayList<>();
         candidatos.get(0).fieldNames().forEachRemaining(campos::add);
         assertThat(campos).containsExactlyInAnyOrder("numero", "estado", "fechaCreacion", "descripcion",
-                "direccion", "foto", "distanciaMetros", "cantidadApoyos", "apoyadoPorMi", "propio");
+                "direccion", "foto", "distanciaMetros", "cantidadApoyos", "apoyadoPorMi", "propio", "categoria",
+                "masParecido");
         assertThat(candidatos.toString()).doesNotContain("Ana", "Perez", "ana@example.org", "30111222");
 
         candidatos(datos.ana(), datos.luminaria(), LATITUD_VECINA).andExpect(jsonPath("$[0].propio").value(true));
@@ -216,6 +217,52 @@ class DuplicadosYApoyosIntegrationTest {
 
         apoyo(post(ruta(numero)), datos.bruno()).andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.codigo").value("CUENTA_BLOQUEADA"));
+    }
+
+    @Test
+    void elAltaSinIaPideLosDeLaMismaCategoriaPorPostConLaDescripcion() throws Exception {
+        String numero = crear(datos.ana(), datos.luminaria(), LATITUD, LONGITUD);
+        crear(datos.ana(), datos.bache(), LATITUD, LONGITUD);
+
+        mvc.perform(post("/api/reclamos/candidatos-duplicados").with(como(datos.bruno()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"categoriaId": %d, "descripcion": "El farol no prende", "latitud": %s, "longitud": %s}"""
+                                .formatted(datos.luminaria(), LATITUD_VECINA, LONGITUD)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.comparadoPorIA").value(false))
+                .andExpect(jsonPath("$.motivo").doesNotExist())
+                .andExpect(jsonPath("$.candidatos", hasSize(1)))
+                .andExpect(jsonPath("$.candidatos[0].numero").value(numero))
+                .andExpect(jsonPath("$.candidatos[0].categoria.nombre").value("Luminaria rota"))
+                .andExpect(jsonPath("$.candidatos[0].masParecido").value(false));
+    }
+
+    @Test
+    void quienSeAsociaRecibeLosAvisosPeroNoPuedeAbrirElReclamo() throws Exception {
+        String numero = crear(datos.ana(), datos.luminaria(), LATITUD, LONGITUD);
+        apoyo(post(ruta(numero)), datos.bruno()).andExpect(status().isOk());
+        cambiarEstado(datos.carla(), numero, "EN_PROCESO");
+        cambiarEstado(datos.carla(), numero, "RESUELTO");
+
+        JsonNode bandeja = leer(mvc.perform(get("/api/notificaciones").with(como(datos.bruno())))
+                .andExpect(status().isOk()));
+        List<String> mensajes = new java.util.ArrayList<>();
+        bandeja.forEach(aviso -> mensajes.add(aviso.get("mensaje").asText()));
+        assertThat(mensajes).containsExactly(
+                "El reclamo " + numero + " que apoyaste fue resuelto.",
+                "El reclamo " + numero + " que apoyaste paso de ASIGNADO a EN_PROCESO.",
+                "Te sumaste al reclamo " + numero + ". Te vamos a avisar cada vez que cambie.");
+        bandeja.forEach(aviso -> assertThat(aviso.get("abrible").asBoolean()).isFalse());
+        assertThat(bandeja.toString()).doesNotContain("Ana", "Perez");
+        mvc.perform(get("/api/notificaciones").with(como(datos.ana())))
+                .andExpect(jsonPath("$[0].abrible").value(true));
+        // Retirar el apoyo corta los avisos.
+        apoyo(delete(ruta(numero)), datos.bruno()).andExpect(status().isOk());
+        mvc.perform(patch("/api/reclamos/" + numero + "/estado").with(como(datos.ana()))
+                .contentType(MediaType.APPLICATION_JSON).content("{\"estado\": \"CERRADO\"}"))
+                .andExpect(status().isOk());
+        mvc.perform(get("/api/notificaciones").with(como(datos.bruno()))).andExpect(jsonPath("$", hasSize(3)));
     }
 
     private String crear(Long usuario, Long categoria, double latitud, double longitud) throws Exception {

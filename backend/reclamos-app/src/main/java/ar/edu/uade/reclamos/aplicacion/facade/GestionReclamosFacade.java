@@ -120,6 +120,12 @@ public class GestionReclamosFacade {
         return duplicados.candidatos(usuarioId, categoriaId, latitud, longitud, radioMetros, limite);
     }
 
+    /** PR 27: los posibles duplicados del alta, comparados por la IA con el texto del reclamo nuevo. */
+    public DuplicadosDelAlta duplicadosDelAlta(Long usuarioId, Long categoriaId, String descripcion, double latitud,
+                                               double longitud) {
+        return duplicados.paraElAlta(usuarioId, categoriaId, descripcion, latitud, longitud);
+    }
+
     /**
      * Apoya el reclamo. Si dos pedidos iguales llegan a la vez (un doble clic), el segundo choca con la
      * restricción única de la base: se responde el estado actual, como si hubiera llegado después.
@@ -207,6 +213,10 @@ public class GestionReclamosFacade {
 
     public List<Notificacion> consultarNotificaciones(Long usuarioId, String numero) {
         return consultas.consultarNotificaciones(usuarioId, numero);
+    }
+
+    public List<AvisoDelUsuario> bandeja(Long usuarioId) {
+        return consultas.bandeja(usuarioId);
     }
 
     public List<Notificacion> consultarAvisosDelUsuario(Long usuarioId) {

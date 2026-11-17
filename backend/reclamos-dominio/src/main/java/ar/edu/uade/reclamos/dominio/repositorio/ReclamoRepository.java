@@ -38,6 +38,8 @@ public interface ReclamoRepository {
      * Reclamos abiertos (INGRESADO, ASIGNADO o EN_PROCESO) de la categoría, con la ubicación confirmada dentro
      * del recuadro dado, del más nuevo al más viejo. El recuadro es un primer filtro barato en la base; la
      * distancia exacta la calcula quien llama.
+     *
+     * @param categoriaId {@code null} para todas las categorías (PR 27: la IA compara reclamos de cualquiera)
      */
     List<Reclamo> buscarAbiertosConUbicacionEn(Long categoriaId, double latitudMinima, double latitudMaxima,
                                                double longitudMinima, double longitudMaxima);

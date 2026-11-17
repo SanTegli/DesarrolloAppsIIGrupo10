@@ -159,18 +159,20 @@ elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA
 servicio llamara directamente a quien avisa, cada reacción nueva (auditoría, broker, estadísticas)
 obligaría a modificarlo.
 
-**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay cuatro
-observadores independientes. El tercero, el de la revisión de la prioridad por IA, se agregó en el PR 24, y el
-cuarto, el de la sugerencia de categoría, en el PR 26, sin tocar ni a los servicios ni a los demás.
+**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay cinco
+observadores independientes. El tercero, el de la revisión de la prioridad por IA, se agregó en el PR 24; el
+cuarto, el de la sugerencia de categoría, en el PR 26; y el quinto, el de los avisos a quienes se asociaron, en
+el PR 27. Ninguno tocó a los servicios ni a los demás observadores.
 
 | Pieza | Rol en el patrón |
 | --- | --- |
 | `PublicadorEventos` (interfaz del dominio) | Sujeto: por donde se publica |
 | `PublicadorEventosSpring` | Implementación con `ApplicationEventPublisher` |
-| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido`, `PrioridadRevisada`, `ReclamoRecategorizado`, `CategoriaSugerida` | Eventos de dominio |
+| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido`, `PrioridadRevisada`, `ReclamoRecategorizado`, `CategoriaSugerida`, `ReclamoApoyado` | Eventos de dominio |
 | `NotificacionesReclamoListener` | Observador 1: genera los avisos, dentro de la transacción |
 | `AuditoriaListener` | Observador 2: registra cada evento en el log, después del commit |
 | `ReevaluacionPrioridadListener` | Observador 3 (PR 24): si el reclamo se creó sin la respuesta de la IA, guarda el pedido de revisión en la outbox, dentro de la transacción. Se sumó sin tocar `ReclamoService` ni los otros dos |
+| `AvisosApoyantesListener` | Observador 5 (PR 27): avisa a los vecinos asociados a un reclamo (`ReclamoApoyado`, `EstadoReclamoCambiado`, `ReclamoResuelto`), dentro de la transacción |
 | `SugerenciaCategoriaListener` | Observador 4 (PR 26): si el vecino eligió "Otro problema" (`ReclamoCreado.categoriaOtra`), guarda el pedido de sugerencia de categoría en la outbox, dentro de la transacción |
 
 | Evento | Quién lo publica | Avisos que genera |
@@ -183,6 +185,7 @@ cuarto, el de la sugerencia de categoría, en el PR 26, sin tocar ni a los servi
 | `PrioridadRevisada` | `ServicioReevaluacionPrioridad.reevaluar` | Solo si la prioridad cambió: ciudadano y agente a cargo, o agentes del área |
 | `ReclamoRecategorizado` | `ReclamoService.recategorizar` | Ciudadano. Si quedó asignado, además sale `ReclamoAsignado` |
 | `CategoriaSugerida` | `ServicioSugerenciaCategoria.sugerir` | Ninguno: es para la auditoría |
+| `ReclamoApoyado` | `ServicioApoyos.apoyar` (PR 27) | El vecino que se asoció. Además, `EstadoReclamoCambiado` y `ReclamoResuelto` avisan a todos los asociados |
 
 ```java
 // ReclamoService: publica y sigue
@@ -294,6 +297,9 @@ integración; el plan completo, PR por PR, está en el documento de planificaci�
 | Chain of Responsibility (propia) | 15 | `ControlDeUso`: `TelefonoVerificado` → `CuentaNoBloqueada` → `LimiteDiarioDeReclamos` | Cada control de uso corta con su error o pasa al siguiente; sumar uno no toca `ReclamoService` |
 | Adapter | 16 | `AlmacenFotos`: `AlmacenFotosLocal` | El caso de uso no sabe dónde se guarda la foto; otro almacén (Firebase Storage, S3) sería otra clase |
 | Lado de lectura separado (Domain Reporting, CQRS) | 18 | `ConsultasTablero`: `ConsultasTableroJpa` | Las métricas no recorren reclamos por el Repository: la base cuenta y agrupa, y vuelven proyecciones planas |
+| Cola de reintentos diferidos (TTL y dead letter) | 24 y 26 | `TopologiaReevaluacion`, `TopologiaSugerenciaCategoria` | Volver a preguntarle a la IA más tarde sin dormir un hilo: el mensaje espera en una cola sin consumidor y vuelve solo |
+| Strategy y Null Object | 27 | `ComparadorDuplicados`: `ComparadorDuplicadosPorIA` y `NINGUNO` | `ServicioDuplicados` compara con o sin IA según la configuración, sin preguntar cuál tiene |
+| Observer | 27 | `AvisosApoyantesListener` | Avisar a los vecinos asociados sin tocar `ReclamoService` ni el listener de avisos existente |
 
 ## Adapter y proxy remoto: `CoberturaSoap`
 

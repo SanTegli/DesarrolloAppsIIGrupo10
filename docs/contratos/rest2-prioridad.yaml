@@ -1,15 +1,15 @@
 # Contrato de REST 2, servicio de prioridad con IA. Lo implementa servicios/servicio-prioridad (PR 10).
-# El PR 26 sumó la segunda operación, /api/categorias/sugerir.
+# El PR 26 sumó la segunda operación, /api/categorias/sugerir, y el PR 27 la tercera, /api/duplicados/comparar.
 # Este archivo fue el acuerdo de partida; el contrato vigente es el que genera el código en
 # docs/openapi/prioridad.yaml (lo regenera OpenApiPrioridadTest) y Swagger UI en http://localhost:8082.
 openapi: 3.0.3
 info:
   title: Sistema de Reclamos Urbanos — Servicio de prioridad (REST 2)
-  version: 1.1.0
+  version: 1.2.0
   description: >
     Sugiere la prioridad de un reclamo a partir de su categoría y su descripción usando un modelo de
     lenguaje externo (Gemini u OpenAI). También sugiere la categoría de un reclamo cargado como
-    "Otro problema". No recibe datos personales: ni nombre, ni email, ni DNI, ni dirección, ni foto.
+    "Otro problema" y dice si alguno de los reclamos cercanos es el mismo problema que uno nuevo. No recibe datos personales: ni nombre, ni email, ni DNI, ni dirección, ni foto.
 servers:
   - url: http://localhost:8082
 paths:
@@ -116,8 +116,100 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /api/duplicados/comparar:
+    post:
+      summary: Comparar un reclamo nuevo con los reclamos abiertos cercanos
+      description: >
+        El backend manda el reclamo que el vecino está por crear y los reclamos abiertos que encontró a pocos
+        metros, de cualquier categoría. Solo texto: categoría y descripción. La respuesta dice cuál describe el
+        mismo problema, o ninguno (similar null).
+      operationId: comparar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ComparacionDuplicadosRequest'
+            example:
+              nuevo: { categoria: Luminaria rota, descripcion: El farol de la esquina no prende hace tres días }
+              candidatos:
+                - { id: '1', categoria: Bache, descripcion: Pozo enorme en la calle }
+                - { id: '2', categoria: Otro problema, descripcion: No hay luz en la esquina, el poste está apagado }
+      responses:
+        '200':
+          description: El id del candidato más parecido, o null si ninguno es el mismo problema
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComparacionDuplicadosResponse'
+              example:
+                similar: '2'
+                motivo: Los dos hablan del mismo farol apagado en la esquina.
+                proveedor: gemini
+                modelo: gemini-3.5-flash-lite
+        '400':
+          description: Entrada inválida o ids repetidos (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: El modelo eligió un id que no estaba entre los candidatos (RESPUESTA_INVALIDA)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: Proveedor caído, sin clave o sin cuota (PROVEEDOR_NO_DISPONIBLE)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '504':
+          description: El modelo no respondió a tiempo (TIEMPO_AGOTADO)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 components:
   schemas:
+    ComparacionDuplicadosRequest:
+      type: object
+      required: [nuevo, candidatos]
+      properties:
+        nuevo:
+          type: object
+          required: [categoria, descripcion]
+          properties:
+            categoria: { type: string, maxLength: 80 }
+            descripcion: { type: string, maxLength: 1000 }
+        candidatos:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            required: [id, categoria, descripcion]
+            properties:
+              id: { type: string, maxLength: 20, pattern: '^[A-Za-z0-9_-]+$', description: Lo elige el backend; no se repite }
+              categoria: { type: string, maxLength: 80 }
+              descripcion: { type: string, maxLength: 1000 }
+    ComparacionDuplicadosResponse:
+      type: object
+      required: [motivo, proveedor, modelo]
+      properties:
+        similar:
+          type: string
+          nullable: true
+          description: El id de uno de los candidatos; null si ninguno es el mismo problema
+        motivo:
+          type: string
+          maxLength: 300
+        proveedor:
+          type: string
+          enum: [gemini, openai, simulado]
+        modelo:
+          type: string
     SugerenciaCategoriaRequest:
       type: object
       required: [categoriaPropuesta, descripcion, categorias]

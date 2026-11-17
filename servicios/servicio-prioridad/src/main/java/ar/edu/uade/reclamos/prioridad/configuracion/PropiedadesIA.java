@@ -12,12 +12,14 @@ import org.springframework.boot.context.properties.bind.DefaultValue;
  * @param tiempoLimite  cuánto se espera al proveedor, para conectar y para leer la respuesta
  * @param instrucciones archivo con los criterios de prioridad que recibe el modelo
  * @param instruccionesCategoria archivo con las reglas para sugerir la categoría de "Otro problema" (PR 26)
+ * @param instruccionesDuplicados archivo con las reglas para comparar un reclamo con los cercanos (PR 27)
  */
 @ConfigurationProperties(prefix = "prioridad.ia", ignoreUnknownFields = false)
 public record PropiedadesIA(@DefaultValue("gemini") String proveedor,
                             @DefaultValue("5s") Duration tiempoLimite,
                             @DefaultValue("classpath:instrucciones-prioridad.txt") String instrucciones,
                             @DefaultValue("classpath:instrucciones-categoria.txt") String instruccionesCategoria,
+                            @DefaultValue("classpath:instrucciones-duplicados.txt") String instruccionesDuplicados,
                             @DefaultValue Proveedor gemini,
                             @DefaultValue Proveedor openai) {
 

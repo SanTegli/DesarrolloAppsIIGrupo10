@@ -15,7 +15,7 @@ cd ../servicios
 
 cd ../frontend
 npm install
-npm test             # 87 tests: capa de API, etiquetas y componentes
+npm test             # 90 tests: capa de API, etiquetas y componentes
 
 cd ..
 node --test scripts/*.test.mjs   # los scripts de la demo y de la carga, contra un sistema simulado
@@ -106,6 +106,13 @@ grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Geor
 | --- | --- | --- | --- |
 | CP73 | "Otro problema" pide qué tipo de problema es, y la IA sugiere una categoría existente o ninguna, por la cola y sin datos del vecino | `SugerenciaCategoriaIntegrationTest`, `RecategorizacionTest`, `SugeridorCategoriaTest`, `CategoriaControllerTest`, `FormularioReclamo.test.jsx` | Como Ana, crear un reclamo de **Otro problema** con "Baldosas levantadas". Queda sin área. Como Elena, abrir el detalle: en unos segundos aparece "La IA sugiere Vereda rota: …" y la lista ya la tiene elegida. En RabbitMQ se ve la cola `reclamos.categoria`. Solo por API: el alta de "Otro problema" sin `categoriaPropuesta` responde 400 |
 | CP74 | El administrador recategoriza: plazo nuevo desde la creación, la prioridad no baja, queda en el historial, se asigna solo y el vecino recibe un aviso | `SugerenciaCategoriaIntegrationTest.elAdministradorRecategorizaYElReclamoSeAsignaSolo`, `soloElAdministradorRecategorizaYNoAOtroProblema`, `RecategorizacionTest`, `DetalleReclamo.test.jsx` | Como Elena, **Recategorizar** con la sugerida: el reclamo pasa a Vereda rota, `ASIGNADO` a Obras Públicas, fecha límite a 7 días de la creación. Ana ve el aviso "paso de Otro problema a Vereda rota". Solo por API: `PATCH .../categoria` con la sesión de Ana responde 403, a "Otro problema" o con el reclamo asignado, 409 |
+
+### Segunda Parte: duplicados comparados por la IA (PR 27)
+
+| Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
+| --- | --- | --- | --- |
+| CP75 | La IA compara el texto del reclamo nuevo con los abiertos a 50 m de cualquier categoría y marca el mismo problema; sin IA, o si falla, quedan los de la misma categoría | `DuplicadosConIAIntegrationTest`, `ComparadorDuplicadosTest`, `DuplicadosControllerTest`, `SimuladoAdapterTest`, `CandidatosDuplicados.test.jsx` | Como Bruno, crear una Luminaria rota en Belgrano 450 (Bernal). Como Ana, cargar **Otro problema** en el mismo punto con "No hay luz en la esquina, el farol no anda": el panel dice "La IA cree que el reclamo REC-… es el mismo problema" y lo marca. Con `servicio-prioridad` detenido, el panel muestra solo los de la misma categoría |
+| CP76 | Quien se asocia recibe los avisos del reclamo, sin poder abrir su detalle | `DuplicadosYApoyosIntegrationTest.quienSeAsociaRecibeLosAvisosPeroNoPuedeAbrirElReclamo`, `ApoyosYCercaniaRepositoryJpaTest`, `App.test.jsx` | Ana toca **Es el mismo: asociarme**. Cuando Carla toma el reclamo, en **Avisos** de Ana aparece "El reclamo REC-… que apoyaste paso de ASIGNADO a EN_PROCESO." con "(lo apoyás)" y sin enlace |
 
 ### Segunda Parte: avisos por correo con RabbitMQ
 
@@ -234,6 +241,8 @@ categoría" (la API simulada no llama a la IA) y la verificación del teléfono 
 | [16-otro-problema-alta](interfaz/16-otro-problema-alta.png) | Ciudadano: "Otro problema" con el tipo de problema escrito (PR 26) | CP73 |
 | [17-otro-problema-sugerencia-ia](interfaz/17-otro-problema-sugerencia-ia.png) | Administrador: la categoría que sugirió la IA, ya elegida para recategorizar. La API simulada sugiere con reglas, no con IA | CP73, CP74 |
 | [18-otro-problema-recategorizado](interfaz/18-otro-problema-recategorizado.png) | Recategorizado: plazo nuevo, asignado solo a Obras Públicas, historial y avisos | CP74 |
+| [19-duplicado-comparado-por-ia](interfaz/19-duplicado-comparado-por-ia.png) | Alta de "Otro problema": la IA marca el bache de Bruno como el mismo problema (PR 27). La API simulada compara con reglas, no con IA | CP75 |
+| [20-asociado](interfaz/20-asociado.png) | Ana se asoció al reclamo de Bruno: no se creó otro y le van a llegar sus avisos | CP76 |
 
 Para volver a tomarlas: `npm run mock` y `npm run dev` en `frontend/`, y el mismo recorrido a mano.
 
@@ -260,8 +269,8 @@ node capturas-evidencias.mjs
 El script crea datos de prueba en cada corrida:
 
 - Tres reclamos de Ana (uno de "Otro problema", que Elena recategoriza) y uno de Bruno.
+- Ana se asocia al bache de Bruno, que ella describe como "Otro problema": la IA lo encuentra igual.
 - Una cuenta nueva.
-- Un apoyo de Ana.
 - El reclamo de Ana pasa por tomar, resolver, reabrir, resolver y cerrar.
 
 También bloquea a Bruno para la captura y lo desbloquea al final. Si una sección falla, guarda
@@ -273,7 +282,7 @@ para seguir el recorrido.
 | `01` a `03`: ingreso, login fallido y registro | CP41, CP42, CP45 |
 | `04` y `05`: verificación simulada de la cuenta nueva | CP47 |
 | `06` a `08`: alta con Georef y foto, archivo rechazado, detalle con origen IA, Maps y foto | CP23, CP27, CP28, CP53, CP54 |
-| `09` a `11`: posible duplicado, apoyo y contador | CP58, CP60 |
+| `09` a `11`: posible duplicado comparado por la IA, asociarse y contador | CP58, CP60, CP75, CP76 |
 | `12` a `16`: agente, reapertura con motivo, cierre y avisos | CP08, CP12, CP14, CP52 |
 | `17` a `20`: sin asignar, asignación manual, cuenta bloqueada | CP06, CP18, CP51 |
 | `21` y `22`: tableros | CP63, CP65 |

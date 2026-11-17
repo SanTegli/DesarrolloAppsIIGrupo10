@@ -13,6 +13,9 @@
 // Tableros (PR 18): GET /api/dashboard/publico (sin sesión) y /api/dashboard/gestion.
 // "Otro problema" (PR 26): el vecino escribe qué tipo de problema es y, a los SEGUNDOS_IA_CATEGORIA (3 s), una "IA"
 // de reglas (como el proveedor simulado de REST 2) sugiere la categoría. Elena recategoriza con PATCH .../categoria.
+// Duplicados con IA (PR 27): POST /api/reclamos/candidatos-duplicados compara el texto del reclamo nuevo con los
+// abiertos a 50 m de cualquier categoría, con las mismas reglas que el simulado de REST 2 (palabras en común).
+// Quien se asocia recibe los avisos del reclamo.
 // El comportamiento de referencia es el del backend Spring; esto es solo una ayuda de desarrollo.
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
@@ -316,6 +319,76 @@ function candidatosDuplicados(usuario, consulta) {
     }))
 }
 
+// PR 27: como ServicioDuplicados.paraElAlta con el proveedor simulado de REST 2. El más parecido es el cercano que
+// contiene más palabras del reclamo nuevo (al menos 2); después van los de la misma categoría.
+function duplicadosDelAlta(usuario, cuerpo) {
+  const { categoriaId, latitud, longitud } = cuerpo
+  const descripcion = String(cuerpo.descripcion ?? '')
+  if (!Number.isInteger(categoriaId) || categoriaId <= 0) throw invalido('Los datos recibidos no son validos.')
+  if (!Number.isFinite(latitud) || latitud < -90 || latitud > 90) throw invalido('La latitud debe estar entre -90 y 90.')
+  if (!Number.isFinite(longitud) || longitud < -180 || longitud > 180) {
+    throw invalido('La longitud debe estar entre -180 y 180.')
+  }
+  const categoria = buscar(categorias, categoriaId, 'categoría')
+  const cercanos = reclamos
+    .filter(puedeSerDuplicado)
+    .map((r) => ({ r, distancia: metros(latitud, longitud, r.ubicacion.latitud, r.ubicacion.longitud) }))
+    .filter(({ distancia }) => distancia <= DUPLICADOS.radioMetros)
+    .sort((a, b) => a.distancia - b.distancia)
+    .slice(0, 10)
+  const comparado = cercanos.length > 0 && descripcion.trim() !== ''
+  const palabras = [...new Set(normalizar(`${categoria.nombre} ${descripcion}`).split(/[^a-z0-9]+/))]
+    .filter((palabra) => palabra.length >= 4)
+    .map((palabra) => (palabra.length > 4 ? palabra.slice(0, -1) : palabra))
+  let similar = null
+  let maximo = 1
+  for (const cercano of comparado ? cercanos : []) {
+    const texto = normalizar(`${categorias.find((c) => c.id === cercano.r.categoriaId).nombre} ${cercano.r.descripcion}`)
+    const enComun = palabras.filter((palabra) => texto.includes(palabra)).length
+    if (enComun > maximo) {
+      maximo = enComun
+      similar = cercano
+    }
+  }
+  const tarjeta = ({ r, distancia }, masParecido) => ({
+    numero: r.numero,
+    estado: r.estado,
+    fechaCreacion: r.fechaCreacion,
+    descripcion: r.descripcion,
+    direccion: r.ubicacion.direccionNormalizada,
+    foto: fotos.has(r.numero) ? `/api/reclamos/${r.numero}/foto` : null,
+    distanciaMetros: Math.round(distancia),
+    cantidadApoyos: cantidadApoyos(r.numero),
+    apoyadoPorMi: apoyos.has(`${usuario.id}|${r.numero}`),
+    propio: r.ciudadanoId === usuario.id,
+    categoria: referencia(categorias.find((c) => c.id === r.categoriaId)),
+    masParecido,
+  })
+  const candidatos = [
+    ...(similar ? [tarjeta(similar, true)] : []),
+    ...cercanos
+      .filter((cercano) => cercano !== similar && cercano.r.categoriaId === categoriaId)
+      .slice(0, DUPLICADOS.maximoCandidatos - (similar ? 1 : 0))
+      .map((cercano) => tarjeta(cercano, false)),
+  ]
+  return {
+    comparadoPorIA: comparado,
+    motivo: !comparado
+      ? null
+      : similar
+        ? `Simulado: comparten ${maximo} palabras con el reclamo nuevo.`
+        : 'Simulado: ningún reclamo cercano comparte palabras con el nuevo.',
+    candidatos,
+  }
+}
+
+// PR 27: quienes se asociaron a un reclamo reciben sus avisos, como AvisosApoyantesListener.
+function notificarApoyantes(reclamo, mensaje, fecha) {
+  ;[...apoyos]
+    .filter((clave) => clave.endsWith(`|${reclamo.numero}`))
+    .forEach((clave) => notificar(reclamo, Number(clave.split('|')[0]), mensaje, fecha))
+}
+
 function cambiarApoyo(usuario, numero, apoyar) {
   const reclamo = reclamos.find((candidato) => candidato.numero === numero)
   if (!reclamo) throw inexistente('reclamo', numero)
@@ -328,6 +401,7 @@ function cambiarApoyo(usuario, numero, apoyar) {
       throw regla(`El reclamo ${numero} ya no está abierto: solo se apoyan reclamos que siguen pendientes.`)
     }
     apoyos.add(clave)
+    notificar(reclamo, usuario.id, `Te sumaste al reclamo ${numero}. Te vamos a avisar cada vez que cambie.`, ahora())
   }
   if (!apoyar) apoyos.delete(clave)
   return { numero, cantidadApoyos: cantidadApoyos(numero), apoyado: apoyos.has(clave) }
@@ -749,9 +823,11 @@ function cambiarEstado(usuario, reclamo, cuerpo) {
       `Tu reclamo ${reclamo.numero} fue resuelto. Podes confirmar el cierre o reabrirlo.`,
       fecha,
     )
+    notificarApoyantes(reclamo, `El reclamo ${reclamo.numero} que apoyaste fue resuelto.`, fecha)
   } else {
     const mensaje = `El reclamo ${reclamo.numero} paso de ${anterior} a ${cuerpo.estado}.`
     notificar(reclamo, reclamo.ciudadanoId, mensaje, fecha)
+    notificarApoyantes(reclamo, `El reclamo ${reclamo.numero} que apoyaste paso de ${anterior} a ${cuerpo.estado}.`, fecha)
     if (anterior === 'RESUELTO' && reclamo.agenteId) notificar(reclamo, reclamo.agenteId, mensaje, fecha)
   }
 }
@@ -917,7 +993,13 @@ async function atender(peticion, contexto) {
     const usuario = usuarioDe(contexto)
     const lista = notificaciones
       .filter((n) => n.destinatarioId === usuario.id)
-      .map((n) => ({ numeroReclamo: n.numero, canal: n.canal, mensaje: n.mensaje, fechaEnvio: n.fechaEnvio }))
+      .map((n) => ({
+        numeroReclamo: n.numero,
+        canal: n.canal,
+        mensaje: n.mensaje,
+        fechaEnvio: n.fechaEnvio,
+        abrible: puedeConsultar(usuario, reclamos.find((r) => r.numero === n.numero)),
+      }))
       .reverse()
     return [200, lista]
   }
@@ -930,6 +1012,9 @@ async function atender(peticion, contexto) {
       const reclamo = crear(usuario, cuerpo)
       fotos.set(reclamo.numero, foto)
       return [201, detalle(usuario, reclamo), { Location: `/api/reclamos/${reclamo.numero}` }]
+    }
+    if (partes.length === 3 && metodo === 'POST' && partes[2] === 'candidatos-duplicados') {
+      return [200, duplicadosDelAlta(usuario, await leerCuerpo(peticion))]
     }
     if (partes.length === 3 && metodo === 'GET' && partes[2] === 'candidatos-duplicados') {
       return [200, candidatosDuplicados(usuario, url.searchParams)]

@@ -11,6 +11,7 @@ public final class EsquemaRespuesta {
     public static final List<String> PRIORIDADES = List.of("BAJA", "MEDIA", "ALTA", "CRITICA");
     public static final String CAMPO_PRIORIDAD = "prioridad";
     public static final String CAMPO_CATEGORIA = "categoria";
+    public static final String CAMPO_SIMILAR = "similar";
     public static final String CAMPO_MOTIVO = "motivo";
 
     private EsquemaRespuesta() {

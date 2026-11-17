@@ -237,7 +237,7 @@ describe('App', () => {
     expect(llamadas.find((llamada) => llamada.ruta === '/api/ubicaciones/sugerencias').consulta).toEqual({
       direccion: 'Belgrano 450',
     })
-    const alta = llamadas.find((llamada) => llamada.metodo === 'POST').cuerpo
+    const alta = llamadas.find((llamada) => llamada.ruta === '/api/reclamos' && llamada.metodo === 'POST').cuerpo
     expect(alta.ubicacion).toEqual({ direccionNormalizada, latitud, longitud })
     expect(alta.municipioId).toBe(1)
   })
@@ -306,7 +306,10 @@ describe('App', () => {
       ...conSesion(ana),
       'GET /api/reclamos': [],
       'GET /api/ubicaciones/sugerencias': { disponible: true, sugerencias: [bernal] },
-      'GET /api/reclamos/candidatos-duplicados': [
+      'POST /api/reclamos/candidatos-duplicados': {
+        comparadoPorIA: true,
+        motivo: 'Los dos hablan del mismo farol.',
+        candidatos: [
         {
           numero: 'REC-AAAA1111',
           estado: 'EN_PROCESO',
@@ -318,8 +321,11 @@ describe('App', () => {
           cantidadApoyos: 0,
           apoyadoPorMi: false,
           propio: false,
+          categoria: { id: 1, nombre: 'Luminaria rota' },
+          masParecido: true,
         },
-      ],
+        ],
+      },
       'POST /api/reclamos/REC-AAAA1111/apoyo': { numero: 'REC-AAAA1111', cantidadApoyos: 1, apoyado: true },
     })
     const usuario = userEvent.setup()
@@ -334,10 +340,12 @@ describe('App', () => {
     await usuario.type(screen.getByLabelText(/Descripción del problema/), 'Farol apagado')
     await usuario.upload(screen.getByLabelText('Foto del problema'), archivoFoto())
     await usuario.click(within(screen.getByRole('main')).getByRole('button', { name: 'Crear reclamo' }))
-    await usuario.click(await screen.findByRole('button', { name: 'Es el mismo: apoyar REC-AAAA1111' }))
+    await usuario.click(await screen.findByRole('button', { name: 'Es el mismo: asociarme a REC-AAAA1111' }))
 
     expect(await screen.findByRole('heading', { name: 'Mis reclamos' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Sumaste tu apoyo al reclamo REC-AAAA1111.')
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'Te asociaste al reclamo REC-AAAA1111: te vamos a avisar cada vez que cambie.',
+    )
   })
 
   it('el administrador ve en Administración los reclamos sin asignar y la cobertura de las áreas', async () => {
@@ -384,6 +392,26 @@ describe('App', () => {
 
     await usuario.click(screen.getByRole('button', { name: 'Volver al listado' }))
     expect(await screen.findByRole('heading', { name: 'Avisos' })).toBeInTheDocument()
+  })
+
+  it('los avisos de un reclamo que el vecino apoya se leen pero no abren el detalle', async () => {
+    simularApi({
+      ...conSesion(ana),
+      'GET /api/reclamos': [],
+      'GET /api/notificaciones': [
+        { numeroReclamo: 'REC-AAAA1111', canal: 'INTERNO', mensaje: 'El reclamo REC-AAAA1111 que apoyaste fue resuelto.', fechaEnvio: '2026-11-02T10:00:00', abrible: false },
+        { numeroReclamo: 'REC-4F2A91BC', canal: 'INTERNO', mensaje: 'Tu reclamo REC-4F2A91BC fue ingresado.', fechaEnvio: '2026-11-01T10:00:00', abrible: true },
+      ],
+    })
+    const usuario = userEvent.setup()
+    render(<App />)
+
+    await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
+
+    expect(await screen.findByText('El reclamo REC-AAAA1111 que apoyaste fue resuelto.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'REC-AAAA1111' })).not.toBeInTheDocument()
+    expect(screen.getByText('(lo apoyás)')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
   })
 
   it('la bandeja vacía lo dice y un error del backend se muestra', async () => {

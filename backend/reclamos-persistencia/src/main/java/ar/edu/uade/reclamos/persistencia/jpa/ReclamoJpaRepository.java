@@ -29,7 +29,8 @@ public interface ReclamoJpaRepository extends JpaRepository<Reclamo, Long> {
     long countByAreaIdAndEstadoIn(Long areaId, Collection<EstadoReclamo> estados);
 
     @EntityGraph(attributePaths = {"ciudadano", "categoria", "municipio", "area", "agente"})
-    @Query("select r from Reclamo r where r.categoria.id = :categoriaId and r.estado in :estados"
+    @Query("select r from Reclamo r where (:categoriaId is null or r.categoria.id = :categoriaId)"
+            + " and r.estado in :estados"
             + " and r.ubicacion.estado = :confirmada"
             + " and r.ubicacion.latitud between :latitudMinima and :latitudMaxima"
             + " and r.ubicacion.longitud between :longitudMinima and :longitudMaxima"

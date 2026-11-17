@@ -224,7 +224,7 @@ habilitada, además salen por correo a través de la outbox.
 | Un código de verificación se usa una sola vez y antes de vencer | `CodigoVerificacion.usar` |
 | Un reclamo guarda la referencia a su foto una sola vez; no se reemplaza | `Reclamo.registrarFoto` |
 | Solo un reclamo abierto y con la ubicación confirmada aparece como posible duplicado | `Reclamo.puedeSerDuplicado` |
-| Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad | Constructor de `Apoyo` |
+| Nadie apoya su propio reclamo ni uno que ya no está abierto; apoyar no cambia la prioridad. Desde el PR 27, apoyar es asociarse: se reciben los avisos del reclamo (`ReclamoApoyado`) | Constructor de `Apoyo` |
 | Un reclamo de "Otro problema" lleva qué tipo de problema es, en palabras del vecino (hasta 80 caracteres); las demás categorías no | `ReclamoFactory.crear` y `Reclamo.proponerCategoria` |
 | La sugerencia de categoría de la IA se guarda una sola vez, solo en un reclamo de "Otro problema", nunca es "Otro problema" y no cambia la categoría | `Reclamo.registrarSugerenciaCategoria` |
 | Recategorizar: solo un administrador, solo sin área (`INGRESADO`), a una categoría concreta y distinta. El plazo se recalcula desde la creación y la prioridad no baja | `Reclamo.recategorizar` |

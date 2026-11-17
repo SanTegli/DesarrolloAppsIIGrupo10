@@ -29,6 +29,9 @@ class ApoyosYCercaniaRepositoryJpaTest extends PersistenciaTestBase {
         flushYLimpiar();
 
         assertThat(apoyos.contarPorReclamo(reclamo.getId())).isEqualTo(2);
+        // PR 27: los que se asociaron reciben los avisos, del primero al último.
+        assertThat(apoyos.buscarApoyantes(reclamo.getId())).extracting(Ciudadano::getEmail)
+                .containsExactly("bruno@example.org", "laura@example.org");
         Apoyo deBruno = apoyos.buscar(bruno.getId(), reclamo.getId()).orElseThrow();
         assertThat(deBruno.getFecha()).isEqualTo(AHORA);
         assertThat(apoyos.buscar(ciudadano.getId(), reclamo.getId())).isEmpty();
@@ -74,6 +77,10 @@ class ApoyosYCercaniaRepositoryJpaTest extends PersistenciaTestBase {
         assertThat(encontrados.get(0).getUbicacion().getLatitud()).isEqualTo(LATITUD);
         assertThat(encontrados).extracting(Reclamo::getNumero)
                 .doesNotContain(lejos.getNumero(), sinUbicacion.getNumero(), resuelto.getNumero());
+        // PR 27: sin categoría, las de todas.
+        assertThat(reclamos.buscarAbiertosConUbicacionEn(null, LATITUD - 0.001, LATITUD + 0.001, LONGITUD - 0.001,
+                LONGITUD + 0.001)).extracting(Reclamo::getNumero)
+                .containsExactlyInAnyOrder(cerca.getNumero(), otraCategoria.getNumero());
     }
 
     private Reclamo ubicado(double latitud, double longitud) {

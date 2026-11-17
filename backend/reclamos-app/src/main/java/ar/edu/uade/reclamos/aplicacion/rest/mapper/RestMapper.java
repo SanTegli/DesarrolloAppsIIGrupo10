@@ -1,7 +1,9 @@
 package ar.edu.uade.reclamos.aplicacion.rest.mapper;
 
 import ar.edu.uade.reclamos.aplicacion.rest.dto.*;
+import ar.edu.uade.reclamos.aplicacion.servicio.AvisoDelUsuario;
 import ar.edu.uade.reclamos.aplicacion.servicio.CandidatoDuplicado;
+import ar.edu.uade.reclamos.aplicacion.servicio.DuplicadosDelAlta;
 import ar.edu.uade.reclamos.aplicacion.tablero.TableroGestion;
 import ar.edu.uade.reclamos.aplicacion.tablero.TableroPublico;
 import ar.edu.uade.reclamos.aplicacion.servicio.EstadoApoyo;
@@ -35,7 +37,12 @@ public class RestMapper {
         return new CandidatoDuplicadoResponse(reclamo.getNumero(), reclamo.getEstado(), reclamo.getFechaCreacion(),
                 reclamo.getDescripcion(), reclamo.getUbicacion().getDireccionNormalizada(), rutaFoto(reclamo),
                 Math.round(candidato.distanciaMetros()), candidato.apoyos(), candidato.apoyadoPorMi(),
-                candidato.propio());
+                candidato.propio(), categoriaReferencia(reclamo.getCategoria()), candidato.masParecido());
+    }
+
+    public DuplicadosDelAltaResponse duplicadosDelAlta(DuplicadosDelAlta duplicados) {
+        return new DuplicadosDelAltaResponse(duplicados.comparadoPorIA(), duplicados.motivo(),
+                duplicados.candidatos().stream().map(this::candidato).toList());
     }
 
     public TableroPublicoResponse tableroPublico(TableroPublico tablero) {
@@ -101,8 +108,13 @@ public class RestMapper {
     }
 
     public AvisoResponse aviso(Notificacion aviso) {
+        return aviso(new AvisoDelUsuario(aviso, true));
+    }
+
+    public AvisoResponse aviso(AvisoDelUsuario delUsuario) {
+        Notificacion aviso = delUsuario.aviso();
         return new AvisoResponse(aviso.getReclamo().getNumero(), aviso.getCanal(), aviso.getMensaje(),
-                aviso.getFechaEnvio());
+                aviso.getFechaEnvio(), delUsuario.abrible());
     }
 
     public UsuarioResponse usuario(Usuario usuario) {

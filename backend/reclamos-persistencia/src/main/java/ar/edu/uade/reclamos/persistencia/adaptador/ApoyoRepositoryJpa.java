@@ -3,6 +3,8 @@ package ar.edu.uade.reclamos.persistencia.adaptador;
 import ar.edu.uade.reclamos.dominio.modelo.Apoyo;
 import ar.edu.uade.reclamos.dominio.repositorio.ApoyoRepository;
 import ar.edu.uade.reclamos.persistencia.jpa.ApoyoJpaRepository;
+import ar.edu.uade.reclamos.dominio.modelo.Ciudadano;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,5 +39,10 @@ public class ApoyoRepositoryJpa implements ApoyoRepository {
     @Override
     public long contarPorReclamo(Long reclamoId) {
         return jpa.countByReclamoId(reclamoId);
+    }
+
+    @Override
+    public List<Ciudadano> buscarApoyantes(Long reclamoId) {
+        return jpa.buscarApoyantes(reclamoId);
     }
 }

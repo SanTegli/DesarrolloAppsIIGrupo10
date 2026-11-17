@@ -45,8 +45,8 @@ flowchart TB
   V -- No --> VT["Ciudadano: verifica el teléfono<br/>con el bot de Telegram"]
   VT --> B
   V -- Sí --> B["Ciudadano: completa el reclamo,<br/>con foto y ubicación"]
-  B --> DU{"¿Hay un reclamo abierto igual<br/>a menos de 50 m?"}
-  DU -- "Sí, es el mismo" --> AP(["Ciudadano: lo apoya y no crea otro"])
+  B --> DU{"¿La IA encuentra el mismo problema<br/>en un reclamo abierto a menos de 50 m?"}
+  DU -- "Sí, es el mismo" --> AP(["Ciudadano: se asocia, no crea otro<br/>y recibe sus avisos"])
   DU -- "No, o es otro problema" --> CU{"Sistema: ¿cuenta habilitada<br/>y dentro del límite diario?"}
   CU -- No --> NO(["Sistema: rechaza el alta (403 o 429)"])
   CU -- Sí --> C["Sistema: calcula la prioridad con la IA<br/>(nunca por debajo de la categoría)"]
