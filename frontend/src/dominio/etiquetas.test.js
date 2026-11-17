@@ -52,5 +52,8 @@ describe('etiquetas', () => {
       describirPrioridad({ prioridad: 'CRITICA', origenPrioridad: 'IA', motivoPrioridad: 'Cables expuestos.' }),
     ).toBe('Crítica, sugerida por IA. Cables expuestos.')
     expect(describirPrioridad({ prioridad: 'BAJA' })).toBe('Baja, por categoría')
+    expect(describirPrioridad({ prioridad: 'MEDIA', origenPrioridad: 'PENDIENTE_IA' })).toBe(
+      'Media, por categoría (la IA lo está revisando)',
+    )
   })
 })

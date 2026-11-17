@@ -211,6 +211,44 @@ public class Reclamo extends Entidad {
                 : Validador.requerirTexto(motivo, "motivo", LONGITUD_MAXIMA_MOTIVO_PRIORIDAD);
     }
 
+    /** La IA no respondió durante el alta y todavía tiene que revisar la prioridad en segundo plano. */
+    public boolean estaPendienteDeIA() {
+        return origenPrioridad == OrigenPrioridad.PENDIENTE_IA;
+    }
+
+    /**
+     * Aplica la prioridad que la IA sugirió en segundo plano, después del alta. La regla es la misma que en el
+     * alta: la IA sube, no baja. Queda la mayor entre la actual (que pudo subir por vencimiento mientras tanto)
+     * y la sugerida.
+     *
+     * @return {@code true} si la prioridad cambió, para avisar solo en ese caso
+     * @throws ReglaNegocioException si la prioridad no estaba pendiente de la IA
+     */
+    public boolean completarPrioridadPorIA(Prioridad sugerida, String motivo) {
+        Validador.requerirNoNulo(sugerida, "prioridad sugerida");
+        if (!estaPendienteDeIA()) {
+            throw new ReglaNegocioException("La prioridad del reclamo " + numero + " ya no espera a la IA.");
+        }
+        Prioridad anterior = prioridad;
+        if (prioridad.esMayorQue(sugerida)) {
+            definirPrioridad(prioridad, OrigenPrioridad.CATEGORIA, "La IA sugirió " + sugerida
+                    + "; se mantiene " + prioridad + ", que es mayor.");
+        } else {
+            definirPrioridad(sugerida, OrigenPrioridad.IA, motivo);
+        }
+        return prioridad != anterior;
+    }
+
+    /**
+     * La IA no respondió en ninguno de los reintentos: la prioridad de la categoría queda como definitiva, con
+     * origen {@link OrigenPrioridad#RESPALDO}. Si ya no estaba pendiente, no hace nada.
+     */
+    public void abandonarRevisionPorIA(String motivo) {
+        if (estaPendienteDeIA()) {
+            definirPrioridad(prioridad, OrigenPrioridad.RESPALDO, motivo);
+        }
+    }
+
     /** Guarda dónde ocurre el reclamo; reemplaza la ubicación anterior. */
     public void registrarUbicacion(Ubicacion nuevaUbicacion) {
         this.ubicacion = Validador.requerirNoNulo(nuevaUbicacion, "ubicación");

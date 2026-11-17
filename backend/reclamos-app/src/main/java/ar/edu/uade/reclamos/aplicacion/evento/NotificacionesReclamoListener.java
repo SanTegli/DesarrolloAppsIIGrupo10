@@ -5,6 +5,7 @@ import ar.edu.uade.reclamos.dominio.evento.EstadoReclamoCambiado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoAsignado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoCreado;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoResuelto;
+import ar.edu.uade.reclamos.dominio.evento.PrioridadRevisada;
 import ar.edu.uade.reclamos.dominio.evento.ReclamoVencido;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
@@ -50,5 +51,14 @@ public class NotificacionesReclamoListener {
     @EventListener
     public void vencido(ReclamoVencido evento) {
         notificaciones.avisarVencimiento(evento.numeroReclamo(), evento.prioridadNueva(), evento.ocurridoEn());
+    }
+
+    /** Solo si la prioridad cambió: que la IA confirme la de la categoría no es novedad para nadie. */
+    @EventListener
+    public void prioridadRevisada(PrioridadRevisada evento) {
+        if (evento.cambio()) {
+            notificaciones.avisarPrioridadRevisada(evento.numeroReclamo(), evento.prioridadAnterior(),
+                    evento.prioridadNueva(), evento.ocurridoEn());
+        }
     }
 }

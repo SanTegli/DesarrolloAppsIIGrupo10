@@ -1,7 +1,9 @@
 # Contrato de mensajes: RabbitMQ
 
 Implementado en el PR 12. El backend publica un mensaje por cada aviso que genera, y
-`servicio-notificaciones` lo consume y envía el correo a Mailpit.
+`servicio-notificaciones` lo consume y envía el correo a Mailpit. Desde el PR 24 el mismo exchange lleva
+también los pedidos de [revisión de prioridad por IA](#revisión-de-prioridad-por-ia-pr-24), que el backend
+se manda a sí mismo.
 
 | Lado | Dónde |
 | --- | --- |
@@ -16,7 +18,7 @@ El flujo de un aviso, del evento de dominio al correo. Las flechas punteadas son
 ```mermaid
 flowchart LR
   subgraph BACK["Backend (productor)"]
-    EV["Evento de dominio<br/>ReclamoCreado, ReclamoAsignado,<br/>EstadoReclamoCambiado, ReclamoResuelto,<br/>ReclamoVencido"]
+    EV["Evento de dominio<br/>ReclamoCreado, ReclamoAsignado,<br/>EstadoReclamoCambiado, ReclamoResuelto,<br/>ReclamoVencido, PrioridadRevisada"]
     LIS["NotificacionesReclamoListener<br/>y ServicioNotificaciones"]
     OUT[("mensajes_salientes<br/>outbox, PENDIENTE")]
     PUB["PublicadorMensajes<br/>cada 2 s, con confirmación"]
@@ -36,7 +38,7 @@ flowchart LR
   EV --> LIS
   LIS -->|"aviso y fila de outbox<br/>en la misma transacción"| OUT
   OUT --> PUB
-  PUB -->|"aviso.reclamo-creado, aviso.reclamo-asignado,<br/>aviso.estado-cambiado, aviso.reclamo-resuelto,<br/>aviso.reclamo-vencido"| EX
+  PUB -->|"aviso.reclamo-creado, aviso.reclamo-asignado,<br/>aviso.estado-cambiado, aviso.reclamo-resuelto,<br/>aviso.reclamo-vencido, aviso.prioridad-revisada"| EX
   PUB -.->|"RabbitMQ caído: la fila<br/>queda PENDIENTE y se reintenta"| OUT
   EX --> Q
   Q --> CON
@@ -64,6 +66,7 @@ Una por evento de dominio que genera avisos:
 | `EstadoReclamoCambiado` | `aviso.estado-cambiado` |
 | `ReclamoResuelto` | `aviso.reclamo-resuelto` |
 | `ReclamoVencido` | `aviso.reclamo-vencido` |
+| `PrioridadRevisada` (solo si la prioridad cambió) | `aviso.prioridad-revisada` |
 
 ## Mensaje
 
@@ -103,3 +106,67 @@ JSON en UTF-8, con `content-type: application/json` y entrega persistente.
   romperlo. Un cambio incompatible sube `version`.
 - **No hay entrega exactamente una vez:** si el consumidor cae después de enviar el correo y antes de
   registrar el `eventId`, el correo se repite al reintentar.
+
+## Revisión de prioridad por IA (PR 24)
+
+Cuando la IA no responde en el alta, el reclamo queda `PENDIENTE_IA` y el backend pide revisarlo después.
+El productor y el consumidor son el mismo backend: la cola desacopla la revisión del alta, no dos
+servicios. La topología la declara el backend (`TopologiaReevaluacion`) solo si la mensajería está prendida
+y la estrategia es `ia`.
+
+```mermaid
+flowchart LR
+  subgraph BACK["Backend"]
+    RL["ReevaluacionPrioridadListener<br/>ReclamoCreado con PENDIENTE_IA"]
+    OUT[("mensajes_salientes<br/>outbox")]
+    SR["ListenerReevaluacionPrioridad<br/>y ServicioReevaluacionPrioridad"]
+  end
+  subgraph MQ["RabbitMQ"]
+    EX{{"reclamos.eventos<br/>topic"}}
+    Q[["reclamos.prioridad"]]
+    W[["reclamos.prioridad.espera<br/>TTL 20 s, sin consumidor"]]
+    DLQ[["reclamos.prioridad.dlq"]]
+  end
+  REST2["servicio-prioridad<br/>REST 2"]
+
+  RL -->|"intento 1"| OUT
+  OUT -->|"ia.prioridad.reevaluar"| EX
+  EX --> Q
+  Q --> SR
+  SR -->|"hasta 10 s"| REST2
+  SR -.->|"falló: intento n+1"| OUT
+  OUT -.->|"ia.prioridad.espera"| EX
+  EX -.-> W
+  W -.->|"vence el TTL: exchange por defecto,<br/>clave reclamos.prioridad"| Q
+  Q -.->|"mensaje inválido o error<br/>después de 3 intentos locales"| DLQ
+```
+
+| Elemento | Nombre | Tipo |
+| --- | --- | --- |
+| Cola | `reclamos.prioridad` | durable, ligada con `ia.prioridad.reevaluar`. Al rechazar, va a `reclamos.prioridad.dlq` |
+| Cola de espera | `reclamos.prioridad.espera` | durable, ligada con `ia.prioridad.espera`, `x-message-ttl` = `reclamos.prioridad.ia.reevaluacion.espera` (20 s). Al vencer, vuelve a `reclamos.prioridad` |
+| Cola de errores | `reclamos.prioridad.dlq` | durable. Separada de `notificaciones.email.dlq` para no mezclar fallas |
+
+```json
+{
+  "eventId": "0b7e4f7a-2d1c-4a6e-8f0b-9e3c5d2a1b77",
+  "version": 1,
+  "tipoEvento": "PrioridadPendiente",
+  "reclamoNumero": "REC-4F2A91BC",
+  "intento": 2,
+  "fechaSolicitud": "2026-11-16T21:00:20-03:00"
+}
+```
+
+| Campo | Regla |
+| --- | --- |
+| `reclamoNumero` | Lo único que identifica el pedido. **No** lleva la descripción: el backend la lee de su base |
+| `intento` | Empieza en 1. Con `intento` igual a `reclamos.prioridad.ia.reevaluacion.intentos` (4) y otra falla, se deja la prioridad de la categoría con origen `RESPALDO` |
+
+- **Idempotencia:** no hace falta registrar el `eventId`. Si el reclamo ya no está `PENDIENTE_IA`, el
+  mensaje se confirma sin llamar a la IA.
+- **Reintentos de dos tipos:** que la IA no responda es un resultado esperado y se reprograma por la cola de
+  espera, sin ocupar un hilo. Un error inesperado (por ejemplo, la base caída) usa los 3 intentos locales de
+  Spring y después va a la cola de errores.
+- **Mensaje inválido:** no es JSON, versión desconocida, falta el número o `intento` < 1: va directo a la cola
+  de errores.

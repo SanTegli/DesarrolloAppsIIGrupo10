@@ -39,7 +39,7 @@ documento donde está la decisión.
 | Id | Atributo | Requerimiento | Se verifica con |
 | --- | --- | --- | --- |
 | RNF-1 | Disponibilidad | El reclamo se crea aunque fallen Georef, la IA, el servicio SOAP, RabbitMQ, el servicio de notificaciones o el correo. Cada falla tiene su respaldo y se recupera sola o con un paso manual documentado. Solo la base de datos no tiene respaldo | [Matriz de fallos](demo.md#matriz-de-fallos), CP20, CP24, CP30, CP35, CP36, CP39 |
-| RNF-2 | Tiempo de respuesta del alta | Una integración lenta no traba el alta más que su tiempo límite: 6 s la IA y 2 s el SOAP, unos 8 s en el peor caso. Georef se consulta antes, en la búsqueda, con 3 s. Con el circuito de la IA abierto, el respaldo es inmediato | `PrioridadPorIAIntegrationTest.siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `ClienteServicioPrioridadTest.despuesDeVariasFallasElCircuitoSeAbreYNoVuelveALlamar` |
+| RNF-2 | Tiempo de respuesta del alta | Una integración lenta no traba el alta más que su tiempo límite: 4 s la IA y 2 s el SOAP, unos 6 s en el peor caso. Lo que la IA no alcanza a responder lo revisa después por la cola, sin que el vecino espere. Georef se consulta antes, en la búsqueda, con 3 s. Con el circuito de la IA abierto, el respaldo es inmediato | `PrioridadPorIAIntegrationTest.siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta`, `ClienteServicioPrioridadTest.despuesDeVariasFallasElCircuitoSeAbreYNoVuelveALlamar` |
 | RNF-3 | Carga básica | Con la demo levantada en una notebook, 20 usuarios simultáneos consultando durante 30 s (catálogos, tablero público, listado, detalle y avisos): ningún error y percentil 95 de 1000 ms o menos | CP68, `scripts/prueba-carga.mjs`. **Medido: 0 errores, p95 de 62 ms** ([prueba-carga.md](evidencias/prueba-carga.md)) |
 | RNF-4 | Seguridad | Sesión del servidor con cookie `HttpOnly` y `SameSite=Lax`, que vence a los 30 minutos sin actividad. Token CSRF en todo `POST`, `PATCH` y `DELETE`. Contraseñas con BCrypt. Permisos por rol en cada endpoint, no solo en la interfaz | CP09, CP41 a CP46 |
 | RNF-5 | Privacidad de los datos personales | El teléfono se muestra enmascarado y no viaja a la IA ni a RabbitMQ. Los mensajes de la cola no llevan DNI, teléfono ni descripción. La foto se guarda re-codificada, sin EXIF. Los posibles duplicados y los tableros no muestran quién reclamó | CP53, CP58, CP63, `OutboxIntegrationTest`, [contratos de mensajes](contratos/README.md) |
@@ -103,8 +103,8 @@ de metas que dice si cada una se cumple.
 | Id | Atributo | Requerimiento | Se verifica con |
 | --- | --- | --- | --- |
 | RNF-IA-1 | Exactitud mínima | Al menos el 70 % de los 25 casos con la prioridad esperada exacta, y al menos el 90 % a un nivel o menos de la esperada (por ejemplo, ALTA cuando se esperaba CRITICA) | `EvaluarPrioridades.java`, CP25 |
-| RNF-IA-2 | Latencia | Percentil 95 del tiempo de respuesta de REST 2 de 6000 ms o menos, que es el tiempo límite del backend. Si la IA tarda más, el backend corta y usa la prioridad de la categoría; si falla la mitad de las últimas 5 llamadas, el circuito deja de llamarla durante 30 s | `EvaluarPrioridades.java`, CP24, `siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite` |
-| RNF-IA-3 | Disponibilidad | Al menos el 95 % de los casos con una respuesta válida (`200` con una de las cuatro prioridades). Una respuesta fuera del esquema es un error del proveedor (`502`) y el backend usa el respaldo | `EvaluarPrioridades.java`, `EvaluadorPrioridadTest`, `ErroresDelProveedorTest` |
+| RNF-IA-2 | Latencia | Percentil 95 del tiempo de respuesta de REST 2 de 6000 ms o menos. El alta espera a la IA 4 s: si tarda más, el reclamo se crea con la prioridad de la categoría (`PENDIENTE_IA`) y la IA lo revisa en segundo plano, con hasta 10 s por intento. Si falla la mitad de las últimas 5 llamadas, el circuito deja de llamarla durante 30 s | `EvaluarPrioridades.java`, CP24, `siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `ReevaluacionPrioridadIntegrationTest.siLaIaNoRespondeElReclamoQuedaPendienteYElPedidoVaALaOutbox` |
+| RNF-IA-3 | Disponibilidad | Al menos el 95 % de los casos con una respuesta válida (`200` con una de las cuatro prioridades). Una respuesta fuera del esquema es un error del proveedor (`502`). Una falla no deja el reclamo sin revisar: se reintenta por la cola cada 20 s, hasta 4 veces, y recién entonces queda la prioridad de la categoría con origen `RESPALDO` | `EvaluarPrioridades.java`, `EvaluadorPrioridadTest`, `ErroresDelProveedorTest`, `ReevaluacionPrioridadIntegrationTest.siLaIaSigueSinResponderReintentaYDespuesQuedaLaCategoria` |
 | RNF-IA-4 | Privacidad de los datos | Al proveedor de IA solo le llegan la categoría y la descripción: nunca nombre, DNI, email, teléfono, dirección ni foto. El motivo que devuelve no incluye datos personales. La clave del proveedor solo está en `.env` | `PrioridadPorIAIntegrationTest.alServicioDeIaSoloLeLlegaLaCategoriaYLaDescripcion`, `ConfiguracionProveedorTest` |
 | RNF-IA-5 | Robustez | Una instrucción escondida en la descripción no cambia la prioridad. La IA puede subir la prioridad de la categoría pero no bajarla, así que un error de la IA no deja sin atender un reclamo peligroso | CP26 (caso 25 de la evaluación), `InstruccionesPrioridadTest`, `PrioridadPorIATest` |
 
@@ -120,8 +120,10 @@ sobre los 25 casos):
 
 Los dos casos no acertados muestran por qué la IA está detrás de un respaldo:
 
-- **Caso 7** (bache grande en una avenida): Gemini no respondió en 5 s y REST 2 devolvió `504`. En el
-  sistema, el reclamo habría quedado con la prioridad de la categoría.
+- **Caso 7** (bache grande en una avenida): Gemini no respondió en 5 s y REST 2 devolvió `504`. Antes del
+  PR 24, el reclamo quedaba con la prioridad de la categoría; ahora queda `PENDIENTE_IA` y la IA lo revisa
+  por la cola, con REST 2 esperando hasta 9 s y el nivel de razonamiento `minimal`, que la hace más rápida.
+  La medición es anterior a ese cambio: conviene volver a correr la evaluación.
 - **Caso 18** (farol con un foco de dos): la IA dijo BAJA donde el grupo esperaba MEDIA. En el sistema queda
   MEDIA, porque esa es la prioridad de "Luminaria rota" y la IA no puede bajarla (RNF-IA-5).
 
@@ -151,7 +153,7 @@ RNF-IA-5.
 | --- | --- | --- |
 | Clasificar la prioridad, y no la categoría | La categoría la elige el vecino y define el área. La prioridad es la que más gana con leer el texto libre | [Decisiones de la Segunda Parte](arquitectura.md#decisiones-de-la-segunda-parte) |
 | Un servicio aparte (REST 2), no una llamada desde el backend | El backend no conoce a Gemini ni a OpenAI: cambiar de proveedor o de modelo no lo toca | [servicios/README.md](../servicios/README.md#servicio-de-prioridad-con-ia-rest-2) |
-| Sincrónica dentro del alta, con tiempo límite y respaldo | El ciudadano ve la prioridad y el motivo al crear el reclamo. Una cola daría la prioridad más tarde y complicaría el flujo de estados | [Prioridad con IA](arquitectura.md#prioridad-con-ia) |
+| Híbrida: sincrónica en el alta con 4 s, y por cola si no llega (PR 24) | Casi siempre el ciudadano ve la prioridad y el motivo al crear el reclamo. Cuando Gemini tarda, que pasa en una de cada cuatro consultas, esperarlo trabaría el alta y descartarlo desperdiciaría la IA: la cola la completa después sin tocar el flujo de estados | [Revisión en segundo plano](arquitectura.md#revisión-en-segundo-plano-pr-24) |
 | Respuesta con esquema JSON y validada | El modelo solo puede contestar una de las cuatro prioridades y un motivo corto. Si contesta otra cosa, es un error y hay respaldo | `EsquemaRespuesta`, `EvaluadorPrioridad` |
 | La IA sube, no baja | Un falso negativo (un peligro clasificado como menor) es más caro que un falso positivo | `PrioridadPorIA` |
 | Gemini por defecto, OpenAI como segundo adaptador y un simulado para los tests | Gemini tiene nivel gratuito sin tarjeta. El simulado permite correr el CI y la demo sin clave, y dice en cada respuesta que no es IA | [Adapter, Factory y Decorator](patrones.md#adapter-factory-y-decorator-en-la-prioridad-con-ia) |

@@ -439,7 +439,7 @@ sequenceDiagram
   PR->>PI: calcular(reclamo)
   PI->>CL: sugerir(categoría, descripción)
   alt circuito cerrado
-    CL->>SP: POST /api/prioridades/evaluar (hasta 6 s)
+    CL->>SP: POST /api/prioridades/evaluar (hasta 4 s)
     SP->>LLM: generateContent con el esquema de respuesta
     LLM-->>SP: {"prioridad": "CRITICA", "motivo": "..."}
     SP-->>CL: 200 con prioridad, motivo, proveedor y modelo
@@ -449,7 +449,7 @@ sequenceDiagram
   else REST 2 falla, tarda o el circuito está abierto
     CL-->>PI: ServicioExternoNoDisponibleException
     PI-->>PR: la excepción sigue
-    PR-->>RS: prioridad de la categoría, origen RESPALDO
+    PR-->>RS: prioridad de la categoría, origen PENDIENTE_IA<br/>(RESPALDO si no hay mensajería)
   end
 ```
 
@@ -457,12 +457,59 @@ sequenceDiagram
 | --- | --- |
 | `servicio-prioridad` | El componente de IA, publicado como servicio. Arma la consulta con los criterios de `instrucciones-prioridad.txt`, la manda al proveedor configurado y valida la respuesta. Recibe solo categoría y descripción |
 | `ProveedorIA` y sus adaptadores | `GeminiAdapter`, `OpenAiAdapter` y `SimuladoAdapter`: traducen la consulta a la API de cada proveedor. Se elige con `prioridad.ia.proveedor` |
-| `ClienteServicioPrioridad` | Llama a REST 2 con 1 s para conectar y 6 s para la respuesta. Si la mitad de las últimas 5 llamadas falló, abre el circuito y durante 30 s falla sin llamar |
+| `ClienteServicioPrioridad` | Llama a REST 2 con 1 s para conectar y 4 s para la respuesta en el alta (10 s en la revisión por la cola). Si la mitad de las últimas 5 llamadas falló, abre el circuito y durante 30 s falla sin llamar. El alta y la revisión tienen cada uno su circuito |
 | `PrioridadPorIA` | La IA puede subir la prioridad de la categoría, pero no bajarla |
-| `PrioridadConRespaldo` | Si la IA no responde, usa la prioridad de la categoría y marca el origen `RESPALDO` |
+| `PrioridadConRespaldo` | Si la IA no responde, usa la prioridad de la categoría. Con la mensajería prendida marca el origen `PENDIENTE_IA` para que la IA lo revise después; sin ella, `RESPALDO` |
+| `ServicioReevaluacionPrioridad` | Consume la cola `reclamos.prioridad`, vuelve a llamar a la IA y completa la prioridad. Si falla, reprograma el intento por la cola de espera; después de 4, deja `RESPALDO` |
 
-La IA se llama dentro de la transacción del alta: en el peor caso, el alta tarda unos 6 segundos más. Con
+La IA se llama dentro de la transacción del alta: en el peor caso, el alta tarda unos 4 segundos más. Con
 el circuito abierto, el respaldo es inmediato.
+
+#### Revisión en segundo plano (PR 24)
+
+Gemini Flash-Lite tarda más de 15 s en una de cada cuatro consultas, más o menos. Esperarlo en el alta haría
+lenta la pantalla; descartar la IA cada vez que tarda le quita sentido. Por eso el alta espera solo 4 s y,
+si la IA no llega, el reclamo se crea con la prioridad de la categoría y queda `PENDIENTE_IA`. La IA lo
+revisa después, por RabbitMQ, sin que nadie espere:
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant RS as ReclamoService
+  participant RL as ReevaluacionPrioridadListener<br/>(Observer)
+  participant OB as Outbox
+  participant MQ as RabbitMQ
+  participant SR as ServicioReevaluacionPrioridad
+  participant SP as servicio-prioridad
+
+  RS->>RS: alta: la IA no respondió en 4 s → PENDIENTE_IA
+  RS-)RL: ReclamoCreado (misma transacción)
+  RL->>OB: PrioridadPendiente, intento 1
+  OB-)MQ: ia.prioridad.reevaluar → cola reclamos.prioridad
+  MQ-)SR: mensaje (solo número de reclamo e intento)
+  SR->>SP: POST /api/prioridades/evaluar (hasta 10 s)
+  alt la IA responde
+    SR->>SR: completarPrioridadPorIA: sube o se mantiene, nunca baja
+    SR->>SR: publica PrioridadRevisada: si cambió, avisos al ciudadano y al área
+  else falla y quedan intentos
+    SR->>OB: PrioridadPendiente, intento n+1
+    OB-)MQ: ia.prioridad.espera → reclamos.prioridad.espera (20 s) → reclamos.prioridad
+  else cuarto intento fallido
+    SR->>SR: abandonarRevisionPorIA → RESPALDO
+  end
+```
+
+- **Sin bloquear:** el reintento no duerme un hilo. El mensaje pasa 20 s en `reclamos.prioridad.espera`, que
+  no tiene consumidor; cuando vence, RabbitMQ lo devuelve a `reclamos.prioridad`.
+- **Idempotente:** la regla está en el dominio. `completarPrioridadPorIA` solo se aplica si el reclamo sigue
+  `PENDIENTE_IA`; un mensaje repetido no cambia nada.
+- **No pisa otros cambios:** si mientras tanto el reclamo venció y subió a `ALTA`, una sugerencia menor no la
+  baja.
+- **Privacidad:** el mensaje lleva el número de reclamo, no la descripción. La descripción la lee el backend
+  de su base y la manda solo a REST 2, como en el alta.
+- **Mensajes inválidos:** van a `reclamos.prioridad.dlq`, separada de la de notificaciones.
+- **Interfaz:** el detalle muestra «por categoría (la IA lo está revisando)» y se actualiza solo cuando la
+  IA termina.
 
 ### Ubicación con Georef (API externa)
 

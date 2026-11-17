@@ -1763,6 +1763,7 @@ components:
           - PALABRAS_CLAVE
           - IA
           - RESPALDO
+          - PENDIENTE_IA
         motivoPrioridad:
           type: string
         vencido:

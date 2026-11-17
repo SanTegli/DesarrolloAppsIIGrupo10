@@ -106,7 +106,7 @@ modificarlo.
 | --- | --- | --- | --- |
 | `EstrategiaPrioridad` | `PrioridadPorCategoria` | Devuelve la prioridad base de la categoría | `categoria` |
 | `EstrategiaPrioridad` | `PrioridadPorPalabrasClave` | Si la descripción dice urgente, peligro, riesgo o accidente, sube como mínimo a `ALTA` | `palabras-clave` |
-| `EstrategiaPrioridad` | `PrioridadPorIA`, envuelta en `PrioridadConRespaldo` | Le pide la prioridad a REST 2 (Gemini) y se queda con la mayor entre esa y la de la categoría. Si REST 2 falla, el Decorator devuelve la de la categoría con origen `RESPALDO` | `ia` |
+| `EstrategiaPrioridad` | `PrioridadPorIA`, envuelta en `PrioridadConRespaldo` | Le pide la prioridad a REST 2 (Gemini) y se queda con la mayor entre esa y la de la categoría. Si REST 2 falla, el Decorator devuelve la de la categoría con origen `PENDIENTE_IA` (la IA la revisa después por la cola) o, sin mensajería, `RESPALDO` | `ia` |
 | `EstrategiaAsignacion` | `AsignacionPorJurisdiccion` | Entre las áreas candidatas, la de menor id | `jurisdiccion` |
 | `EstrategiaAsignacion` | `AsignacionPorCargaDeTrabajo` | Entre las áreas candidatas, la que tiene menos reclamos pendientes | `carga-trabajo` |
 
@@ -116,7 +116,7 @@ que se las pide a `servicio-cobertura` por SOAP (`reclamos.cobertura.origen: loc
 no cambia: recibe la misma lista en los dos casos.
 
 Las estrategias de prioridad devuelven una `PrioridadCalculada`: la prioridad, qué la decidió
-(`CATEGORIA`, `PALABRAS_CLAVE`, `IA` o `RESPALDO`) y un motivo. El reclamo guarda las tres cosas, así
+(`CATEGORIA`, `PALABRAS_CLAVE`, `IA`, `RESPALDO` o `PENDIENTE_IA`) y un motivo. El reclamo guarda las tres cosas, así
 gestión sabe cuánto confiar en ella.
 
 La estrategia activa se elige en `application.yml`, sin tocar código:
@@ -159,16 +159,18 @@ elegida.ifPresent(area -> reclamo.asignarArea(area, null, OBSERVACION_AUTOMATICA
 servicio llamara directamente a quien avisa, cada reacción nueva (auditoría, broker, estadísticas)
 obligaría a modificarlo.
 
-**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay dos
-observadores independientes; agregar un tercero no toca ni a los servicios ni a los otros dos.
+**Solución.** El servicio publica un evento de dominio y no sabe quién escucha. Hay tres
+observadores independientes; el tercero, el de la revisión de la prioridad por IA, se agregó en el PR 24
+sin tocar ni a los servicios ni a los otros dos.
 
 | Pieza | Rol en el patrón |
 | --- | --- |
 | `PublicadorEventos` (interfaz del dominio) | Sujeto: por donde se publica |
 | `PublicadorEventosSpring` | Implementación con `ApplicationEventPublisher` |
-| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido` | Eventos de dominio |
+| `ReclamoCreado`, `ReclamoAsignado`, `EstadoReclamoCambiado`, `ReclamoResuelto`, `ReclamoVencido`, `PrioridadRevisada` | Eventos de dominio |
 | `NotificacionesReclamoListener` | Observador 1: genera los avisos, dentro de la transacción |
 | `AuditoriaListener` | Observador 2: registra cada evento en el log, después del commit |
+| `ReevaluacionPrioridadListener` | Observador 3 (PR 24): si el reclamo se creó sin la respuesta de la IA, guarda el pedido de revisión en la outbox, dentro de la transacción. Se sumó sin tocar `ReclamoService` ni los otros dos |
 
 | Evento | Quién lo publica | Avisos que genera |
 | --- | --- | --- |
@@ -177,6 +179,7 @@ observadores independientes; agregar un tercero no toca ni a los servicios ni a 
 | `EstadoReclamoCambiado` | `ReclamoService.cambiarEstado` | Ciudadano; en reapertura y cierre, también el agente a cargo |
 | `ReclamoResuelto` | `ReclamoService.cambiarEstado` | Ciudadano |
 | `ReclamoVencido` | `ServicioVencimientos.marcarVencidos` | Ciudadano y agente a cargo, o agentes del área |
+| `PrioridadRevisada` | `ServicioReevaluacionPrioridad.reevaluar` | Solo si la prioridad cambió: ciudadano y agente a cargo, o agentes del área |
 
 ```java
 // ReclamoService: publica y sigue
@@ -370,15 +373,16 @@ ClienteServicioPrioridad ── circuit breaker ── HTTP ──▶ POST /api/
 | Adapter | `GeminiAdapter`, `OpenAiAdapter` | Traducen la misma `ConsultaIA` (instrucciones y reclamo) a la API de cada proveedor, y su respuesta a `RespuestaIA`. Cambiar de Gemini a OpenAI es `prioridad.ia.proveedor: openai` |
 | Factory | `ConfiguracionProveedor` | Es el único lugar que conoce las tres implementaciones |
 | Strategy | `PrioridadPorIA` | Tercera estrategia de prioridad; se elige con `reclamos.prioridad.estrategia: ia`. La IA puede subir la prioridad de la categoría, no bajarla |
-| Decorator | `PrioridadConRespaldo` | Misma interfaz que la estrategia que envuelve. Si la IA falla, devuelve la prioridad de la categoría con origen `RESPALDO`: el reclamo siempre se crea |
-| Circuit breaker | `ClienteServicioPrioridad` (Resilience4j) | Si falló la mitad de las últimas 5 llamadas, durante 30 s no llama y falla enseguida: con Gemini sin cuota, el alta no espera 6 s cada vez |
+| Decorator | `PrioridadConRespaldo` | Misma interfaz que la estrategia que envuelve. Si la IA falla, devuelve la prioridad de la categoría: el reclamo siempre se crea. Dos variantes con el mismo código: `conRevisionPosterior` marca `PENDIENTE_IA` para que la IA lo complete por la cola; el constructor común marca `RESPALDO` |
+| Circuit breaker | `ClienteServicioPrioridad` (Resilience4j) | Si falló la mitad de las últimas 5 llamadas, durante 30 s no llama y falla enseguida: con Gemini sin cuota, el alta no espera 4 s cada vez. La revisión por la cola tiene su propio circuito |
 
 ```java
 public PrioridadCalculada calcular(Reclamo reclamo) {          // PrioridadConRespaldo
     try {
         return principal.calcular(reclamo);                      // PrioridadPorIA
     } catch (ServicioExternoNoDisponibleException error) {
-        return new PrioridadCalculada(respaldo.calcular(reclamo).prioridad(), OrigenPrioridad.RESPALDO, MOTIVO);
+        // PENDIENTE_IA con conRevisionPosterior (la IA lo revisa por la cola); RESPALDO con el constructor común
+        return new PrioridadCalculada(respaldo.calcular(reclamo).prioridad(), origenSiFalla, motivoSiFalla);
     }
 }
 ```
@@ -386,7 +390,11 @@ public PrioridadCalculada calcular(Reclamo reclamo) {          // PrioridadConRe
 - **Código del backend:** `reclamos-app/…/aplicacion/estrategia/PrioridadPorIA.java`,
   `PrioridadConRespaldo.java` y `aplicacion/integracion/ClienteServicioPrioridad.java`
 - **Servicio:** `servicios/servicio-prioridad`, paquete `proveedor`
-- **Tests:** `PrioridadPorIATest`, `ClienteServicioPrioridadTest`, `PrioridadPorIAIntegrationTest` y, del
+- **Revisión por la cola (PR 24):** `aplicacion/prioridad/ServicioReevaluacionPrioridad.java`,
+  `ListenerReevaluacionPrioridad.java` y `TopologiaReevaluacion.java`; la regla de «sube, nunca baja» está en
+  `Reclamo.completarPrioridadPorIA`
+- **Tests:** `PrioridadPorIATest`, `ClienteServicioPrioridadTest`, `PrioridadPorIAIntegrationTest`,
+  `ReevaluacionPrioridadIntegrationTest`, `RevisionPrioridadPorIATest` y, del
   lado del servicio, `GeminiAdapterTest`, `OpenAiAdapterTest` y `ConfiguracionProveedorTest`
 
 ## Adapter y proxy de caché en la geocodificación

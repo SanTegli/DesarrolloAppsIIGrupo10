@@ -251,6 +251,11 @@ export async function ejecutar(config, { chromium, registro = console } = {}) {
     await p.getByRole('img', { name: 'Vista previa de la foto elegida' }).waitFor()
     estado.luminaria = await crear(p)
     await esperarFoto(p)
+    // Si la IA no respondió en el alta, el detalle se actualiza solo cuando termina la revisión por la cola.
+    await p
+      .getByText(/la IA lo está revisando/)
+      .waitFor({ state: 'detached', timeout: 90000 })
+      .catch(() => {})
     await captura(p, '08-detalle-ia-maps-foto')
   })
 

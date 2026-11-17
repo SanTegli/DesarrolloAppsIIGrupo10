@@ -76,9 +76,15 @@ class ConfiguracionAplicacionTest {
             PropiedadesReclamos.Ia ia = ctx.getBean(PropiedadesReclamos.class).prioridad().ia();
             assertThat(ia.url()).isEqualTo("http://servicio-prioridad:8082");
             assertThat(ia.tiempoConexion()).isEqualTo(Duration.ofSeconds(1));
-            assertThat(ia.tiempoRespuesta()).isEqualTo(Duration.ofSeconds(6));
+            assertThat(ia.tiempoRespuesta()).isEqualTo(Duration.ofSeconds(4));
             assertThat(ia.circuito().llamadas()).isEqualTo(5);
             assertThat(ia.circuito().espera()).isEqualTo(Duration.ofSeconds(30));
+            assertThat(ia.reevaluacion().habilitada()).isTrue();
+            assertThat(ia.reevaluacion().tiempoRespuesta()).isEqualTo(Duration.ofSeconds(10));
+            assertThat(ia.reevaluacion().intentos()).isEqualTo(4);
+            assertThat(ia.reevaluacion().espera()).isEqualTo(Duration.ofSeconds(20));
+            // Sin mensajería no hay cola: el respaldo es definitivo.
+            assertThat(ctx.getBean(PropiedadesReclamos.class).reevaluaPrioridadConIA()).isFalse();
         });
     }
 

@@ -297,7 +297,7 @@ docker compose logs -f backend
 
 En este modo el backend arranca con `RECLAMOS_COBERTURA_ORIGEN=soap`, `RECLAMOS_PRIORIDAD_ESTRATEGIA=ia` y `RECLAMOS_MENSAJERIA_HABILITADA=true`: la asignación automática pasa por el servicio SOAP, la prioridad por el servicio de IA y cada aviso sale por correo a través de RabbitMQ. El WSDL queda en `http://localhost:8081/ws/cobertura.wsdl` y Swagger del servicio de IA en `http://localhost:8082/swagger-ui.html`.
 
-Para que la IA funcione, `.env` tiene que tener `GEMINI_API_KEY` (ver «Probar el servicio de prioridad con IA», en la sección 10). Sin clave todo arranca igual, pero cada reclamo sale con la prioridad de la categoría y origen `RESPALDO`.
+Para que la IA funcione, `.env` tiene que tener `GEMINI_API_KEY` (ver «Probar el servicio de prioridad con IA», en la sección 10). Sin clave todo arranca igual, pero cada reclamo sale con la prioridad de la categoría: primero «la IA lo está revisando» (`PENDIENTE_IA`) y, después de un minuto de reintentos, origen `RESPALDO`. Si Gemini solo tarda, el detalle se actualiza solo cuando responde: no hace falta recargar la página.
 
 **Comprobar que todo anda.** Con la demo levantada, en otra terminal desde la raíz:
 
@@ -549,7 +549,7 @@ $env:RECLAMOS_PRIORIDAD_ESTRATEGIA="ia"
 .\mvnw.cmd -pl reclamos-app spring-boot:run
 ```
 
-Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cables expuestos frente a la escuela": la prioridad sale `CRITICA` (o la que sugiera el modelo) con origen `IA` y el motivo que escribió. Después detener el servicio de prioridad con **Ctrl+C** y crear otro: el alta igual responde 201, con la prioridad de la categoría y origen `RESPALDO`.
+Crear un reclamo "Luminaria rota" con la descripción "Poste inclinado con cables expuestos frente a la escuela": la prioridad sale `CRITICA` (o la que sugiera el modelo) con origen `IA` y el motivo que escribió. Después detener el servicio de prioridad con **Ctrl+C** y crear otro: el alta igual responde 201, con la prioridad de la categoría y origen `RESPALDO` (con el backend a mano no hay mensajería; en Docker Compose queda `PENDIENTE_IA` y la IA lo revisa por la cola).
 
 **Evaluación con los 25 casos.** Con el servicio levantado con la clave, desde la raíz: `java servicios/servicio-prioridad/evaluacion/EvaluarPrioridades.java`. Tarda unos tres minutos y deja el resultado en `docs/evidencias/ia-evaluacion.md`, que se commitea como evidencia.
 

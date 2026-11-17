@@ -192,11 +192,11 @@ sequenceDiagram
   PRI->>LLM: generateContent con las instrucciones
   LLM-->>PRI: JSON con prioridad y motivo
   PRI-->>B: prioridad sugerida
-  Note right of B: si falla o pasan 6 s: prioridad de la categoría (RESPALDO)
+  Note right of B: si falla o pasan 4 s: prioridad de la categoría (PENDIENTE_IA)<br/>y pedido de revisión por la cola (PR 24)
   B->>COB: ConsultarCobertura (municipio, barrio, categoría)
   COB-->>B: áreas que lo cubren
   Note right of B: si falla o pasan 2 s: asignación pendiente
-  B->>DB: guarda el reclamo, sus avisos y una fila PENDIENTE por aviso en mensajes_salientes
+  B->>DB: guarda el reclamo, sus avisos y una fila PENDIENTE por aviso (y por la revisión de la IA) en mensajes_salientes
   Note over B,DB: confirma la transacción
   B->>B: confirma la foto (la mueve del directorio de pendientes)
   B-->>UI: 201 Created con el reclamo

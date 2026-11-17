@@ -106,6 +106,8 @@ services:
       # gemini necesita GEMINI_API_KEY en .env; simulado funciona sin clave, pero no es IA.
       PRIORIDAD_IA_PROVEEDOR: ${PRIORIDAD_IA_PROVEEDOR:-gemini}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Cuánto "piensa" Gemini antes de responder: minimal es el más rápido (menos timeouts en el alta).
+      GEMINI_RAZONAMIENTO: ${GEMINI_RAZONAMIENTO:-minimal}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       JAVA_TOOL_OPTIONS: -Xmx256m -XX:+UseSerialGC
       TZ: America/Argentina/Buenos_Aires

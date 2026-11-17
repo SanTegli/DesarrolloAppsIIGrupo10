@@ -92,6 +92,24 @@ class PrioridadPorIATest {
                 .isEqualTo(OrigenPrioridad.IA);
     }
 
+    @Test
+    void conRevisionPosteriorElRespaldoQuedaPendienteDeLaIA() {
+        servidor.expect(anything()).andRespond(withServerError());
+        PrioridadConRespaldo conRevision = PrioridadConRespaldo.conRevisionPosterior(ia, new PrioridadPorCategoria());
+
+        assertThat(conRevision.calcular(reclamo(Prioridad.MEDIA, "Pozo"))).isEqualTo(new PrioridadCalculada(
+                Prioridad.MEDIA, OrigenPrioridad.PENDIENTE_IA, PrioridadConRespaldo.MOTIVO_PENDIENTE));
+    }
+
+    @Test
+    void conRevisionPosteriorSiLaIaRespondeNoQuedaNadaPendiente() {
+        responder("ALTA", "Bache en avenida.");
+        PrioridadConRespaldo conRevision = PrioridadConRespaldo.conRevisionPosterior(ia, new PrioridadPorCategoria());
+
+        assertThat(conRevision.calcular(reclamo(Prioridad.BAJA, "Bache en la avenida")).origen())
+                .isEqualTo(OrigenPrioridad.IA);
+    }
+
     private void responder(String prioridad, String motivo) {
         servidor.expect(anything()).andRespond(withSuccess(
                 "{\"prioridad\": \"" + prioridad + "\", \"motivo\": \"" + motivo + "\", \"proveedor\": \"gemini\", "

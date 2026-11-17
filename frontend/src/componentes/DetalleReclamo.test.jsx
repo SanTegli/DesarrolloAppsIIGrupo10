@@ -95,6 +95,42 @@ describe('DetalleReclamo', () => {
     expect(screen.getByText('Sin asignar: el servicio de cobertura no respondió')).toBeInTheDocument()
   })
 
+  it('mientras la IA revisa la prioridad, consulta de nuevo y se actualiza cuando terminó', async () => {
+    const pendiente = reclamo({
+      prioridad: 'MEDIA',
+      origenPrioridad: 'PENDIENTE_IA',
+      motivoPrioridad: 'La IA no respondió a tiempo.',
+    })
+    const revisado = reclamo({ prioridad: 'CRITICA', origenPrioridad: 'IA', motivoPrioridad: 'Cables expuestos.' })
+    const respuestas = [pendiente, pendiente, revisado]
+    const llamadas = simularApi({
+      [`GET ${RUTA}`]: () => respuestas.shift() ?? revisado,
+      [`GET ${RUTA}/notificaciones`]: [],
+    })
+    render(
+      <DetalleReclamo usuario={ana} numero="REC-4F2A91BC" areas={AREAS} onVolver={vi.fn()} revisionIA={{ cada: 10, intentos: 5 }} />,
+    )
+
+    expect(
+      await screen.findByText('Media, por categoría (la IA lo está revisando). La IA no respondió a tiempo.'),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('Crítica, sugerida por IA. Cables expuestos.')).toBeInTheDocument()
+    // Carga inicial, dos consultas de la espera (la segunda ve el cambio) y la recarga completa.
+    expect(llamadas.filter((l) => l.ruta === RUTA)).toHaveLength(4)
+  })
+
+  it('deja de consultar después de los intentos previstos si la IA no termina', async () => {
+    const pendiente = reclamo({ origenPrioridad: 'PENDIENTE_IA' })
+    const llamadas = simularApi({ [`GET ${RUTA}`]: pendiente, [`GET ${RUTA}/notificaciones`]: [] })
+    render(
+      <DetalleReclamo usuario={ana} numero="REC-4F2A91BC" areas={AREAS} onVolver={vi.fn()} revisionIA={{ cada: 5, intentos: 2 }} />,
+    )
+
+    expect(await screen.findByText(/la IA lo está revisando/)).toBeInTheDocument()
+    await new Promise((listo) => setTimeout(listo, 80))
+    expect(llamadas.filter((l) => l.ruta === RUTA)).toHaveLength(3)
+  })
+
   it('no ofrece acciones cuando el backend no devuelve ninguna', async () => {
     mostrar(ana, { [`GET ${RUTA}`]: reclamo({ estado: 'EN_PROCESO', accionesDisponibles: [] }) })
 

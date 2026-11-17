@@ -237,7 +237,8 @@ entorno: `RECLAMOS_PRIORIDAD_ESTRATEGIA: ia` y `RECLAMOS_COBERTURA_ORIGEN: soap`
 si encuentra alguna, devuelve el máximo entre la prioridad base y `ALTA`. No interpreta
 negaciones, plurales ni contexto; varias coincidencias no acumulan aumentos. `ia` le pide la prioridad
 al servicio de prioridad (REST 2, con Gemini) y se queda con la mayor entre esa y la base; si el servicio
-falla o tarda más de 6 s, usa la base. El detalle está en [Prioridad con IA](docs/arquitectura.md#prioridad-con-ia).
+falla o tarda más de 4 s, usa la base y, con la mensajería prendida, la IA lo revisa después por RabbitMQ
+(hasta 4 intentos, cada 20 s). El detalle está en [Prioridad con IA](docs/arquitectura.md#prioridad-con-ia).
 
 `cobertura.origen` elige de dónde salen las áreas candidatas: `local` las consulta en la base del
 backend y `soap` se las pide a `servicio-cobertura`. Las dos dan el mismo resultado; ver
@@ -329,3 +330,6 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 | 19 | `feature/19-cierre` | Requerimientos funcionales y no funcionales (con los de la IA y su verificación), metas en la evaluación de la IA, prueba de carga básica en el CI, diagramas de componentes y despliegue al día, acceso local y remoto, y capturas nuevas de la interfaz |
 | 20 | `feature/20-consistencia` | Revisión completa contra el TP: metas de la IA sobre los 25 casos (con `--rehacer`), requerimientos corregidos (rechazo, cancelación, límites), diagramas de capas, proceso de negocio, secuencias del alta y flujo de mensajes al día, CP69 de acceso local y remoto, y campos obligatorios en el OpenAPI de REST 2 |
 | 21 | `feature/21-capturas-evidencias` | Script de Playwright que saca las capturas del sistema real (interfaz, Swagger de REST 2, WSDL, Mailpit y RabbitMQ) con su índice de casos, y paso a paso de las evidencias a mano en la sección 15 del instructivo |
+| 22 | `evidencias/sistema-real` | Capturas y salidas del sistema real (`docs/evidencias/sistema-real/`) |
+| 23 | `mejora/interfaz` | Rediseño de la interfaz |
+| 24 | `feature/24-ia-asincronica` | IA híbrida: el alta espera 4 s y, si la IA no llega, el reclamo queda `PENDIENTE_IA` y se revisa por la cola `reclamos.prioridad` con reintentos sin bloquear (cola de espera con TTL). La IA sube o mantiene, nunca baja; avisa si cambió. Gemini con razonamiento `minimal` y el detalle se actualiza solo |

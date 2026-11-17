@@ -9,7 +9,8 @@ public enum TipoAviso {
     RECLAMO_ASIGNADO("ReclamoAsignado", "aviso.reclamo-asignado"),
     ESTADO_CAMBIADO("EstadoReclamoCambiado", "aviso.estado-cambiado"),
     RECLAMO_RESUELTO("ReclamoResuelto", "aviso.reclamo-resuelto"),
-    RECLAMO_VENCIDO("ReclamoVencido", "aviso.reclamo-vencido");
+    RECLAMO_VENCIDO("ReclamoVencido", "aviso.reclamo-vencido"),
+    PRIORIDAD_REVISADA("PrioridadRevisada", "aviso.prioridad-revisada");
 
     private final String evento;
     private final String claveRuteo;

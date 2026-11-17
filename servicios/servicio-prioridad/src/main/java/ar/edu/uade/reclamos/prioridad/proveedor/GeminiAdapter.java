@@ -2,8 +2,10 @@ package ar.edu.uade.reclamos.prioridad.proveedor;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -15,6 +17,10 @@ import org.springframework.web.client.RestClientException;
  *
  * <p>Autentica con el encabezado {@code x-goog-api-key}; la clave sale de {@code GEMINI_API_KEY}. En el nivel
  * gratuito Google puede usar el contenido para mejorar sus productos: mandar solo datos de prueba.
+ *
+ * <p>El nivel de razonamiento ({@code thinkingConfig.thinkingLevel}) va explícito: con {@code minimal} el modelo
+ * contesta más rápido, y clasificar una prioridad no necesita más. Así no depende del valor por defecto de cada
+ * modelo, que en algunos es {@code medium} o {@code high}.
  */
 public class GeminiAdapter implements ProveedorIA {
 
@@ -32,13 +38,35 @@ public class GeminiAdapter implements ProveedorIA {
     private final RestClient http;
     private final String clave;
     private final String modelo;
-    private final ObjectMapper json;
+    static final Set<String> NIVELES_RAZONAMIENTO = Set.of("minimal", "low", "medium", "high");
 
+    private final ObjectMapper json;
+    private final String razonamiento;
+
+    /** Sin nivel de razonamiento: el modelo usa el suyo por defecto. */
     public GeminiAdapter(RestClient http, String clave, String modelo, ObjectMapper json) {
+        this(http, clave, modelo, json, null);
+    }
+
+    /**
+     * @param razonamiento {@code minimal}, {@code low}, {@code medium} o {@code high}; vacío o {@code null} para
+     *                     el valor por defecto del modelo
+     */
+    public GeminiAdapter(RestClient http, String clave, String modelo, ObjectMapper json, String razonamiento) {
         this.http = http;
         this.clave = clave;
         this.modelo = modelo;
         this.json = json;
+        this.razonamiento = razonamiento == null || razonamiento.isBlank() ? null : razonamiento.strip();
+        if (this.razonamiento != null && !NIVELES_RAZONAMIENTO.contains(this.razonamiento)) {
+            throw new IllegalArgumentException("El nivel de razonamiento de Gemini debe ser minimal, low, medium o "
+                    + "high, no " + this.razonamiento);
+        }
+    }
+
+    /** {@code null} si se usa el del modelo. */
+    public String razonamiento() {
+        return razonamiento;
     }
 
     @Override
@@ -56,10 +84,16 @@ public class GeminiAdapter implements ProveedorIA {
         if (clave == null || clave.isBlank()) {
             throw new ProveedorNoDisponibleException("Falta la clave de Gemini: definir GEMINI_API_KEY");
         }
+        Map<String, Object> generacion = new LinkedHashMap<>();
+        generacion.put("responseMimeType", "application/json");
+        generacion.put("responseSchema", ESQUEMA);
+        if (razonamiento != null) {
+            generacion.put("thinkingConfig", Map.of("thinkingLevel", razonamiento));
+        }
         Map<String, Object> pedido = Map.of(
                 "systemInstruction", Map.of("parts", List.of(Map.of("text", consulta.instrucciones()))),
                 "contents", List.of(Map.of("role", "user", "parts", List.of(Map.of("text", consulta.reclamo())))),
-                "generationConfig", Map.of("responseMimeType", "application/json", "responseSchema", ESQUEMA));
+                "generationConfig", generacion);
         JsonNode respuesta;
         try {
             respuesta = http.post().uri(RUTA, modelo)

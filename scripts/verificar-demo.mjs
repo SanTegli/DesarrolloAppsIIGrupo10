@@ -20,6 +20,8 @@ const VALORES_POR_DEFECTO = {
   rabbitmqClave: 'reclamos_dev',
   mailpitUrl: 'http://localhost:8025',
   esperaCorreoMs: 30000,
+  // Si la IA no respondió en el alta, el backend la reintenta por la cola cada 20 s, hasta 4 veces.
+  esperaIaMs: 90000,
   intervaloMs: 1000,
   tiempoLimiteMs: 10000,
 }
@@ -69,6 +71,7 @@ export function configuracionDesdeEntorno(entorno = process.env) {
     rabbitmqClave: entorno.RABBITMQ_PASSWORD || VALORES_POR_DEFECTO.rabbitmqClave,
     mailpitUrl: entorno.MAILPIT_URL || VALORES_POR_DEFECTO.mailpitUrl,
     esperaCorreoMs: numero('VERIFICAR_ESPERA_CORREO_MS', VALORES_POR_DEFECTO.esperaCorreoMs),
+    esperaIaMs: numero('VERIFICAR_ESPERA_IA_MS', VALORES_POR_DEFECTO.esperaIaMs),
     intervaloMs: numero('VERIFICAR_INTERVALO_MS', VALORES_POR_DEFECTO.intervaloMs),
     tiempoLimiteMs: numero('VERIFICAR_TIEMPO_LIMITE_MS', VALORES_POR_DEFECTO.tiempoLimiteMs),
   }
@@ -210,7 +213,15 @@ export async function verificarDemo(config, informar = () => {}) {
     return resultados
   }
 
-  await paso(anotar, 'Prioridad con IA', async () => revisarPrioridad(reclamo))
+  await paso(anotar, 'Prioridad con IA', async () => {
+    if (reclamo.origenPrioridad !== 'PENDIENTE_IA') {
+      return revisarPrioridad(reclamo)
+    }
+    // La IA no llegó a tiempo en el alta: se espera a que la revisión por la cola termine.
+    const inicio = Date.now()
+    const revisado = await esperarRevisionIA(http, config, reclamo.numero)
+    return revisarPrioridad(revisado, { esperaSegundos: Math.round((Date.now() - inicio) / 1000) })
+  })
   await paso(anotar, 'Área por SOAP', async () => revisarArea(reclamo))
   await paso(anotar, 'Ubicación', async () => revisarUbicacion(reclamo, sugerencia))
   await paso(anotar, 'Foto', async () => {
@@ -259,8 +270,14 @@ export async function verificarDemo(config, informar = () => {}) {
   return resultados
 }
 
-export function revisarPrioridad(reclamo) {
-  const detalle = `${reclamo.prioridad}, origen ${reclamo.origenPrioridad}: ${reclamo.motivoPrioridad ?? 'sin motivo'}`
+/**
+ * @param esperaSegundos si la IA no respondió en el alta, cuánto se esperó la revisión por la cola
+ */
+export function revisarPrioridad(reclamo, { esperaSegundos } = {}) {
+  const porLaCola =
+    esperaSegundos === undefined ? '' : ` (la IA no respondió en el alta; se esperó su revisión ${esperaSegundos} s)`
+  const detalle =
+    `${reclamo.prioridad}, origen ${reclamo.origenPrioridad}: ${reclamo.motivoPrioridad ?? 'sin motivo'}${porLaCola}`
   switch (reclamo.origenPrioridad) {
     case 'IA':
     case 'CATEGORIA':
@@ -271,6 +288,12 @@ export function revisarPrioridad(reclamo) {
         FALLA,
         `${detalle}. El servicio de IA no respondió: revisar GEMINI_API_KEY en .env o usar ` +
           'PRIORIDAD_IA_PROVEEDOR=simulado',
+      ]
+    case 'PENDIENTE_IA':
+      return [
+        FALLA,
+        `${detalle}. La IA todavía no lo revisó: mirar en RabbitMQ que la cola reclamos.prioridad tenga ` +
+          'consumidor y los logs del backend',
       ]
     default:
       return [FALLA, `${detalle}. El backend no está usando la estrategia ia`]
@@ -307,6 +330,17 @@ async function esperarCorreos(http, config, numero) {
     const correos = (buzon.messages ?? []).filter((correo) => (correo.Subject ?? '').includes(numero))
     if (correos.length > 0 || Date.now() >= limite) {
       return correos
+    }
+    await new Promise((listo) => setTimeout(listo, config.intervaloMs))
+  }
+}
+
+async function esperarRevisionIA(http, config, numero) {
+  const limite = Date.now() + config.esperaIaMs
+  for (;;) {
+    const reclamo = await http.json(`${config.backendUrl}/api/reclamos/${numero}`)
+    if (reclamo.origenPrioridad !== 'PENDIENTE_IA' || Date.now() >= limite) {
+      return reclamo
     }
     await new Promise((listo) => setTimeout(listo, config.intervaloMs))
   }

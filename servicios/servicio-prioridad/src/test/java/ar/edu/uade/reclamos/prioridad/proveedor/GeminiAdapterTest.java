@@ -58,6 +58,7 @@ class GeminiAdapterTest {
                 .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
                 .andExpect(jsonPath("$.generationConfig.responseSchema.properties.prioridad.enum[3]")
                         .value("CRITICA"))
+                .andExpect(jsonPath("$.generationConfig.thinkingConfig").doesNotExist())
                 .andRespond(withSuccess(respuesta(
                         "{\\\"prioridad\\\": \\\"CRITICA\\\", \\\"motivo\\\": \\\"Riesgo eléctrico.\\\"}"),
                         MediaType.APPLICATION_JSON));
@@ -65,6 +66,28 @@ class GeminiAdapterTest {
         assertThat(gemini.sugerir(CONSULTA)).isEqualTo(new RespuestaIA("CRITICA", "Riesgo eléctrico."));
         assertThat(gemini.nombre()).isEqualTo("gemini");
         assertThat(gemini.modelo()).isEqualTo("gemini-3.5-flash-lite");
+    }
+
+    @Test
+    void conNivelDeRazonamientoLoMandaEnThinkingConfig() {
+        RestClient.Builder http = RestClient.builder().baseUrl("https://gemini.test");
+        MockRestServiceServer otro = MockRestServiceServer.bindTo(http).build();
+        GeminiAdapter rapido = new GeminiAdapter(http.build(), "clave-de-prueba", "gemini-3.5-flash-lite",
+                new ObjectMapper(), "minimal");
+        otro.expect(requestTo(URL))
+                .andExpect(jsonPath("$.generationConfig.thinkingConfig.thinkingLevel").value("minimal"))
+                .andExpect(jsonPath("$.generationConfig.responseMimeType").value("application/json"))
+                .andRespond(withSuccess(respuesta("{\\\"prioridad\\\": \\\"MEDIA\\\", \\\"motivo\\\": \\\"Sin riesgo.\\\"}"),
+                        MediaType.APPLICATION_JSON));
+
+        assertThat(rapido.sugerir(CONSULTA)).isEqualTo(new RespuestaIA("MEDIA", "Sin riesgo."));
+        otro.verify();
+    }
+
+    @Test
+    void unNivelDeRazonamientoDesconocidoNoArranca() {
+        assertThatThrownBy(() -> new GeminiAdapter(RestClient.create(), "c", "m", new ObjectMapper(), "altisimo"))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("altisimo");
     }
 
     @Test

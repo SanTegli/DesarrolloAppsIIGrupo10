@@ -118,8 +118,9 @@ Para que el backend lo use, se arranca el backend con `RECLAMOS_PRIORIDAD_ESTRAT
 | --- | --- | --- |
 | `server.port` | `8082` | Puerto HTTP |
 | `prioridad.ia.proveedor` | `gemini` | `gemini`, `openai` o `simulado` |
-| `prioridad.ia.tiempo-limite` | `5s` | Cuánto se espera al proveedor; después responde 504 |
+| `prioridad.ia.tiempo-limite` | `9s` | Cuánto se espera al proveedor; después responde 504. El backend espera 4 s en el alta y 10 s en la revisión por la cola |
 | `prioridad.ia.gemini.modelo` | `gemini-3.5-flash-lite` | Modelo de Gemini; se cambia con `GEMINI_MODELO` |
+| `prioridad.ia.gemini.razonamiento` | `minimal` | Cuánto razona Gemini antes de responder (`minimal`, `low`, `medium` o `high`); va en `thinkingConfig.thinkingLevel`. Se cambia con `GEMINI_RAZONAMIENTO`. Clasificar una prioridad no necesita más, y `minimal` es el más rápido |
 | `prioridad.ia.openai.modelo` | `gpt-5.4-mini` | Modelo de OpenAI; se cambia con `OPENAI_MODELO` |
 | `prioridad.ia.instrucciones` | `classpath:instrucciones-prioridad.txt` | Criterios para el modelo; se pueden ajustar sin tocar código |
 
@@ -140,7 +141,7 @@ casos en que la IA puso menos prioridad de la esperada, los tiempos y la tabla d
 minutos. No necesita Maven: Java 21 ejecuta el archivo directamente.
 
 Todas las cifras son sobre los 25 casos: uno sin respuesta válida (por ejemplo, un `504` porque Gemini tardó
-más de 5 s) cuenta como no acertado, y su tiempo entra en el percentil 95. Así una falla no mejora los
+más que `tiempo-limite`) cuenta como no acertado, y su tiempo entra en el percentil 95. Así una falla no mejora los
 porcentajes ni esconde la latencia.
 
 Para recalcular los totales de una corrida anterior sin volver a llamar a Gemini (por ejemplo, si cambia el

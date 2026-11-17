@@ -118,3 +118,8 @@ UPDATE usuarios SET telefono_verificado = '+5491100000001', fecha_verificacion_t
 WHERE id = 1 AND tipo = 'CIUDADANO' AND telefono_verificado IS NULL;
 UPDATE usuarios SET telefono_verificado = '+5491100000002', fecha_verificacion_telefono = '2026-01-01 00:00:00'
 WHERE id = 2 AND tipo = 'CIUDADANO' AND telefono_verificado IS NULL;
+
+-- PR 24: el origen de la prioridad suma PENDIENTE_IA. En MySQL, Hibernate crea los enums como ENUM(...) y
+-- ddl-auto update no agrega valores a una columna que ya existe: sin esto, una base anterior rechazaría el
+-- valor nuevo. Como texto entra cualquier origen sin migrar; repetirlo en cada arranque no cambia nada.
+ALTER TABLE reclamos MODIFY COLUMN origen_prioridad VARCHAR(16) NULL;
