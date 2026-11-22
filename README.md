@@ -16,8 +16,6 @@ El repositorio tiene las tres etapas del trabajo práctico:
 - **Integrador:** login, foto, posibles duplicados y apoyos, tableros, los
   [requerimientos](docs/requerimientos.md) (incluidos los de la IA) y la prueba de carga básica.
 
-Cada PR está en el [plan de trabajo](#plan-de-trabajo-de-la-segunda-parte).
-
 ## Estructura
 
 ```text
@@ -35,7 +33,7 @@ servicios/                  Servicios de integración de la Segunda Parte, cada 
   servicio-cobertura/       SOAP: qué áreas de cada municipio atienden cada categoría (WSDL en el puerto 8081)
   servicio-prioridad/       REST 2: prioridad sugerida por IA con Gemini (Swagger en el puerto 8082)
   servicio-notificaciones/  Consumidor de RabbitMQ: manda los avisos por correo (Mailpit)
-docs/                       Requerimientos, arquitectura, patrones, contratos, despliegue, demo y evidencias
+docs/                       Requerimientos, arquitectura, patrones, contratos, despliegue y evidencias
   contratos/                Contratos de integración: XSD de SOAP, OpenAPI de REST 2 y mensajes
   openapi/                  Contrato OpenAPI de REST 1, generado del código
 scripts/                    Verificación de la demo de punta a punta y prueba de carga (Node, sin dependencias);
@@ -167,7 +165,7 @@ docker compose run --rm verificar-demo
 ```
 
 Crea un reclamo de prueba y sigue su recorrido por Georef, la IA, el servicio SOAP, RabbitMQ y el correo en
-Mailpit. El [guion de la demo](docs/demo.md) tiene el recorrido para presentar y la matriz de fallos.
+Mailpit. La matriz de fallos está en [despliegue](docs/despliegue.md#matriz-de-fallos).
 
 Para la prueba de carga básica (20 usuarios simultáneos leyendo durante 30 s, sin crear reclamos):
 
@@ -293,47 +291,6 @@ Una clave desconocida dentro de `reclamos` (por ejemplo `vencimiento` en singula
 - [Contrato REST](docs/api-contract.md): endpoints, objetos, errores y datos semilla.
 - [Contratos de integración](docs/contratos/README.md): SOAP, REST 2 y mensajes de la Segunda Parte, con el
   [flujo de mensajes](docs/contratos/mensajes.md#topología) de RabbitMQ.
-- [Despliegue](docs/despliegue.md): contenedores, puertos, arranque, memoria y configuración.
-- [Guion de la demo](docs/demo.md): recorrido para presentar, fallas a propósito, matriz de fallos y
-  verificación automática.
+- [Despliegue](docs/despliegue.md): contenedores, puertos, arranque, memoria, configuración y matriz de fallos.
 - [Evidencias](docs/evidencias/README.md): cómo demostrar cada caso, capturas de la interfaz,
-  [evaluación de la IA](docs/evidencias/ia-evaluacion.md), [prueba de carga](docs/evidencias/prueba-carga.md)
-  y lo pendiente antes de entregar.
-- [Instructivo para Windows](README_INSTRUCTIVO.md): instalación y ejecución paso a paso.
-
-## Plan de trabajo del Hito 1
-
-| PR | Rama | Contenido |
-| --- | --- | --- |
-| 1 | `feature/01-domain-foundation` | Estructura, dominio, reglas, Factory y contratos |
-| 2 | `feature/02-persistence-repositories` | Persistencia JPA, MySQL y datos semilla |
-| 3 | `feature/03-services-rest` | Servicios, Strategy, Observer, Facade y API REST |
-| 4 | `feature/04-frontend-integration` | React, integración, documentación y Docker |
-| 5 | `feature/05-hito1-fixes` | Servicios de asignación, notificaciones y vencimientos; auditoría |
-| 6 | `feature/06-ci-docs` | Integración continua, modelo de dominio e instructivo |
-| 7 | `feature/07-avisos-config` | Bandeja de avisos y configuración de vencimientos validada |
-
-## Plan de trabajo de la Segunda Parte
-
-| PR | Rama | Contenido |
-| --- | --- | --- |
-| 8 | `feature/08-base-segunda-entrega` | OpenAPI de REST 1, puntos de entrada para las integraciones, bloqueo optimista, contratos y correcciones de documentación |
-| 9 | `feature/09-soap-cobertura` | Servicio SOAP de cobertura (WSDL, catálogo, faults) y su cliente `CoberturaSoap` con modo degradado |
-| 10 | `feature/10-ia-prioridad` | Servicio de prioridad con IA (REST 2): adaptadores de Gemini, OpenAI y simulado, respaldo por categoría y circuit breaker |
-| 11 | `feature/11-geocodificacion` | Geocodificación con Georef: búsqueda de la dirección, elección de la sugerencia en el alta, enlace a Google Maps y caché |
-| 12 | `feature/12-mensajeria-correo` | RabbitMQ, outbox, consumidor idempotente con reintentos y cola de errores, y Mailpit |
-| 13 | `feature/13-integracion-demo` | Compose con orden de arranque, chequeos de salud y memoria acotada; verificación de punta a punta en el CI; diagrama de componentes UML, secuencia completa, guion de demo y matriz de fallos |
-| 14 | `feature/14-login` | Login con sesión del servidor y CSRF (Spring Security), registro de ciudadanos, contraseñas con BCrypt y pantalla de ingreso; se elimina `X-Usuario-Id` |
-| 15 | `feature/15-verificacion-reaperturas` | Teléfono verificado por Telegram (un número, una cuenta) con modo simulado, límites de uso, bloqueo de cuentas por el administrador y reaperturas con motivo, una vez y dentro de 7 días |
-| 16 | `feature/16-foto` | Foto obligatoria en el alta (multipart): JPEG o PNG validados por contenido, re-codificados sin EXIF, guardados en un volumen y servidos con los permisos del detalle |
-| 17 | `feature/17-duplicados-apoyos` | Posibles duplicados en el alta (misma categoría, a menos de 50 m, con Haversine) y apoyos únicos por ciudadano, sin datos del autor |
-| 18 | `feature/18-dashboards` | Tablero público (sin sesión ni datos personales) y de gestión (vencidos por fecha y tabla por área y barrio), con consultas agregadas en un puerto de lectura propio |
-| 19 | `feature/19-cierre` | Requerimientos funcionales y no funcionales (con los de la IA y su verificación), metas en la evaluación de la IA, prueba de carga básica en el CI, diagramas de componentes y despliegue al día, acceso local y remoto, y capturas nuevas de la interfaz |
-| 20 | `feature/20-consistencia` | Revisión completa contra el TP: metas de la IA sobre los 25 casos (con `--rehacer`), requerimientos corregidos (rechazo, cancelación, límites), diagramas de capas, proceso de negocio, secuencias del alta y flujo de mensajes al día, CP69 de acceso local y remoto, y campos obligatorios en el OpenAPI de REST 2 |
-| 21 | `feature/21-capturas-evidencias` | Script de Playwright que saca las capturas del sistema real (interfaz, Swagger de REST 2, WSDL, Mailpit y RabbitMQ) con su índice de casos, y paso a paso de las evidencias a mano en la sección 15 del instructivo |
-| 22 | `evidencias/sistema-real` | Capturas y salidas del sistema real (`docs/evidencias/sistema-real/`) |
-| 23 | `mejora/interfaz` | Rediseño de la interfaz |
-| 24 | `feature/24-ia-asincronica` | IA híbrida: el alta espera 4 s y, si la IA no llega, el reclamo queda `PENDIENTE_IA` y se revisa por la cola `reclamos.prioridad` con reintentos sin bloquear (cola de espera con TTL). La IA sube o mantiene, nunca baja; avisa si cambió. Gemini con razonamiento `minimal` y el detalle se actualiza solo |
-| 25 | `feature/25-municipios` | Municipios en vez de barrios: Quilmes, Avellaneda y Berazategui, cada uno con sus áreas. Georef busca la dirección en todos y la sugerencia elegida define el municipio; en el alta, `GET /ubicacion` confirma el partido. Lista de municipios si el mapa no responde. SOAP v2 por municipio y categoría. Semilla `datos-dev-v2` |
-| 26 | `feature/26-otro-problema` | Cinco categorías nuevas, entre ellas "Otro problema": el vecino escribe qué tipo de problema es, la IA sugiere una categoría existente por la cola `reclamos.categoria` (REST 2 `POST /api/categorias/sugerir`) y un administrador recategoriza con `PATCH /api/reclamos/{numero}/categoria`; el reclamo se asigna solo y el vecino recibe un aviso. Semilla en un bloque aparte, sin borrar la base |
-| 27 | `feature/27-duplicados-ia` | Duplicados comparados por la IA: el alta manda la descripción y REST 2 (`POST /api/duplicados/comparar`) compara solo textos de los reclamos abiertos a 50 m de cualquier categoría, sin fotos. El más parecido va primero y marcado. "Asociarme" apoya el reclamo y desde ahí el vecino recibe sus avisos (quinto observador) |
+  [evaluación de la IA](docs/evidencias/ia-evaluacion.md) y [prueba de carga](docs/evidencias/prueba-carga.md).

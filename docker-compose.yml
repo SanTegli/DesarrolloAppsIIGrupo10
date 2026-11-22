@@ -124,7 +124,7 @@ services:
     build: ./backend
     container_name: reclamos-backend
     # Espera a que los servicios estén listos: así el primer reclamo de la demo ya pasa por la IA y el SOAP.
-    # Si uno se cae después, el backend sigue andando con su respaldo (docs/demo.md, matriz de fallos).
+    # Si uno se cae después, el backend sigue andando con su respaldo (docs/despliegue.md, matriz de fallos).
     depends_on:
       mysql:
         condition: service_healthy

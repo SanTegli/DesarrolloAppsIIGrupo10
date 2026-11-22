@@ -50,8 +50,7 @@ Los usuarios, municipios, categorías y áreas son los de la semilla (ver
 
 ### Segunda Parte: servicio SOAP de cobertura
 
-Se reproducen con `docker compose up --build`, o con el servicio y el backend levantados a mano como
-explica [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md#probar-el-servicio-soap-de-cobertura).
+Se reproducen con `docker compose up --build`, o levantando el servicio SOAP y el backend por separado.
 
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
 | --- | --- | --- | --- |
@@ -63,7 +62,7 @@ explica [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md#probar-el-servicio-s
 
 ### Segunda Parte: prioridad con IA (REST 2)
 
-Necesitan `GEMINI_API_KEY` en `.env` (ver [README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md#probar-el-servicio-de-prioridad-con-ia)).
+Necesitan `GEMINI_API_KEY` en `.env`.
 Los tests automáticos nunca llaman a Gemini: simulan su API.
 
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
@@ -81,9 +80,6 @@ Para CP13, con el número del reclamo:
 ```sql
 UPDATE reclamos SET fecha_limite = NOW() - INTERVAL 1 DAY WHERE numero = 'REC-XXXXXXXX';
 ```
-
-Los casos "solo por API" se prueban con los comandos de PowerShell de
-[README_INSTRUCTIVO.md](../../README_INSTRUCTIVO.md).
 
 ### Segunda Parte: ubicación con Georef (API externa)
 
@@ -122,7 +118,7 @@ RabbitMQ y Mailpit como servicios; en una máquina sin las variables `RABBITMQ_H
 
 | Caso | Qué demuestra | Test que lo cubre | Cómo reproducirlo |
 | --- | --- | --- | --- |
-| CP32 | Cada aviso deja un mensaje en la outbox, en la misma transacción que el alta | `OutboxIntegrationTest.elAltaDejaUnMensajePendientePorCadaAvisoConElContrato`, `OutboxIntegrationTest.siElAltaFallaNoQuedaNingunMensaje` | Crear un reclamo y consultar `mensajes_salientes` (ver README_INSTRUCTIVO) |
+| CP32 | Cada aviso deja un mensaje en la outbox, en la misma transacción que el alta | `OutboxIntegrationTest.elAltaDejaUnMensajePendientePorCadaAvisoConElContrato`, `OutboxIntegrationTest.siElAltaFallaNoQuedaNingunMensaje` | Crear un reclamo y consultar `mensajes_salientes` en MySQL |
 | CP33 | El aviso llega como correo | `FlujoCorreoIntegrationTest.unAvisoPublicadoLlegaComoCorreoYElRepetidoNoSeManda`, `PublicacionRabbitIntegrationTest`, `CorreoSmtpTest` | Crear un reclamo y abrir Mailpit en `http://localhost:8025` |
 | CP34 | Un mensaje repetido no manda dos correos | `ProcesadorAvisosTest.unMensajeRepetidoNoSeVuelveAMandar`, `FlujoCorreoIntegrationTest` | En la consola de RabbitMQ, publicar dos veces el mismo mensaje en `reclamos.eventos`: llega un solo correo |
 | CP35 | Con RabbitMQ caído el alta sigue; el mensaje espera y sale cuando vuelve | `OutboxIntegrationTest.conElBrokerCaidoLosMensajesEsperanYSalenCuandoVuelve`, `PublicadorMensajesTest.siElBrokerFallaElMensajeQuedaPendienteConElErrorYSeCortaLaPasada` | `docker compose stop rabbitmq`, crear un reclamo (201) y ver el mensaje `PENDIENTE`; `docker compose start rabbitmq` y pasa a `PUBLICADO` |
@@ -130,14 +126,14 @@ RabbitMQ y Mailpit como servicios; en una máquina sin las variables `RABBITMQ_H
 
 ### Segunda Parte: demo completa
 
-Un solo reclamo atraviesa las cinco integraciones del alta (Georef, IA, SOAP, RabbitMQ y correo); Telegram se prueba aparte, en CP49. El guion para presentarlo y la matriz de fallos están en
-[demo.md](../demo.md).
+Un solo reclamo atraviesa las cinco integraciones del alta (Georef, IA, SOAP, RabbitMQ y correo); Telegram se prueba aparte, en CP49. La matriz de fallos está en
+[despliegue.md](../despliegue.md#matriz-de-fallos).
 
 | Caso | Qué demuestra | Cómo se comprueba | Cómo reproducirlo |
 | --- | --- | --- | --- |
 | CP37 | `docker compose up --build` levanta los ocho contenedores en orden y quedan sanos | Trabajo «Demo completa» del CI, paso «Construir y levantar los ocho contenedores» | `docker compose up --build` y `docker compose ps` |
 | CP38 | Un reclamo pasa por Georef, la IA, el SOAP, RabbitMQ y llega como correo | `scripts/verificar-demo.mjs`, en el mismo trabajo del CI (con el proveedor simulado de IA) | `docker compose run --rm verificar-demo`: termina con `0 fallas` |
-| CP39 | Cada pieza que falla tiene su respaldo y el alta no se traba | Los tests de la [matriz de fallos](../demo.md#matriz-de-fallos) | Las fallas a propósito del guion, con `docker compose stop` y `start` |
+| CP39 | Cada pieza que falla tiene su respaldo y el alta no se traba | Los tests de la [matriz de fallos](../despliegue.md#matriz-de-fallos) | Detener cada servicio con `docker compose stop` y volverlo a levantar con `start` |
 | CP40 | Los ocho contenedores entran en la memoria de una notebook | Paso «Memoria de cada contenedor» del CI | `docker stats --no-stream` con la demo levantada |
 
 ### Segunda Parte: login con sesión
@@ -288,40 +284,3 @@ para seguir el recorrido.
 | `21` y `22`: tableros | CP63, CP65 |
 | `23` a `27`: Swagger de REST 2 con Gemini, WSDL, Mailpit y RabbitMQ | CP16, CP22, CP33, CP36 |
 | `28` a `30`: "Otro problema", la sugerencia de la IA y la recategorización (PR 26) | CP73, CP74 |
-
-## Pendiente antes de entregar
-
-Todo con el sistema real levantado (`docker compose up --build`, con la clave de Gemini en `.env`). Los
-archivos van en `sistema-real/`. El paso a paso, con los comandos, está en la sección 15 del
-[instructivo](../../README_INSTRUCTIVO.md#15-evidencias-del-sistema-real).
-
-**Con el script de capturas** (las automáticas de la tabla anterior):
-
-- [x] Correr `capturas-evidencias.mjs` y commitear `sistema-real/` con `indice.md`, sin secciones con fallas.
-
-**A mano:**
-
-- [x] `m01-backend-mvnw-test.txt`: salida de `./mvnw test` en `backend/` con `BUILD SUCCESS`.
-- [x] `m02-servicios-mvnw-verify.txt`: salida de `./mvnw verify` en `servicios/` con `BUILD SUCCESS`.
-- [x] `m03-frontend-npm-test.txt`: salida de `npm test`.
-- [x] `m04-verificar-demo.txt`: `docker compose run --rm verificar-demo` con la clave de Gemini, sin fallas (CP38).
-- [x] `m05-docker-stats.txt`: `docker stats --no-stream` con la demo levantada (CP40).
-- [x] `m06-sql-flujo.png`: consulta SQL de `reclamos`, `historial_estados` y `notificaciones` del reclamo de las capturas `12` a `15` (CP11).
-- [x] `m07-estrategias.png`: con el backend a mano, un reclamo con "peligro" en `ALTA` por `palabras-clave` y dos baches repartidos por `carga-trabajo` (CP04 y CP05).
-- [x] `m08-log-auditoria.txt`: líneas del logger `auditoria` y de `TareaVencimientos` (CP07 y CP13).
-- [x] `m09-soap-consulta.png`: una consulta SOAP con su respuesta y un Fault por id inválido (CP17 y CP19).
-- [x] `m10-asignacion-pendiente.png`: detalle de un reclamo creado con `servicio-cobertura` detenido (CP20).
-- [x] `m11-outbox.png`: `mensajes_salientes` con un mensaje `PENDIENTE` con RabbitMQ detenido, y después `PUBLICADO` (CP35).
-- [x] `m12-cola-errores.png`: la cola de errores con un mensaje (CP36).
-- [x] `m13-fotos-volumen.txt`: contenido de `/data/fotos` en el contenedor del backend (CP56).
-- [x] `m14-telegram.png`: el chat con el bot real y la pantalla que pasa al formulario (CP49).
-- [x] `m15-numero-repetido.png`: un número ya verificado en otra cuenta se rechaza (CP48).
-- [x] `m16-cobertura-local.png` y `m17-cobertura-soap.txt`: el mismo reclamo con cobertura local y con SOAP, y el log de `servicio-cobertura` (CP69).
-- [x] `m18-respuestas-api.txt`: respuestas `400`, `403`, `404` y `409` de los casos "solo por API".
-- [x] `m19-tablero-cuenta-a-mano.png`: la consulta SQL que cuenta los reclamos por estado, al lado del tablero público (CP63).
-- [ ] Grabar el recorrido del guion de [demo.md](../demo.md) una vez, por si el día de la demo falla algo externo (fuera del repositorio).
-
-**Ya hechas:**
-
-- [x] Correr `EvaluarPrioridades.java` con la clave y commitear `ia-evaluacion.md` (CP25).
-- [x] Correr la prueba de carga con la demo levantada en la notebook de la presentación y commitear `prueba-carga.md` (CP68).

@@ -26,7 +26,7 @@ const VALORES_POR_DEFECTO = {
   tiempoLimiteMs: 10000,
 }
 
-// Datos de la semilla de desarrollo (README_INSTRUCTIVO, sección 9).
+// Datos de la semilla de desarrollo (datos-dev.sql).
 export const RECLAMO_DE_PRUEBA = {
   correoCiudadano: 'ana@example.org',
   contrasena: 'demo1234',

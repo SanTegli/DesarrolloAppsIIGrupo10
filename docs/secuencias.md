@@ -163,7 +163,7 @@ Responsibility: ver [patrones](patrones.md#chain-of-responsibility-propia-contro
 La secuencia anterior muestra las clases del backend. Esta muestra los procesos, tal como corre en la demo
 (`docker compose up`): el mismo reclamo pasa por Georef, la IA, el servicio SOAP y RabbitMQ hasta llegar como
 correo. La sexta integración, Telegram, no está en el alta: se usa antes, una sola vez, para verificar el
-teléfono (ver [Teléfono verificado con Telegram](arquitectura.md#teléfono-verificado-con-telegram-segunda-api-externa)). Cada llamada externa tiene su respaldo; el detalle está en la [matriz de fallos](demo.md#matriz-de-fallos).
+teléfono (ver [Teléfono verificado con Telegram](arquitectura.md#teléfono-verificado-con-telegram-segunda-api-externa)). Cada llamada externa tiene su respaldo; el detalle está en la [matriz de fallos](despliegue.md#matriz-de-fallos).
 
 ```mermaid
 sequenceDiagram

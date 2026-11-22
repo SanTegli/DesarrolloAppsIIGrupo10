@@ -100,7 +100,7 @@ flowchart LR
 | `servicio-notificaciones`, `reclamos-mailpit` | Están corriendo | Sin chequeo propio: nadie espera por ellos para arrancar |
 
 Cada flecha va del contenedor que tiene que estar listo al que lo espera, y vale solo para el arranque. Si un servicio se cae después, el backend sigue andando con su respaldo
-(ver la [matriz de fallos](demo.md#matriz-de-fallos)).
+(ver la [matriz de fallos](#matriz-de-fallos)).
 
 **Memoria.** Cada servicio Java tiene un tope de heap en `JAVA_TOOL_OPTIONS`, con el recolector serial, que
 ocupa menos memoria que el predeterminado:
@@ -120,8 +120,7 @@ las siguientes las toman de la caché, aunque cambie el código.
 
 **Verificación.** `docker compose run --rm verificar-demo` corre `scripts/verificar-demo.mjs` en un contenedor
 de Node, dentro de la misma red: crea un reclamo y sigue su recorrido por las cinco integraciones del alta. Ese
-contenedor está en el perfil `verificacion`, así que `docker compose up` no lo levanta. El detalle está en
-[demo.md](demo.md#verificación-automática).
+contenedor está en el perfil `verificacion`, así que `docker compose up` no lo levanta.
 
 **Prueba de carga.** `docker compose run --rm -T prueba-carga` corre `scripts/prueba-carga.mjs` en otro
 contenedor de Node del mismo perfil: 20 usuarios simultáneos leyendo del backend durante 30 s, sin crear
@@ -180,3 +179,32 @@ y se arranca el backend con `RECLAMOS_COBERTURA_ORIGEN=soap`. Lo mismo con la IA
 
 En desarrollo el proxy de `/api` lo hace Vite; en la demo lo hace nginx. Para el navegador es lo
 mismo: siempre llama a `/api` en el origen de la interfaz.
+
+## Matriz de fallos
+
+Qué hace el sistema cuando falla cada pieza. La regla general: **el reclamo se crea siempre**, salvo que falle
+la base de datos.
+
+| Pieza que falla | Qué hace el sistema | Qué ve el usuario | Recuperación | Test que lo cubre |
+| --- | --- | --- | --- | --- |
+| Georef caído, lento o sin Internet | Corta a los 3 s y responde `disponible: false` | "El mapa no responde en este momento"; el reclamo se crea con la ubicación pendiente | Automática en la próxima búsqueda | `UbicacionesIntegrationTest.georefCaidoDevuelveNoDisponibleSinError` |
+| Georef no encuentra la dirección | Lista vacía | "No encontramos esa dirección"; se crea igual | - | `UbicacionesIntegrationTest.direccionInexistenteDevuelveListaVacia` |
+| Servicio de IA caído o sin clave | Prioridad de la categoría, origen `PENDIENTE_IA`, y pedido de revisión por la cola. Reintenta cada 20 s; después de 4 intentos queda `RESPALDO` | "por categoría (la IA lo está revisando)" y después "por categoría (la IA no respondió)" | Automática: si vuelve dentro del minuto, la IA completa la prioridad | `ReevaluacionPrioridadIntegrationTest.siLaIaSigueSinResponderReintentaYDespuesQuedaLaCategoria`, `PrioridadPorIAIntegrationTest.siLaIaFallaElReclamoSeCreaConLaPrioridadDeLaCategoria` (sin mensajería) |
+| Servicio de IA lento | El alta corta a los 4 s y deja el reclamo `PENDIENTE_IA`; la revisión por la cola espera hasta 10 s. Con varias fallas seguidas el circuit breaker deja de llamarlo un rato | "por categoría (la IA lo está revisando)"; el detalle se actualiza solo cuando la IA responde, y llega un aviso si la prioridad subió | El circuit breaker prueba de nuevo solo | `PrioridadPorIAIntegrationTest.siLaIaTardaElAltaNoEsperaMasQueElTiempoLimite`, `ReevaluacionPrioridadIntegrationTest.cuandoLaIaRespondeSubeLaPrioridadYAvisaAlVecinoYAlArea`, `ClienteServicioPrioridadTest.despuesDeVariasFallasElCircuitoSeAbreYNoVuelveALlamar` |
+| Gemini sin cuota (429) | El servicio responde 503: el reclamo queda `PENDIENTE_IA` y, si la cuota no vuelve en el minuto de reintentos, `RESPALDO` | Igual que caído | Esperar a que se renueve la cuota, o `PRIORIDAD_IA_PROVEEDOR=simulado` | `GeminiAdapterTest.cuotaAgotadaEsProveedorNoDisponible` |
+| Servicio SOAP caído o lento | Corta a los 2 s; el reclamo queda `INGRESADO` con la asignación pendiente | "Sin asignar: el servicio de cobertura no respondió" | La administradora lo asigna a mano | `AsignacionPorSoapIntegrationTest.servicioLentoDejaLaAsignacionPendienteSinTrabarElAlta` |
+| SOAP sin áreas para el pedido | El reclamo queda `INGRESADO`, como en el Hito 1 | "Sin asignar" | Asignación manual | `AsignacionPorSoapIntegrationTest.listaVaciaDejaElReclamoIngresadoSinMarcarlo` |
+| RabbitMQ caído | El mensaje queda `PENDIENTE` en la outbox; el publicador reintenta cada 2 s | Nada: el aviso interno ya está | Automática: sale cuando vuelve | `OutboxIntegrationTest.conElBrokerCaidoLosMensajesEsperanYSalenCuandoVuelve` |
+| Servicio de notificaciones caído | Los mensajes esperan en la cola durable | Nada; el correo llega tarde | Automática al levantarlo | Cola durable en `TopologiaRabbitTest` |
+| SMTP caído | Tres intentos (1 s y 2 s de espera) y después a la cola de errores | Nada; ese correo no llega | Revisar la cola de errores a mano | `ConfiguracionReintentosTest`, `FlujoCorreoIntegrationTest` |
+| Mensaje repetido | El consumidor lo descarta por su `eventId` | Un solo correo | - | `ProcesadorAvisosTest.unMensajeRepetidoNoSeVuelveAMandar` |
+| Mensaje inválido | Va directo a la cola de errores, sin reintentos | Nada | Revisarlo a mano | `FlujoCorreoIntegrationTest.unMensajeInvalidoTerminaEnLaColaDeErroresSinReintentos` |
+| Pedido de revisión de prioridad repetido o inválido | Repetido: se confirma sin llamar a la IA, porque el reclamo ya no está pendiente. Inválido: a `reclamos.prioridad.dlq` | Nada | - | `ReevaluacionPrioridadIntegrationTest.unPedidoRepetidoNoVuelveALlamarNiAvisa`, `ListenerReevaluacionPrioridadTest.unPedidoIlegibleOConOtraVersionVaALaColaDeErrores` |
+| Sugerencia de categoría ("Otro problema") sin respuesta o inválida | Se pide por la cola `reclamos.categoria` y reintenta cada 20 s hasta 4 veces; si sigue fallando queda sin sugerencia | El administrador recategoriza igual eligiendo la categoría de la lista | Automática en los reintentos, o elección manual del administrador | `SugerenciaCategoriaIntegrationTest`, `ListenerSugerenciaCategoriaTest` |
+| Comparación de duplicados con IA caída o lenta | Corta y usa el respaldo geométrico: muestra los reclamos abiertos a 50 m de la misma categoría | Aparecen igual los candidatos cercanos de la misma categoría | Automática en la próxima consulta | `DuplicadosConIAIntegrationTest.siLaIaFallaQuedanLosDeLaMismaCategoria` |
+| Telegram caído o sin Internet (modo `telegram`) | El bot registra el error y vuelve a consultar cada 2 s, desde la misma actualización | El código sigue vigente 10 minutos; la pantalla espera la confirmación | Automática al volver. Plan B: `RECLAMOS_TELEGRAM_MODO=simulado` y reiniciar el backend | `BotTelegramTest.siTelegramFallaNoSeCaeYVuelveAPedirDesdeElMismoPunto` |
+| Disco del volumen de fotos lleno o sin permisos | La foto no se puede guardar: el alta responde `500` y no se crea el reclamo. Si falla después del alta (al confirmar), el reclamo queda creado sin foto visible y el error queda en el log | Error al crear, o "Este reclamo no tiene foto" | Liberar espacio en el volumen `reclamos-fotos` | `AlmacenFotosLocalTest`, `GestionReclamosFacadeTest.siElAltaFallaLaFotoPendienteSeDescartaYElErrorSigue` |
+| MySQL caído | Sin respaldo: es la base del sistema. Las operaciones responden error | Mensaje de error en la interfaz | `docker compose start mysql`; los datos están en el volumen | - |
+
+Los tiempos límite suman como máximo unos 6 segundos dentro del alta (4 de la IA y 2 del SOAP). Georef y la
+comparación de duplicados se consultan antes, fuera del alta.
