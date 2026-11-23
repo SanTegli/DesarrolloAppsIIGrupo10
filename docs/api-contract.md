@@ -623,17 +623,13 @@ viejo. Cada usuario ve solo los suyos; no hay filtros.
     "canal": "INTERNO",
     "mensaje": "Tu reclamo REC-4F2A91BC fue asignado al area Alumbrado.",
     "fechaEnvio": "2026-10-05T10:00:00",
-    "abrible": true,
-    "seguimiento": false
+    "abrible": true
   }
 ]
 ```
 
-Sin avisos devuelve `[]`. Sin sesión, `401`. Si `abrible` y `seguimiento` son verdaderos, el aviso abre
-`GET /api/reclamos/{numero}/seguimiento`. Ese endpoint devuelve estado, categoría, descripción, foto e historial
-de estados y fechas. La foto se sirve por `GET /api/reclamos/{numero}/seguimiento/foto`. Ambos endpoints
-requieren un apoyo vigente y devuelven `403` cuando se retira. El detalle habitual y sus acciones conservan
-los permisos del titular y del personal autorizado.
+Sin avisos devuelve `[]`. Sin sesión, `401`. `abrible` (PR 27) es `false` en los avisos de un reclamo ajeno que
+el vecino apoya: los lee, pero el detalle sigue siendo del autor, y la interfaz no ofrece abrirlo.
 
 ## Tableros
 
@@ -756,10 +752,7 @@ para elegir a mano cuando el mapa no responde o el vecino no elige ninguna direc
 [
   { "id": 1, "nombre": "Quilmes", "provincia": "Buenos Aires" },
   { "id": 2, "nombre": "Avellaneda", "provincia": "Buenos Aires" },
-  { "id": 3, "nombre": "Berazategui", "provincia": "Buenos Aires" },
-  { "id": 4, "nombre": "Comuna 13", "provincia": "Ciudad Autónoma de Buenos Aires" },
-  { "id": 5, "nombre": "Comuna 14", "provincia": "Ciudad Autónoma de Buenos Aires" },
-  { "id": 6, "nombre": "San Isidro", "provincia": "Buenos Aires" }
+  { "id": 3, "nombre": "Berazategui", "provincia": "Buenos Aires" }
 ]
 ```
 
@@ -832,9 +825,6 @@ es por municipio (`datos-dev-v2`): una base anterior se borra una vez con `docke
 | 1 | Quilmes | Buenos Aires |
 | 2 | Avellaneda | Buenos Aires |
 | 3 | Berazategui | Buenos Aires |
-| 4 | Comuna 13 | Ciudad Autónoma de Buenos Aires |
-| 5 | Comuna 14 | Ciudad Autónoma de Buenos Aires |
-| 6 | San Isidro | Buenos Aires |
 
 Las categorías 4 a 8 son del PR 26. Van en un bloque aparte de la semilla, con su propia marca
 (`categorias-pr26`): una base del PR 25 las recibe al arrancar, sin borrarla.
@@ -861,15 +851,6 @@ Las categorías 4 a 8 son del PR 26. Van en un bloque aparte de la semilla, con 
 | 7 | Alumbrado | Berazategui | Luminaria rota, Semáforo averiado |
 | 8 | Obras Públicas | Berazategui | Bache, Pérdida de agua, Vereda rota |
 | 9 | Higiene Urbana | Berazategui | Residuos, Árbol caído o con riesgo |
-| 10 | Alumbrado | Comuna 13 | Luminaria rota, Semáforo averiado |
-| 11 | Obras Públicas | Comuna 13 | Bache, Pérdida de agua, Vereda rota |
-| 12 | Higiene Urbana | Comuna 13 | Residuos, Árbol caído o con riesgo |
-| 13 | Alumbrado | Comuna 14 | Luminaria rota, Semáforo averiado |
-| 14 | Obras Públicas | Comuna 14 | Bache, Pérdida de agua, Vereda rota |
-| 15 | Higiene Urbana | Comuna 14 | Residuos, Árbol caído o con riesgo |
-| 16 | Alumbrado | San Isidro | Luminaria rota, Semáforo averiado |
-| 17 | Obras Públicas | San Isidro | Bache, Pérdida de agua, Vereda rota |
-| 18 | Higiene Urbana | San Isidro | Residuos, Árbol caído o con riesgo |
 
 "Otro problema" no la atiende ningún área.
 

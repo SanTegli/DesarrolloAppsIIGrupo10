@@ -187,8 +187,8 @@ La conexión de `dev` se puede cambiar sin tocar archivos con las variables `DB_
 
 En `dev`, Hibernate actualiza el esquema y luego se ejecuta
 `reclamos-persistencia/src/main/resources/db/datos-dev.sql`. La semilla respeta los IDs de
-`docs/api-contract.md`: seis jurisdicciones (Quilmes, Avellaneda, Berazategui, Comuna 13, Comuna 14 y San Isidro),
-ocho categorías, dieciocho áreas y ocho usuarios. Desde el PR 25 no hay barrios: una base creada antes se borra una vez con
+`docs/api-contract.md`: tres municipios (Quilmes, Avellaneda y Berazategui), ocho categorías (desde el PR 26,
+con "Otro problema"), nueve áreas y ocho usuarios. Desde el PR 25 no hay barrios: una base creada antes se borra una vez con
 `docker compose down -v`. La tabla técnica `inicializaciones` registra el marcador `datos-dev-v2` al terminar la primera
 ejecución. Los siguientes arranques no restauran datos ni relaciones eliminadas o modificadas.
 Esta tabla se usa únicamente para inicializar datos de desarrollo; una base nueva vuelve a cargar
