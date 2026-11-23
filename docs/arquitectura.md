@@ -908,9 +908,7 @@ una tabla proyectada desde los eventos de dominio sin tocar el servicio ni la in
 - **Fotos en un solo disco.** El almacén local no se replica: con dos instancias del backend haría falta un
   almacén compartido (otra implementación de `AlmacenFotos`). Un reclamo borrado de la base deja su foto.
 - **Duplicados solo con el punto en el mapa.** Un reclamo sin la ubicación confirmada no se compara ni
-  aparece como candidato. Tampoco se comparan textos ni fotos.
-- **Apoyos sin aviso.** El autor ve cuántos vecinos apoyan su reclamo en el detalle, pero no recibe un aviso
-  cuando alguien lo apoya.
+  aparece como candidato. La IA compara categoría y descripción. Las fotos se muestran en las tarjetas para la decisión del vecino.
 - **Tableros sin historia.** El público dice cuántos reclamos hay hoy en cada estado, no cuántos había en una
   fecha pasada. Tampoco hay gráficos ni mapas: tarjetas y una tabla.
 - **Listados sin paginar.** Los filtros se aplican en memoria sobre los reclamos visibles.

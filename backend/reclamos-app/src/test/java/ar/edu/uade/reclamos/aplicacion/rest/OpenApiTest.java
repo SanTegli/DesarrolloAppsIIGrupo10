@@ -45,6 +45,7 @@ class OpenApiTest {
                 "/api/ubicaciones/sugerencias", "/api/auth/login", "/api/auth/registro", "/api/auth/yo",
                 "/api/auth/logout", "/api/verificacion-telefono", "/api/verificacion-telefono/simulada",
                 "/api/usuarios/{id}/bloqueo", "/api/reclamos/{numero}/foto",
+                "/api/reclamos/{numero}/seguimiento", "/api/reclamos/{numero}/seguimiento/foto",
                 "/api/reclamos/candidatos-duplicados", "/api/reclamos/{numero}/apoyo",
                 "/api/dashboard/publico", "/api/dashboard/gestion");
         assertThat(contrato.at("/components/schemas/ErrorResponse/properties").has("codigo")).isTrue();

@@ -4,6 +4,7 @@ import { alVencerSesion } from './api/cliente.js'
 import { cerrarSesion, usuarioActual } from './api/sesion.js'
 import { AvisoError, AvisoExito } from './componentes/Aviso.jsx'
 import BandejaAvisos from './componentes/BandejaAvisos.jsx'
+import SeguimientoReclamo from './componentes/SeguimientoReclamo.jsx'
 import DetalleReclamo from './componentes/DetalleReclamo.jsx'
 import Encabezado from './componentes/Encabezado.jsx'
 import FormularioReclamo from './componentes/FormularioReclamo.jsx'
@@ -97,7 +98,7 @@ export default function App() {
   const usuario = sesion.estado === 'activa' && catalogos.datos ? sesion.usuario : null
   const abrir = (numero, aviso) => setVista({ nombre: 'detalle', numero, aviso, origen: vista.nombre })
   const pestanas = usuario ? pestanasPara(usuario.rol) : []
-  const pestanaActiva = vista.nombre === 'detalle' ? vista.origen : vista.nombre
+  const pestanaActiva = vista.nombre === 'seguimiento' ? 'avisos' : vista.nombre === 'detalle' ? vista.origen : vista.nombre
 
   return (
     <>
@@ -214,7 +215,13 @@ export default function App() {
         )}
 
         {usuario && vista.nombre === 'avisos' && (
-          <BandejaAvisos key={usuario.id} usuario={usuario} onAbrir={abrir} />
+          <BandejaAvisos key={usuario.id} usuario={usuario} onAbrir={abrir}
+            onSeguir={(numero) => setVista({ nombre: 'seguimiento', numero })} />
+        )}
+
+        {usuario && vista.nombre === 'seguimiento' && (
+          <SeguimientoReclamo key={vista.numero} numero={vista.numero}
+            onVolver={() => setVista({ nombre: 'avisos' })} />
         )}
 
         {usuario && vista.nombre === 'detalle' && (

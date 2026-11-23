@@ -20,7 +20,7 @@ public class CorreoSmtp implements EnvioCorreo {
             "ReclamoVencido", "venció el plazo de atención",
             "PrioridadRevisada", "cambió de prioridad",
             "ReclamoRecategorizado", "cambió de categoría",
-            "ReclamoApoyado", "te sumaste a este reclamo");
+            "ReclamoApoyado", "nuevo apoyo");
 
     private final JavaMailSender correo;
     private final String remitente;

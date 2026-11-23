@@ -1203,6 +1203,121 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+  /api/reclamos/{numero}/seguimiento:
+    get:
+      tags:
+      - Reclamos
+      summary: Seguimiento de solo lectura de un reclamo con apoyo vigente
+      operationId: seguimiento
+      parameters:
+      - name: numero
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/SeguimientoReclamoResponse"
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+  /api/reclamos/{numero}/seguimiento/foto:
+    get:
+      tags:
+      - Reclamos
+      summary: "Foto del reclamo seguido, accesible con apoyo vigente"
+      operationId: fotoSeguimiento
+      parameters:
+      - name: numero
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: byte
+        "400":
+          description: Datos inválidos o formato incorrecto (DATOS_INVALIDOS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Sin sesión (NO_AUTENTICADO) o login fallido (CREDENCIALES_INVALIDAS)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "403":
+          description: "El rol no puede hacer la operación o el reclamo no es suyo\
+            \ (ACCESO_DENEGADO), o falta el token CSRF en un POST o PATCH (CSRF_INVALIDO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: "No existe el usuario, reclamo, municipio, categoría o área\
+            \ (RECURSO_NO_ENCONTRADO)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "409":
+          description: "Regla de negocio o cambio concurrente (REGLA_NEGOCIO, CONFLICTO_CONCURRENTE)"
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Error inesperado (ERROR_INTERNO)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
   /api/reclamos/{numero}/notificaciones:
     get:
       tags:
@@ -2241,6 +2356,47 @@ components:
           $ref: "#/components/schemas/UsuarioReferenciaResponse"
         area:
           $ref: "#/components/schemas/ReferenciaResponse"
+    Cambio:
+      type: object
+      properties:
+        estadoNuevo:
+          type: string
+          enum:
+          - INGRESADO
+          - ASIGNADO
+          - EN_PROCESO
+          - RESUELTO
+          - CERRADO
+          - RECHAZADO
+          - CANCELADO
+        fecha:
+          type: string
+          format: date-time
+    SeguimientoReclamoResponse:
+      type: object
+      properties:
+        numero:
+          type: string
+        estado:
+          type: string
+          enum:
+          - INGRESADO
+          - ASIGNADO
+          - EN_PROCESO
+          - RESUELTO
+          - CERRADO
+          - RECHAZADO
+          - CANCELADO
+        categoria:
+          type: string
+        descripcion:
+          type: string
+        foto:
+          type: string
+        historial:
+          type: array
+          items:
+            $ref: "#/components/schemas/Cambio"
     NotificacionResponse:
       type: object
       properties:
@@ -2274,6 +2430,8 @@ components:
           type: string
           format: date-time
         abrible:
+          type: boolean
+        seguimiento:
           type: boolean
     MunicipioResponse:
       type: object

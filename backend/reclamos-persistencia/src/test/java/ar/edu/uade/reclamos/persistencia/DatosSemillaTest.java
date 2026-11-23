@@ -38,9 +38,10 @@ class DatosSemillaTest extends PersistenciaTestBase {
 
     @Test void cargaDosVecesSinDuplicarYRespetaLosIdsDelContrato() {
         flushYLimpiar();
-        assertThat(municipios.buscarTodos()).extracting(Municipio::getNombre)
-                .containsExactly("Quilmes", "Avellaneda", "Berazategui");
-        assertThat(municipios.buscarTodos()).extracting(Municipio::getProvincia).containsOnly("Buenos Aires");
+        assertThat(municipios.buscarTodos()).extracting(Municipio::getNombre, Municipio::getProvincia)
+                .containsExactly(tuple("Quilmes", "Buenos Aires"), tuple("Avellaneda", "Buenos Aires"),
+                        tuple("Berazategui", "Buenos Aires"), tuple("Comuna 13", "Ciudad Autónoma de Buenos Aires"),
+                        tuple("Comuna 14", "Ciudad Autónoma de Buenos Aires"), tuple("San Isidro", "Buenos Aires"));
         assertThat(categorias.buscarPorId(1L).orElseThrow().getSlaHoras()).isEqualTo(48);
         assertThat(categorias.buscarPorId(2L).orElseThrow().getSlaHoras()).isEqualTo(120);
         assertThat(categorias.buscarPorId(3L).orElseThrow().getSlaHoras()).isEqualTo(72);
@@ -56,7 +57,7 @@ class DatosSemillaTest extends PersistenciaTestBase {
                 .containsExactly(8L);
         assertThat(categorias.buscarPorId(4L).orElseThrow().getSlaHoras()).isEqualTo(24);
         assertThat(categorias.buscarPorId(7L).orElseThrow().getPrioridadBase()).isEqualTo(Prioridad.BAJA);
-        assertThat(areas.buscarTodas()).hasSize(9);
+        assertThat(areas.buscarTodas()).hasSize(18);
         assertThat(areas.buscarPorId(5L).orElseThrow().getMunicipio().getNombre()).isEqualTo("Avellaneda");
         assertThat(usuarios.buscarTodos()).extracting(Usuario::getId).containsExactly(1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L);
         assertThat(usuarios.buscarTodos()).extracting(Usuario::getNombreCompleto)
@@ -80,7 +81,10 @@ class DatosSemillaTest extends PersistenciaTestBase {
         assertThat(areas.buscarCandidatas(4L, 2L)).isEmpty();
         assertThat(areas.buscarCandidatas(7L, 1L)).extracting(AreaMunicipal::getId).containsExactly(2L, 4L);
         assertThat(areas.buscarCandidatas(8L, 1L)).isEmpty();
-        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(21);
+        assertThat(areas.buscarCandidatas(1L, 4L)).extracting(AreaMunicipal::getId).containsExactly(10L);
+        assertThat(areas.buscarCandidatas(2L, 5L)).extracting(AreaMunicipal::getId).containsExactly(14L);
+        assertThat(areas.buscarCandidatas(3L, 6L)).extracting(AreaMunicipal::getId).containsExactly(18L);
+        assertThat(jdbc.queryForObject("select count(*) from area_categoria", Integer.class)).isEqualTo(42);
         assertThat(reclamos.buscarTodos()).isEmpty();
         assertThat(usuarios.buscarTodos()).allMatch(Usuario::tieneContrasena);
         assertThat(usuarios.buscarPorEmail("ana@example.org")).isPresent();

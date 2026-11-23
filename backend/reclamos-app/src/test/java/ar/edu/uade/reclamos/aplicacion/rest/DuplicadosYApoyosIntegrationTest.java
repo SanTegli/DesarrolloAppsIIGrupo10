@@ -196,6 +196,17 @@ class DuplicadosYApoyosIntegrationTest {
     void unReclamoResueltoNoSeApoyaNiApareceYSuFotoVuelveASerPrivada() throws Exception {
         String numero = crear(datos.ana(), datos.luminaria(), LATITUD, LONGITUD);
         apoyo(post(ruta(numero)), datos.bruno()).andExpect(status().isOk());
+        apoyo(post(ruta(numero)), datos.bruno()).andExpect(status().isOk());
+        JsonNode avisosDeAna = leer(mvc.perform(get("/api/notificaciones").with(como(datos.ana())))
+                .andExpect(status().isOk()));
+        int avisosDeApoyo = 0;
+        for (JsonNode aviso : avisosDeAna) {
+            if (aviso.get("mensaje").asText().equals("Un vecino se asoció a tu reclamo " + numero + ".")) {
+                assertThat(aviso.get("abrible").asBoolean()).isTrue();
+                avisosDeApoyo++;
+            }
+        }
+        assertThat(avisosDeApoyo).isEqualTo(1);
         cambiarEstado(datos.carla(), numero, "EN_PROCESO");
         cambiarEstado(datos.carla(), numero, "RESUELTO");
 
@@ -239,8 +250,11 @@ class DuplicadosYApoyosIntegrationTest {
     }
 
     @Test
-    void quienSeAsociaRecibeLosAvisosPeroNoPuedeAbrirElReclamo() throws Exception {
+    void quienSeAsociaPuedeVerElSeguimientoHastaRetirarSuApoyo() throws Exception {
         String numero = crear(datos.ana(), datos.luminaria(), LATITUD, LONGITUD);
+        String detalle = "/api/reclamos/" + numero;
+        String seguimiento = detalle + "/seguimiento";
+        mvc.perform(get(seguimiento).with(como(datos.bruno()))).andExpect(status().isForbidden());
         apoyo(post(ruta(numero)), datos.bruno()).andExpect(status().isOk());
         cambiarEstado(datos.carla(), numero, "EN_PROCESO");
         cambiarEstado(datos.carla(), numero, "RESUELTO");
@@ -253,12 +267,30 @@ class DuplicadosYApoyosIntegrationTest {
                 "El reclamo " + numero + " que apoyaste fue resuelto.",
                 "El reclamo " + numero + " que apoyaste paso de ASIGNADO a EN_PROCESO.",
                 "Te sumaste al reclamo " + numero + ". Te vamos a avisar cada vez que cambie.");
-        bandeja.forEach(aviso -> assertThat(aviso.get("abrible").asBoolean()).isFalse());
+        bandeja.forEach(aviso -> {
+            assertThat(aviso.get("abrible").asBoolean()).isTrue();
+            assertThat(aviso.get("seguimiento").asBoolean()).isTrue();
+        });
+        mvc.perform(get(seguimiento).with(como(datos.bruno()))).andExpect(status().isOk())
+                .andExpect(jsonPath("$.estado").value("RESUELTO"))
+                .andExpect(jsonPath("$.categoria").value("Luminaria rota"))
+                .andExpect(jsonPath("$.descripcion").value("Farol apagado"))
+                .andExpect(jsonPath("$.historial[0].usuario").doesNotExist())
+                .andExpect(jsonPath("$.historial[0].observacion").doesNotExist())
+                .andExpect(jsonPath("$.ciudadano").doesNotExist())
+                .andExpect(jsonPath("$.accionesDisponibles").doesNotExist());
+        mvc.perform(get(seguimiento + "/foto").with(como(datos.bruno()))).andExpect(status().isOk());
+        mvc.perform(get(detalle).with(como(datos.bruno()))).andExpect(status().isForbidden());
+        mvc.perform(get(detalle + "/notificaciones").with(como(datos.bruno()))).andExpect(status().isForbidden());
         assertThat(bandeja.toString()).doesNotContain("Ana", "Perez");
         mvc.perform(get("/api/notificaciones").with(como(datos.ana())))
                 .andExpect(jsonPath("$[0].abrible").value(true));
         // Retirar el apoyo corta los avisos.
         apoyo(delete(ruta(numero)), datos.bruno()).andExpect(status().isOk());
+        mvc.perform(get(seguimiento).with(como(datos.bruno()))).andExpect(status().isForbidden());
+        mvc.perform(get(seguimiento + "/foto").with(como(datos.bruno()))).andExpect(status().isForbidden());
+        mvc.perform(get("/api/notificaciones").with(como(datos.bruno())))
+                .andExpect(jsonPath("$[0].abrible").value(false));
         mvc.perform(patch("/api/reclamos/" + numero + "/estado").with(como(datos.ana()))
                 .contentType(MediaType.APPLICATION_JSON).content("{\"estado\": \"CERRADO\"}"))
                 .andExpect(status().isOk());

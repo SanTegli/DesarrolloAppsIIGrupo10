@@ -247,7 +247,8 @@ REC-…: cambió de categoría".
 
 ## Avisos a quienes se asocian (PR 27)
 
-Un vecino que se asocia a un reclamo ajeno recibe `ReclamoApoyado` (clave `aviso.reclamo-apoyado`) y, mientras
+Al registrarse un nuevo apoyo, el autor recibe un aviso de que un vecino se asoció a su reclamo. El vecino
+que se asocia también recibe `ReclamoApoyado` (clave `aviso.reclamo-apoyado`) y, mientras
 siga asociado, los avisos de cambio de estado y de resolución de ese reclamo, con las claves de siempre
 (`aviso.estado-cambiado`, `aviso.reclamo-resuelto`). Van a su propio correo, como cualquier aviso. Los textos no
 dicen quién creó el reclamo.

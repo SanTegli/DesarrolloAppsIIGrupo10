@@ -174,6 +174,112 @@ SELECT 'categorias-pr26' WHERE NOT EXISTS (
     SELECT 1 FROM inicializaciones WHERE identificador = 'categorias-pr26'
 );
 
+-- Jurisdicciones adicionales de AMBA. La marca permite ampliar instalaciones existentes sin borrar datos.
+INSERT INTO municipios (id, nombre, provincia)
+SELECT 4, 'Comuna 13', 'Ciudad Autónoma de Buenos Aires' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM municipios WHERE id = 4);
+INSERT INTO municipios (id, nombre, provincia)
+SELECT 5, 'Comuna 14', 'Ciudad Autónoma de Buenos Aires' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM municipios WHERE id = 5);
+INSERT INTO municipios (id, nombre, provincia)
+SELECT 6, 'San Isidro', 'Buenos Aires' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM municipios WHERE id = 6);
+
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 10, 'Alumbrado', 'alumbrado.comuna13@example.org', true, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 10);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 11, 'Obras Públicas', 'obras.comuna13@example.org', true, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 11);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 12, 'Higiene Urbana', 'higiene.comuna13@example.org', true, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 12);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 13, 'Alumbrado', 'alumbrado.comuna14@example.org', true, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 13);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 14, 'Obras Públicas', 'obras.comuna14@example.org', true, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 14);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 15, 'Higiene Urbana', 'higiene.comuna14@example.org', true, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 15);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 16, 'Alumbrado', 'alumbrado.sanisidro@example.org', true, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 16);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 17, 'Obras Públicas', 'obras.sanisidro@example.org', true, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 17);
+INSERT INTO areas_municipales (id, nombre, email_contacto, activa, municipio_id)
+SELECT 18, 'Higiene Urbana', 'higiene.sanisidro@example.org', true, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM areas_municipales WHERE id = 18);
+
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 10, 1 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 10 AND categoria_id = 1);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 10, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 10 AND categoria_id = 4);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 11, 2 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 11 AND categoria_id = 2);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 11, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 11 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 11, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 11 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 12, 3 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 12 AND categoria_id = 3);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 12, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 12 AND categoria_id = 5);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 13, 1 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 13 AND categoria_id = 1);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 13, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 13 AND categoria_id = 4);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 14, 2 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 14 AND categoria_id = 2);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 14, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 14 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 14, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 14 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 15, 3 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 15 AND categoria_id = 3);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 15, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 15 AND categoria_id = 5);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 16, 1 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 16 AND categoria_id = 1);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 16, 4 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 16 AND categoria_id = 4);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 17, 2 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 17 AND categoria_id = 2);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 17, 6 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 17 AND categoria_id = 6);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 17, 7 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 17 AND categoria_id = 7);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 18, 3 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 18 AND categoria_id = 3);
+INSERT INTO area_categoria (area_id, categoria_id)
+SELECT 18, 5 WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba')
+AND NOT EXISTS (SELECT 1 FROM area_categoria WHERE area_id = 18 AND categoria_id = 5);
+
+INSERT INTO inicializaciones (identificador)
+SELECT 'jurisdicciones-amba' WHERE NOT EXISTS (SELECT 1 FROM inicializaciones WHERE identificador = 'jurisdicciones-amba');
+
 -- Login (PR 14): contraseña de desarrollo "demo1234" para los ocho usuarios de la semilla, en BCrypt. Solo toca
 -- los usuarios sin contraseña: no pisa una que se haya cambiado.
 UPDATE usuarios SET hash_contrasena = '$2a$10$Fj7CGx6hDi2DyQSJv4Bat.Crnxp12nWpSIXthWYde6v/q.bYhjFjW'

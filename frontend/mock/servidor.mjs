@@ -40,6 +40,9 @@ const municipios = [
   { id: 1, nombre: 'Quilmes', provincia: 'Buenos Aires' },
   { id: 2, nombre: 'Avellaneda', provincia: 'Buenos Aires' },
   { id: 3, nombre: 'Berazategui', provincia: 'Buenos Aires' },
+  { id: 4, nombre: 'Comuna 13', provincia: 'Ciudad Autónoma de Buenos Aires' },
+  { id: 5, nombre: 'Comuna 14', provincia: 'Ciudad Autónoma de Buenos Aires' },
+  { id: 6, nombre: 'San Isidro', provincia: 'Buenos Aires' },
 ]
 const nuevaCategoria = (id, nombre, descripcion, slaHoras, prioridadBase, otra = false) => ({
   id,
@@ -71,6 +74,15 @@ const areas = [
   { id: 7, nombre: 'Alumbrado', activa: true, municipioId: 3, categorias: [1, 4] },
   { id: 8, nombre: 'Obras Públicas', activa: true, municipioId: 3, categorias: [2, 6, 7] },
   { id: 9, nombre: 'Higiene Urbana', activa: true, municipioId: 3, categorias: [3, 5] },
+  { id: 10, nombre: 'Alumbrado', activa: true, municipioId: 4, categorias: [1, 4] },
+  { id: 11, nombre: 'Obras Públicas', activa: true, municipioId: 4, categorias: [2, 6, 7] },
+  { id: 12, nombre: 'Higiene Urbana', activa: true, municipioId: 4, categorias: [3, 5] },
+  { id: 13, nombre: 'Alumbrado', activa: true, municipioId: 5, categorias: [1, 4] },
+  { id: 14, nombre: 'Obras Públicas', activa: true, municipioId: 5, categorias: [2, 6, 7] },
+  { id: 15, nombre: 'Higiene Urbana', activa: true, municipioId: 5, categorias: [3, 5] },
+  { id: 16, nombre: 'Alumbrado', activa: true, municipioId: 6, categorias: [1, 4] },
+  { id: 17, nombre: 'Obras Públicas', activa: true, municipioId: 6, categorias: [2, 6, 7] },
+  { id: 18, nombre: 'Higiene Urbana', activa: true, municipioId: 6, categorias: [3, 5] },
 ]
 // Solo es una ayuda de desarrollo: las contraseñas quedan en memoria y en texto. El backend guarda BCrypt.
 const CONTRASENA_SEMILLA = 'demo1234'
@@ -100,9 +112,7 @@ const MAXIMO_FOTO = 5 * 1024 * 1024
 const apoyos = new Set()
 const DUPLICADOS = { radioMetros: 50, radioMaximoMetros: 200, maximoCandidatos: 5 }
 
-// Respuestas fijas en lugar de Georef, como si se buscara en cada municipio: "Belgrano" devuelve dos opciones
-// en Quilmes y una en Avellaneda, "caido" simula Georef sin responder y cualquier otra dirección, ninguna. Las
-// de Quilmes son las coordenadas que devolvió Georef para Belgrano 450.
+// Respuestas fijas para probar el formulario sin llamar a Georef.
 const QUILMES = { id: 1, nombre: 'Quilmes' }
 const AVELLANEDA = { id: 2, nombre: 'Avellaneda' }
 const SUGERENCIAS_BELGRANO = [
@@ -110,11 +120,29 @@ const SUGERENCIAS_BELGRANO = [
   { direccionNormalizada: 'GRL BELGRANO 450, Quilmes, Buenos Aires', latitud: -34.75816353, longitud: -58.29744745, municipio: QUILMES },
   { direccionNormalizada: 'BELGRANO 450, Wilde, Avellaneda, Buenos Aires', latitud: -34.7012, longitud: -58.3181, municipio: AVELLANEDA },
 ]
+const SUGERENCIAS_POR_DIRECCION = [
+  [/belgrano/i, SUGERENCIAS_BELGRANO],
+  [/cabildo\s+2000/i, [{
+    direccionNormalizada: 'AV CABILDO 2000, Belgrano, Comuna 13, Ciudad Autónoma de Buenos Aires',
+    latitud: -34.562989074, longitud: -58.455872345, municipio: { id: 4, nombre: 'Comuna 13' },
+  }]],
+  [/santa fe\s+4500/i, [{
+    direccionNormalizada: 'AV SANTA FE 4500, Palermo, Comuna 14, Ciudad Autónoma de Buenos Aires',
+    latitud: -34.579291314, longitud: -58.424377442, municipio: { id: 5, nombre: 'Comuna 14' },
+  }]],
+  [/9 de julio\s+500/i, [{
+    direccionNormalizada: '9 DE JULIO 500, San Isidro, Buenos Aires',
+    latitud: -34.468251144, longitud: -58.510549221, municipio: { id: 6, nombre: 'San Isidro' },
+  }]],
+]
 // Igual que reclamos.geocodificacion.recuadros en application.yml.
 const RECUADROS = {
   1: { latitudMinima: -34.82, latitudMaxima: -34.66, longitudMinima: -58.38, longitudMaxima: -58.17 },
   2: { latitudMinima: -34.73, latitudMaxima: -34.62, longitudMinima: -58.41, longitudMaxima: -58.24 },
   3: { latitudMinima: -34.92, latitudMaxima: -34.72, longitudMinima: -58.28, longitudMaxima: -58.02 },
+  4: { latitudMinima: -34.59, latitudMaxima: -34.52, longitudMinima: -58.50, longitudMaxima: -58.41 },
+  5: { latitudMinima: -34.61, latitudMaxima: -34.54, longitudMinima: -58.46, longitudMaxima: -58.37 },
+  6: { latitudMinima: -34.54, latitudMaxima: -34.44, longitudMinima: -58.62, longitudMaxima: -58.46 },
 }
 
 function sugerirUbicaciones(parametros) {
@@ -123,7 +151,8 @@ function sugerirUbicaciones(parametros) {
     throw invalido('Los parametros recibidos no son validos.', ['direccion: entre 3 y 200 caracteres'])
   }
   if (/caido/i.test(direccion)) return { disponible: false, sugerencias: [] }
-  return { disponible: true, sugerencias: /belgrano/i.test(direccion) ? SUGERENCIAS_BELGRANO : [] }
+  const coincidencia = SUGERENCIAS_POR_DIRECCION.find(([patron]) => patron.test(direccion))
+  return { disponible: true, sugerencias: coincidencia?.[1] ?? [] }
 }
 
 // Igual que ServicioUbicaciones.confirmar: sin elección queda pendiente; fuera del municipio, 400.
@@ -401,7 +430,9 @@ function cambiarApoyo(usuario, numero, apoyar) {
       throw regla(`El reclamo ${numero} ya no está abierto: solo se apoyan reclamos que siguen pendientes.`)
     }
     apoyos.add(clave)
-    notificar(reclamo, usuario.id, `Te sumaste al reclamo ${numero}. Te vamos a avisar cada vez que cambie.`, ahora())
+    const fecha = ahora()
+    notificar(reclamo, reclamo.ciudadanoId, `Un vecino se asoció a tu reclamo ${numero}.`, fecha)
+    notificar(reclamo, usuario.id, `Te sumaste al reclamo ${numero}. Te vamos a avisar cada vez que cambie.`, fecha)
   }
   if (!apoyar) apoyos.delete(clave)
   return { numero, cantidadApoyos: cantidadApoyos(numero), apoyado: apoyos.has(clave) }
@@ -993,13 +1024,12 @@ async function atender(peticion, contexto) {
     const usuario = usuarioDe(contexto)
     const lista = notificaciones
       .filter((n) => n.destinatarioId === usuario.id)
-      .map((n) => ({
-        numeroReclamo: n.numero,
-        canal: n.canal,
-        mensaje: n.mensaje,
-        fechaEnvio: n.fechaEnvio,
-        abrible: puedeConsultar(usuario, reclamos.find((r) => r.numero === n.numero)),
-      }))
+      .map((n) => {
+        const accesoCompleto = puedeConsultar(usuario, reclamos.find((r) => r.numero === n.numero))
+        const seguimiento = !accesoCompleto && apoyos.has(`${usuario.id}|${n.numero}`)
+        return { numeroReclamo: n.numero, canal: n.canal, mensaje: n.mensaje, fechaEnvio: n.fechaEnvio,
+          abrible: accesoCompleto || seguimiento, seguimiento }
+      })
       .reverse()
     return [200, lista]
   }
@@ -1023,6 +1053,23 @@ async function atender(peticion, contexto) {
       return [200, cambiarApoyo(usuario, partes[2], metodo === 'POST')]
     }
     if (partes.length === 3 && metodo === 'GET') return [200, detalle(usuario, reclamoVisible(usuario, partes[2]))]
+    if (metodo === 'GET' && partes[3] === 'seguimiento' &&
+        (partes.length === 4 || (partes.length === 5 && partes[4] === 'foto'))) {
+      const numero = partes[2]
+      const reclamo = reclamos.find((r) => r.numero === numero)
+      if (!reclamo) throw inexistente('reclamo', numero)
+      if (!apoyos.has(`${usuario.id}|${numero}`)) throw denegado('Solo podés seguir un reclamo mientras estés asociado.')
+      const foto = fotos.get(numero)
+      if (partes.length === 5) {
+        if (!foto) throw inexistente('foto', numero)
+        return [200, foto.bytes, { 'Content-Type': foto.tipo, 'Cache-Control': 'no-store' }]
+      }
+      return [200, {
+        numero, estado: reclamo.estado, categoria: categorias.find((c) => c.id === reclamo.categoriaId).nombre,
+        descripcion: reclamo.descripcion, foto: foto ? `/api/reclamos/${numero}/seguimiento/foto` : null,
+        historial: reclamo.historial.map(({ estadoNuevo, fecha }) => ({ estadoNuevo, fecha })),
+      }, { 'Cache-Control': 'no-store' }]
+    }
     if (partes.length === 4 && metodo === 'GET' && partes[3] === 'foto') {
       // Como el backend: además de quien ve el detalle, cualquier ciudadano ve la foto de un posible duplicado.
       const posible = reclamos.find((r) => r.numero === partes[2])

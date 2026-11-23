@@ -108,7 +108,7 @@ grabadas en `backend/reclamos-app/src/test/resources/georef/`, sin llamar a Geor
 | Caso | Qué se comprueba | Test automático | Cómo reproducirlo a mano |
 | --- | --- | --- | --- |
 | CP75 | La IA compara el texto del reclamo nuevo con los abiertos a 50 m de cualquier categoría y marca el mismo problema; sin IA, o si falla, quedan los de la misma categoría | `DuplicadosConIAIntegrationTest`, `ComparadorDuplicadosTest`, `DuplicadosControllerTest`, `SimuladoAdapterTest`, `CandidatosDuplicados.test.jsx` | Como Bruno, crear una Luminaria rota en Belgrano 450 (Bernal). Como Ana, cargar **Otro problema** en el mismo punto con "No hay luz en la esquina, el farol no anda": el panel dice "La IA cree que el reclamo REC-… es el mismo problema" y lo marca. Con `servicio-prioridad` detenido, el panel muestra solo los de la misma categoría |
-| CP76 | Quien se asocia recibe los avisos del reclamo, sin poder abrir su detalle | `DuplicadosYApoyosIntegrationTest.quienSeAsociaRecibeLosAvisosPeroNoPuedeAbrirElReclamo`, `ApoyosYCercaniaRepositoryJpaTest`, `App.test.jsx` | Ana toca **Es el mismo: asociarme**. Cuando Carla toma el reclamo, en **Avisos** de Ana aparece "El reclamo REC-… que apoyaste paso de ASIGNADO a EN_PROCESO." con "(lo apoyás)" y sin enlace |
+| CP76 | El autor recibe un aviso de apoyo y el vecino asociado puede abrir el seguimiento de solo lectura mientras conserve el apoyo | `DuplicadosYApoyosIntegrationTest.quienSeAsociaPuedeVerElSeguimientoHastaRetirarSuApoyo`, `ApoyosYCercaniaRepositoryJpaTest`, `App.test.jsx` | Bruno se asocia al bache de Ana en Av. Calchaquí. En **Avisos**, abre el número con «(lo apoyás)» y ve estado, foto e historial. Ana verifica el aviso del apoyo. |
 
 ### Segunda Parte: avisos por correo con RabbitMQ
 

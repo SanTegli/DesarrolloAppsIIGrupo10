@@ -394,14 +394,18 @@ describe('App', () => {
     expect(await screen.findByRole('heading', { name: 'Avisos' })).toBeInTheDocument()
   })
 
-  it('los avisos de un reclamo que el vecino apoya se leen pero no abren el detalle', async () => {
+  it('abre el seguimiento de solo lectura desde un aviso de apoyo vigente', async () => {
     simularApi({
       ...conSesion(ana),
       'GET /api/reclamos': [],
       'GET /api/notificaciones': [
-        { numeroReclamo: 'REC-AAAA1111', canal: 'INTERNO', mensaje: 'El reclamo REC-AAAA1111 que apoyaste fue resuelto.', fechaEnvio: '2026-11-02T10:00:00', abrible: false },
+        { numeroReclamo: 'REC-AAAA1111', canal: 'INTERNO', mensaje: 'El reclamo REC-AAAA1111 que apoyaste fue resuelto.', fechaEnvio: '2026-11-02T10:00:00', abrible: true, seguimiento: true },
         { numeroReclamo: 'REC-4F2A91BC', canal: 'INTERNO', mensaje: 'Tu reclamo REC-4F2A91BC fue ingresado.', fechaEnvio: '2026-11-01T10:00:00', abrible: true },
       ],
+      'GET /api/reclamos/REC-AAAA1111/seguimiento': {
+        numero: 'REC-AAAA1111', estado: 'RESUELTO', categoria: 'Luminaria rota', descripcion: 'Farol apagado',
+        foto: null, historial: [{ estadoNuevo: 'RESUELTO', fecha: '2026-11-02T10:00:00' }],
+      },
     })
     const usuario = userEvent.setup()
     render(<App />)
@@ -409,9 +413,12 @@ describe('App', () => {
     await usuario.click(await screen.findByRole('button', { name: 'Avisos' }))
 
     expect(await screen.findByText('El reclamo REC-AAAA1111 que apoyaste fue resuelto.')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'REC-AAAA1111' })).not.toBeInTheDocument()
-    expect(screen.getByText('(lo apoyás)')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'REC-4F2A91BC' })).toBeInTheDocument()
+    await usuario.click(screen.getByRole('button', { name: 'REC-AAAA1111 (lo apoyás)' }))
+    expect(await screen.findByText('Farol apagado')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Confirmar solución' })).not.toBeInTheDocument()
+    await usuario.click(screen.getByRole('button', { name: 'Volver a avisos' }))
+    expect(await screen.findByRole('button', { name: 'REC-AAAA1111 (lo apoyás)' })).toBeInTheDocument()
   })
 
   it('la bandeja vacía lo dice y un error del backend se muestra', async () => {

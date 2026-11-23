@@ -49,10 +49,14 @@ public class AvisosApoyantesListener {
 
     @EventListener
     public void apoyado(ReclamoApoyado evento) {
-        reclamos.buscarPorNumero(evento.numeroReclamo()).ifPresent(reclamo ->
-                usuarios.buscarPorId(evento.ciudadanoId()).ifPresent(vecino -> notificar(reclamo, vecino,
-                        "Te sumaste al reclamo " + reclamo.getNumero() + ". Te vamos a avisar cada vez que cambie.",
-                        evento.ocurridoEn(), TipoAviso.RECLAMO_APOYADO)));
+        reclamos.buscarPorNumero(evento.numeroReclamo()).ifPresent(reclamo -> {
+            notificar(reclamo, reclamo.getCiudadano(),
+                    "Un vecino se asoció a tu reclamo " + reclamo.getNumero() + ".",
+                    evento.ocurridoEn(), TipoAviso.RECLAMO_APOYADO);
+            usuarios.buscarPorId(evento.ciudadanoId()).ifPresent(vecino -> notificar(reclamo, vecino,
+                    "Te sumaste al reclamo " + reclamo.getNumero() + ". Te vamos a avisar cada vez que cambie.",
+                    evento.ocurridoEn(), TipoAviso.RECLAMO_APOYADO));
+        });
     }
 
     /** La resolución tiene su propio aviso; acá se omite para no duplicarlo. */
