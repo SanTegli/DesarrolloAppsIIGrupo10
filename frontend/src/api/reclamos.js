@@ -56,6 +56,10 @@ export function obtenerReclamo(numero) {
   return pedir(ruta(numero))
 }
 
+export function obtenerSeguimiento(numero) {
+  return pedir(`${ruta(numero)}/seguimiento`)
+}
+
 /** PATCH /api/reclamos/{numero}/estado. */
 export function cambiarEstado(numero, estado, observacion) {
   return pedir(`${ruta(numero)}/estado`, {

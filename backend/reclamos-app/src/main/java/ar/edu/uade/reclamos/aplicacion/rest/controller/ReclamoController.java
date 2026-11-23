@@ -113,6 +113,24 @@ public class ReclamoController {
                 request.descripcion(), request.latitud(), request.longitud()));
     }
 
+    @Operation(summary = "Seguimiento de solo lectura de un reclamo con apoyo vigente")
+    @GetMapping("/{numero}/seguimiento")
+    public ResponseEntity<SeguimientoReclamoResponse> seguimiento(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable String numero) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore())
+                .body(mapper.seguimiento(facade.seguimiento(usuario.id(), numero)));
+    }
+
+    @Operation(summary = "Foto del reclamo seguido, accesible con apoyo vigente")
+    @GetMapping("/{numero}/seguimiento/foto")
+    public ResponseEntity<byte[]> fotoSeguimiento(
+            @Parameter(hidden = true) @AuthenticationPrincipal UsuarioAutenticado usuario,
+            @PathVariable String numero) {
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).cacheControl(CacheControl.noStore())
+                .body(facade.fotoSeguimiento(usuario.id(), numero));
+    }
+
     /** "A mí también me pasa". Idempotente: apoyar dos veces deja un solo apoyo. */
     @Operation(summary = "Apoyar el reclamo de otro vecino (solo ciudadanos)")
     @PostMapping("/{numero}/apoyo")

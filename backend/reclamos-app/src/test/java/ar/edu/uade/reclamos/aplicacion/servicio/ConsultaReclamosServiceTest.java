@@ -18,7 +18,8 @@ class ConsultaReclamosServiceTest {
     private final ReclamoRepository reclamos = mock(ReclamoRepository.class);
     private final NotificacionRepository notificaciones = mock(NotificacionRepository.class);
     private final ConsultaReclamosService servicio =
-            new ConsultaReclamosService(usuarios, reclamos, notificaciones, new PermisosReclamo());
+            new ConsultaReclamosService(usuarios, reclamos, notificaciones, new PermisosReclamo(), e.reloj,
+                    PoliticaReapertura.PREDETERMINADA, mock(ApoyoRepository.class));
 
     @BeforeEach
     void prepararUsuarios() {

@@ -11,7 +11,6 @@ import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,24 +23,32 @@ public class ConsultaReclamosService {
     private final ReclamoRepository reclamos;
     private final NotificacionRepository notificaciones;
     private final PermisosReclamo permisos;
-
-    public ConsultaReclamosService(UsuarioRepository usuarios, ReclamoRepository reclamos,
-                                    NotificacionRepository notificaciones, PermisosReclamo permisos) {
-        this(usuarios, reclamos, notificaciones, permisos, Clock.systemDefaultZone(),
-                PoliticaReapertura.PREDETERMINADA);
-    }
+    private final ApoyoRepository apoyos;
 
     /** @param reaperturas para no ofrecer "reabrir" cuando el reclamo ya no se puede reabrir */
-    @Autowired
     public ConsultaReclamosService(UsuarioRepository usuarios, ReclamoRepository reclamos,
                                     NotificacionRepository notificaciones, PermisosReclamo permisos, Clock reloj,
-                                    PoliticaReapertura reaperturas) {
+                                    PoliticaReapertura reaperturas, ApoyoRepository apoyos) {
         this.reloj = reloj;
         this.reaperturas = reaperturas;
         this.usuarios = usuarios;
         this.reclamos = reclamos;
         this.notificaciones = notificaciones;
         this.permisos = permisos;
+        this.apoyos = apoyos;
+    }
+
+    public Reclamo buscarAsociado(Long usuarioId, String numero) {
+        Usuario usuario = usuario(usuarioId);
+        Reclamo reclamo = reclamo(numero);
+        if (!estaAsociado(usuario, reclamo)) {
+            throw new AccesoDenegadoException("Solo podés seguir un reclamo mientras estés asociado.");
+        }
+        return reclamo;
+    }
+
+    private boolean estaAsociado(Usuario usuario, Reclamo reclamo) {
+        return usuario instanceof Ciudadano && apoyos.buscar(usuario.getId(), reclamo.getId()).isPresent();
     }
 
     public List<Reclamo> listar(Long usuarioId, EstadoReclamo estado, Long areaId, Long ciudadanoId) {
@@ -96,15 +103,16 @@ public class ConsultaReclamosService {
         return notificaciones.buscarPorDestinatario(usuario.getId());
     }
 
-    /**
-     * La bandeja con cada aviso marcado según si el usuario puede abrir su reclamo. Desde el PR 27 llegan avisos
-     * de reclamos ajenos, los que el vecino apoya: esos se leen en la bandeja, pero el detalle sigue siendo del
-     * autor.
-     */
+    /** La bandeja indica si el aviso abre el detalle habitual o el seguimiento de un apoyo vigente. */
     public List<AvisoDelUsuario> bandeja(Long usuarioId) {
         Usuario usuario = usuario(usuarioId);
         return notificaciones.buscarPorDestinatario(usuario.getId()).stream()
-                .map(aviso -> new AvisoDelUsuario(aviso, permisos.puedeConsultar(usuario, aviso.getReclamo())))
+                .map(aviso -> {
+                    Reclamo reclamo = aviso.getReclamo();
+                    boolean accesoCompleto = permisos.puedeConsultar(usuario, reclamo);
+                    boolean seguimiento = !accesoCompleto && estaAsociado(usuario, reclamo);
+                    return new AvisoDelUsuario(aviso, accesoCompleto || seguimiento, seguimiento);
+                })
                 .toList();
     }
 

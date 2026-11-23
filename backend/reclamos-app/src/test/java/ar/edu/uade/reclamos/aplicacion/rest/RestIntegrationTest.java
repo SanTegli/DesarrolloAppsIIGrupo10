@@ -406,8 +406,10 @@ class RestIntegrationTest {
         MvcResult resultado = mvc.perform(get(ruta).with(como(datos.ciudadano())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].numeroReclamo").value(datos.asignado()))
-                .andExpect(jsonPath("$[0].canal").value("INTERNO")).andReturn();
-        campos(leer(resultado).get(0), "numeroReclamo", "canal", "mensaje", "fechaEnvio", "abrible");
+                .andExpect(jsonPath("$[0].canal").value("INTERNO"))
+                .andExpect(jsonPath("$[0].abrible").value(true))
+                .andExpect(jsonPath("$[0].seguimiento").value(false)).andReturn();
+        campos(leer(resultado).get(0), "numeroReclamo", "canal", "mensaje", "fechaEnvio", "abrible", "seguimiento");
         mvc.perform(get(ruta).with(como(datos.otroCiudadano())))
                 .andExpect(status().isOk()).andExpect(jsonPath("$", hasSize(0)));
         error(mvc.perform(get(ruta)), 401, "NO_AUTENTICADO", ruta);

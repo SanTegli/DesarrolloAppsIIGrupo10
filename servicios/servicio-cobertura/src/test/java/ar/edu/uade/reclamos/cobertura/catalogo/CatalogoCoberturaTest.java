@@ -43,9 +43,12 @@ class CatalogoCoberturaTest {
     }
 
     @Test
-    void elArchivoDelRepositorioEsLaVersionDosConNueveAreasEnTresMunicipios() {
+    void elArchivoDelRepositorioEsLaVersionDosConCoberturaParaLasNuevasJurisdicciones() {
         assertThat(catalogo.getVersion()).isEqualTo(2);
-        assertThat(catalogo.cantidadDeAreas()).isEqualTo(9);
+        assertThat(catalogo.cantidadDeAreas()).isEqualTo(18);
+        assertThat(catalogo.consultar(4, 1)).extracting(DatosCatalogo.Area::id).containsExactly(10L);
+        assertThat(catalogo.consultar(5, 2)).extracting(DatosCatalogo.Area::id).containsExactly(14L);
+        assertThat(catalogo.consultar(6, 3)).extracting(DatosCatalogo.Area::id).containsExactly(18L);
     }
 
     @Test

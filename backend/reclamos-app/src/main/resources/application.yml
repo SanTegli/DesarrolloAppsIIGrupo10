@@ -130,7 +130,7 @@ reclamos:
     url: https://apis.datos.gob.ar/georef/api/v2.0
     tiempo-conexion: 1s
     tiempo-respuesta: 3s
-    max-sugerencias: 5
+    max-sugerencias: 10
     cache:
       duracion: 10m              # la misma dirección en el mismo municipio no se vuelve a consultar
       maximo: 500
@@ -155,3 +155,18 @@ reclamos:
         latitud-maxima: -34.72
         longitud-minima: -58.28
         longitud-maxima: -58.02
+      "[Comuna 13]":
+        latitud-minima: -34.59
+        latitud-maxima: -34.52
+        longitud-minima: -58.50
+        longitud-maxima: -58.41
+      "[Comuna 14]":
+        latitud-minima: -34.61
+        latitud-maxima: -34.54
+        longitud-minima: -58.46
+        longitud-maxima: -58.37
+      "[San Isidro]":
+        latitud-minima: -34.54
+        latitud-maxima: -34.44
+        longitud-minima: -58.62
+        longitud-maxima: -58.46

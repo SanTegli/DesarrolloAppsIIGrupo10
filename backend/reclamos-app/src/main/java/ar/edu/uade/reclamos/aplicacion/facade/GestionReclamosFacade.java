@@ -109,9 +109,20 @@ public class GestionReclamosFacade {
      * como posible duplicado, cualquier ciudadano.
      */
     public byte[] foto(Long usuarioId, String numero) {
-        Reclamo reclamo = consultas.buscarParaFoto(usuarioId, numero);
+        return leerFoto(consultas.buscarParaFoto(usuarioId, numero));
+    }
+
+    public Reclamo seguimiento(Long usuarioId, String numero) {
+        return consultas.buscarAsociado(usuarioId, numero);
+    }
+
+    public byte[] fotoSeguimiento(Long usuarioId, String numero) {
+        return leerFoto(seguimiento(usuarioId, numero));
+    }
+
+    private byte[] leerFoto(Reclamo reclamo) {
         return reclamo.getFoto().flatMap(fotos::leer)
-                .orElseThrow(() -> new RecursoNoEncontradoException("El reclamo " + numero + " no tiene foto."));
+                .orElseThrow(() -> new RecursoNoEncontradoException("El reclamo " + reclamo.getNumero() + " no tiene foto."));
     }
 
     /** Reclamos abiertos de la categoría cerca del punto elegido, para no crear uno repetido. */

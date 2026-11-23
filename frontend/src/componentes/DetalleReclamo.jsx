@@ -375,7 +375,7 @@ function SugerenciaIA({ reclamo, esperando }) {
 }
 
 /** La foto del problema. Los reclamos de antes de la foto obligatoria no tienen. */
-function FotoReclamo({ foto }) {
+export function FotoReclamo({ foto }) {
   if (!foto) {
     return <p className="secundario">Este reclamo no tiene foto.</p>
   }

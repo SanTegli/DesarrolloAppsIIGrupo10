@@ -24,7 +24,9 @@ class ConsultaAvisosTest {
             e.ciudadano, e.otroCiudadano, e.agente, e.otroAgente, e.administrador);
     private final ServicioNotificaciones notificaciones = new ServicioNotificaciones(reclamos, avisos, usuarios);
     private final ConsultaReclamosService consultas =
-            new ConsultaReclamosService(usuarios, reclamos, avisos, new PermisosReclamo());
+            new ConsultaReclamosService(usuarios, reclamos, avisos, new PermisosReclamo(), e.reloj,
+                    ar.edu.uade.reclamos.dominio.modelo.PoliticaReapertura.PREDETERMINADA,
+                    org.mockito.Mockito.mock(ar.edu.uade.reclamos.dominio.repositorio.ApoyoRepository.class));
 
     private List<String> mensajesDe(Long usuarioId) {
         return consultas.consultarAvisosDelUsuario(usuarioId).stream().map(Notificacion::getMensaje).toList();

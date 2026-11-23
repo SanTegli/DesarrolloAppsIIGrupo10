@@ -3,7 +3,10 @@
   "municipios": [
     { "id": 1, "nombre": "Quilmes" },
     { "id": 2, "nombre": "Avellaneda" },
-    { "id": 3, "nombre": "Berazategui" }
+    { "id": 3, "nombre": "Berazategui" },
+    { "id": 4, "nombre": "Comuna 13" },
+    { "id": 5, "nombre": "Comuna 14" },
+    { "id": 6, "nombre": "San Isidro" }
   ],
   "categorias": [
     { "id": 1, "nombre": "Luminaria rota" },
@@ -24,6 +27,15 @@
     { "id": 6, "nombre": "Higiene Urbana", "municipioId": 2, "categorias": [3, 5] },
     { "id": 7, "nombre": "Alumbrado", "municipioId": 3, "categorias": [1, 4] },
     { "id": 8, "nombre": "Obras Públicas", "municipioId": 3, "categorias": [2, 6, 7] },
-    { "id": 9, "nombre": "Higiene Urbana", "municipioId": 3, "categorias": [3, 5] }
+    { "id": 9, "nombre": "Higiene Urbana", "municipioId": 3, "categorias": [3, 5] },
+    { "id": 10, "nombre": "Alumbrado", "municipioId": 4, "categorias": [1, 4] },
+    { "id": 11, "nombre": "Obras Públicas", "municipioId": 4, "categorias": [2, 6, 7] },
+    { "id": 12, "nombre": "Higiene Urbana", "municipioId": 4, "categorias": [3, 5] },
+    { "id": 13, "nombre": "Alumbrado", "municipioId": 5, "categorias": [1, 4] },
+    { "id": 14, "nombre": "Obras Públicas", "municipioId": 5, "categorias": [2, 6, 7] },
+    { "id": 15, "nombre": "Higiene Urbana", "municipioId": 5, "categorias": [3, 5] },
+    { "id": 16, "nombre": "Alumbrado", "municipioId": 6, "categorias": [1, 4] },
+    { "id": 17, "nombre": "Obras Públicas", "municipioId": 6, "categorias": [2, 6, 7] },
+    { "id": 18, "nombre": "Higiene Urbana", "municipioId": 6, "categorias": [3, 5] }
   ]
 }

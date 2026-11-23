@@ -108,13 +108,22 @@ public class RestMapper {
     }
 
     public AvisoResponse aviso(Notificacion aviso) {
-        return aviso(new AvisoDelUsuario(aviso, true));
+        return aviso(new AvisoDelUsuario(aviso, true, false));
     }
 
     public AvisoResponse aviso(AvisoDelUsuario delUsuario) {
         Notificacion aviso = delUsuario.aviso();
         return new AvisoResponse(aviso.getReclamo().getNumero(), aviso.getCanal(), aviso.getMensaje(),
-                aviso.getFechaEnvio(), delUsuario.abrible());
+                aviso.getFechaEnvio(), delUsuario.abrible(), delUsuario.seguimiento());
+    }
+
+    public SeguimientoReclamoResponse seguimiento(Reclamo reclamo) {
+        return new SeguimientoReclamoResponse(reclamo.getNumero(), reclamo.getEstado(),
+                reclamo.getCategoria().getNombre(), reclamo.getDescripcion(),
+                reclamo.getFoto().map(foto -> "/api/reclamos/" + reclamo.getNumero() + "/seguimiento/foto")
+                        .orElse(null),
+                reclamo.getHistorial().stream().map(cambio -> new SeguimientoReclamoResponse.Cambio(
+                        cambio.getEstadoNuevo(), cambio.getFecha())).toList());
     }
 
     public UsuarioResponse usuario(Usuario usuario) {
